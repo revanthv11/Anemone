@@ -9,22 +9,21 @@ struct HomeView: View {
 
     @Environment(BrowseModel.self) private var browse
     @Environment(AppModel.self) private var model
-    @Environment(\.scenePhase) private var scenePhase
     @State private var stack = PageStack()
 
     var body: some View {
         NavigationStack(path: $stack.path) {
             content
+                .pageTask(id: isSelected) {
+                    // Refreshes the rows whenever Home shows again: after Back from the pages
+                    // pushed here, on coming back to it in the sidebar, and when the app returns to
+                    // the foreground. Leaving Home cancels a refresh still under way.
+                    guard isSelected else { return }
+                    await browse.refresh()
+                }
+                // Home is the stack's root, which `itemPages(in:)` doesn't reach.
+                .environment(\.pageStack, stack)
                 .itemPages(in: stack)
-        }
-        .task(id: isSelected && stack.path.isEmpty && scenePhase == .active) {
-            // Refreshes the rows whenever Home shows again: on coming back to it in the sidebar,
-            // after Back from the pages pushed here, and when the app returns to the foreground,
-            // like Wholphin's refresh on resume. Watched this way because tvOS doesn't restart the
-            // root page's tasks when a page is popped. Leaving Home or the app cancels a refresh
-            // still under way.
-            guard isSelected, stack.path.isEmpty, scenePhase == .active else { return }
-            await browse.refresh()
         }
     }
 

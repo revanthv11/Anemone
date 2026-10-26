@@ -112,7 +112,7 @@ tvOS ignores `.keyboardType(.numberPad)`, so PIN entry uses the full on-screen k
 - [x] Home page with Wholphin's default rows: Continue Watching, Next Up, and Recently Added per library, with new episodes shown as their series; empty rows hidden
 - [x] Focused-item header, and a backdrop that follows focus after 150 ms
 - [x] Row memory and focus restore after Back, per the home-focus spike
-- [x] Rows refresh quietly after Back to Home from an item page, on coming back to Home in the sidebar, and when the app returns to the foreground, like Wholphin on resume, so Continue Watching and Next Up stay current. Row memory and the header survive; if the focused card's item left its row, focus moves to that row's first card, or the next row if the row went, including when the refresh lands before Back has finished. Triggered from the navigation path and the sidebar selection, because tvOS doesn't restart the root page's tasks when a page is popped
+- [x] Rows refresh quietly after Back to Home from an item page, on coming back to Home in the sidebar, and when the app returns to the foreground, like Wholphin on resume, so Continue Watching and Next Up stay current. Row memory and the header survive; if the focused card's item left its row, focus moves to that row's first card, or the next row if the row went, including when the refresh lands before Back has finished. Uses the same `pageTask` as item pages (see 2c), plus the sidebar selection
 - [x] Artwork through Nuke, with Wholphin's image fallbacks
 - [x] Item detail placeholder (title, year, overview) until 2c
 
