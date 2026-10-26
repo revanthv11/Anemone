@@ -129,7 +129,16 @@ Tested live in the simulator against the Jellyfin 12.3 demo server profile saved
 
 #### 2c: item pages
 
-- Movie, series, season, episode, collection, playlist and person pages
+- [x] Movie page, also used for videos and types without their own page: title or logo, quick details (with "Ends at"), genres, tagline, overview, "Directed by", people, More Like This
+- [x] Series page: studios and genres, Seasons row, people, More Like This; marking the whole series watched asks first
+- [x] Season page (Wholphin's series overview), opened from a season or an episode: season tabs, the selected episode's details over the episode row, its actions, Cast & Crew and Guest Stars. Episodes outside a season get Wholphin's episode page
+- [x] Collection page: a row per item type; the header and backdrop follow the focused card
+- [x] Playlist page: numbered list beside the focused entry's details; reordering when the user can edit the playlist
+- [x] Person page: photo, birth, birthplace, death, overview; Movies, TV Shows and Episodes rows
+- [x] Mark watched or unwatched, and favourite, from item pages
+- [x] Row memory and focus restored after Back, as on the home page
+- Play, Resume, Restart and Shuffle are marked as not wired up; Resume shows the resume position. They play in Phase 3
+- Not yet: trailers, extras, chapters, version and track choice, delete, the context menu, collection sort/filter/view options, Seerr rows, theme music
 
 #### Later in Phase 2
 

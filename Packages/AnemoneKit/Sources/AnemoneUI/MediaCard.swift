@@ -10,6 +10,7 @@ public struct MediaCard: View {
     private let shape: CardShape
     private let width: CGFloat
     private let progress: Double?
+    private let badges: CardBadges
     private let showsCaption: Bool
 
     /// - Parameters:
@@ -22,6 +23,7 @@ public struct MediaCard: View {
         shape: CardShape,
         width: CGFloat,
         progress: Double? = nil,
+        badges: CardBadges = CardBadges(),
         showsCaption: Bool = true,
     ) {
         self.title = title
@@ -30,6 +32,7 @@ public struct MediaCard: View {
         self.shape = shape
         self.width = width
         self.progress = progress
+        self.badges = badges
         self.showsCaption = showsCaption
     }
 
@@ -59,6 +62,30 @@ public struct MediaCard: View {
                         .padding(.bottom, Self.progressInset)
                 }
             }
+            .overlay(alignment: .topLeading) {
+                if badges.isFavorite {
+                    Badge(systemImage: "heart.fill", tint: .red, label: "Favorite")
+                        .padding(Self.progressInset)
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                HStack(spacing: 8) {
+                    // Partly watched items have the progress bar instead, as in Wholphin.
+                    if badges.isPlayed, (progress ?? 0) <= 0 {
+                        Badge(systemImage: "checkmark", tint: .white, label: "Watched")
+                    }
+                    if let count = badges.unplayedCount, count > 0 {
+                        Text(count, format: .number.notation(.compactName))
+                            .font(.caption2.bold())
+                            .padding(.horizontal, 12)
+                            .frame(minWidth: Badge.size, minHeight: Badge.size)
+                            .foregroundStyle(.white)
+                            .background(.black.opacity(0.6), in: .capsule)
+                            .accessibilityLabel("\(count) unwatched")
+                    }
+                }
+                .padding(Self.progressInset)
+            }
             .liftOnFocus()
     }
 
@@ -74,6 +101,38 @@ private extension View {
         #else
             self
         #endif
+    }
+}
+
+/// Marks drawn over a card's artwork, like Wholphin's card overlay: a heart for favourites, and a
+/// check or an unwatched count in the corner.
+public struct CardBadges: Hashable, Sendable {
+    public var isFavorite: Bool
+    public var isPlayed: Bool
+    /// For series, seasons and collections.
+    public var unplayedCount: Int?
+
+    public init(isFavorite: Bool = false, isPlayed: Bool = false, unplayedCount: Int? = nil) {
+        self.isFavorite = isFavorite
+        self.isPlayed = isPlayed
+        self.unplayedCount = unplayedCount
+    }
+}
+
+private struct Badge: View {
+    static let size: CGFloat = 44
+
+    let systemImage: String
+    let tint: Color
+    let label: String
+
+    var body: some View {
+        Image(systemName: systemImage)
+            .font(.caption2.bold())
+            .foregroundStyle(tint)
+            .frame(width: Self.size, height: Self.size)
+            .background(.black.opacity(0.6), in: .circle)
+            .accessibilityLabel(label)
     }
 }
 

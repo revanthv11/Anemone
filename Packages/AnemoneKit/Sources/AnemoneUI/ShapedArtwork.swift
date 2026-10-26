@@ -7,19 +7,29 @@ public struct ShapedArtwork: View {
     private let shape: CardShape
     private let width: CGFloat
     private let cornerRadius: CGFloat
+    private let placeholderOverride: String?
 
-    public init(url: URL?, shape: CardShape, width: CGFloat, cornerRadius: CGFloat = 12) {
+    /// - Parameter placeholderSymbol: an SF Symbol to show until the image arrives, in place of
+    ///   the shape's usual one.
+    public init(
+        url: URL?,
+        shape: CardShape,
+        width: CGFloat,
+        cornerRadius: CGFloat = 12,
+        placeholderSymbol: String? = nil,
+    ) {
         self.url = url
         self.shape = shape
         self.width = width
         self.cornerRadius = cornerRadius
+        placeholderOverride = placeholderSymbol
     }
 
     public var body: some View {
         ZStack {
             Rectangle()
                 .fill(.quaternary)
-            Image(systemName: placeholderSymbol)
+            Image(systemName: placeholderOverride ?? placeholderSymbol)
                 .font(.system(size: 48))
                 .foregroundStyle(.tertiary)
             ArtworkImage(url: url)

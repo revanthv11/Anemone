@@ -6,6 +6,7 @@ public struct ItemImage: Hashable, Sendable {
         case primary = "Primary"
         case thumb = "Thumb"
         case backdrop = "Backdrop"
+        case logo = "Logo"
     }
 
     public let itemID: String
@@ -69,10 +70,12 @@ public extension MediaItem {
     }
 
     private func own(_ kind: ItemImage.Kind) -> ItemImage? {
-        let tag = switch kind {
+        let tag: String? = switch kind {
         case .primary: artwork.primaryTag
         case .thumb: artwork.thumbTag
         case .backdrop: artwork.backdropTag
+        // Cards don't carry logos; item pages get them from `ItemDetails`.
+        case .logo: nil
         }
         return ItemImage(itemID: id, kind: kind, tag: tag)
     }
