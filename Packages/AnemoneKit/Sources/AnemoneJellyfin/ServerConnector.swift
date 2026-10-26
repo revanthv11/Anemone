@@ -26,6 +26,8 @@ public enum ServerConnectionError: Error, Equatable {
     case unsupportedVersion(String)
     /// The server's startup wizard hasn't been finished, so it can't sign anyone in yet.
     case setupIncomplete
+    /// Something answered, but it's another product (such as Emby), not Jellyfin.
+    case notJellyfin(String)
 }
 
 /// Finds the Jellyfin server behind an address someone typed, like Wholphin's "add server" step.
@@ -44,23 +46,48 @@ public struct ServerConnector: Sendable {
         makeSessionConfiguration = sessionConfiguration
     }
 
-    /// Tries each of `ServerAddress.candidates(for:)` in turn and returns the first Jellyfin server found.
+    /// Probes every candidate from `ServerAddress.candidates(for:)` at once and uses the
+    /// highest-priority one that answers, so a blocked HTTPS port doesn't delay the HTTP fallback.
     public func connect(to address: String) async throws(ServerConnectionError) -> ConnectedServer {
         let candidates = ServerAddress.candidates(for: address)
         guard !candidates.isEmpty else { throw .invalidAddress }
+        guard let (url, info) = await firstAnswer(from: candidates) else { throw .unreachable }
 
-        for url in candidates {
-            guard let info = await publicInfo(at: url), let id = info.id, let versionString = info.version else {
-                continue
-            }
-            // From here on this is the right server, so problems are reported rather than skipped.
-            guard let version = ServerVersion(versionString), version.isSupported else {
-                throw .unsupportedVersion(versionString)
-            }
-            guard info.isStartupWizardCompleted != false else { throw .setupIncomplete }
-            return ConnectedServer(id: id, name: info.serverName ?? url.host() ?? id, version: versionString, url: url)
+        // From here on this is the server that was meant, so problems are reported, not skipped.
+        if let product = info.productName, product != Self.jellyfinProductName {
+            throw .notJellyfin(product)
         }
-        throw .unreachable
+        guard let id = info.id, let versionString = info.version else { throw .unreachable }
+        guard let version = ServerVersion(versionString), version.isSupported else {
+            throw .unsupportedVersion(versionString)
+        }
+        guard info.isStartupWizardCompleted != false else { throw .setupIncomplete }
+        return ConnectedServer(id: id, name: info.serverName ?? url.host() ?? id, version: versionString, url: url)
+    }
+
+    private static let jellyfinProductName = "Jellyfin Server"
+
+    /// The first candidate, in priority order, that answers. Returns as soon as every
+    /// higher-priority candidate has failed, and cancels the probes still running.
+    private func firstAnswer(from candidates: [URL]) async -> (URL, PublicSystemInfo)? {
+        await withTaskGroup(of: (Int, PublicSystemInfo?).self) { group in
+            for (index, url) in candidates.enumerated() {
+                group.addTask { await (index, publicInfo(at: url)) }
+            }
+            // nil: still waiting; .some(nil): failed; .some(info): answered.
+            var results = [PublicSystemInfo??](repeating: nil, count: candidates.count)
+            for await (index, info) in group {
+                results[index] = .some(info)
+                for (position, result) in results.enumerated() {
+                    guard let result else { break }
+                    if let info = result {
+                        group.cancelAll()
+                        return (candidates[position], info)
+                    }
+                }
+            }
+            return nil
+        }
     }
 
     private func publicInfo(at url: URL) async -> PublicSystemInfo? {

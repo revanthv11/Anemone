@@ -33,6 +33,25 @@ struct ServerConnectorTests {
         #expect(server.url.absoluteString == "https://proxy.test/jellyfin")
     }
 
+    @Test func `prefers HTTPS when every candidate answers`() async throws {
+        MockServer.register(host: "both.test") { request in
+            .publicInfo(name: request.url?.scheme == "https" ? "Secure" : "Plain")
+        }
+
+        let server = try await connector.connect(to: "both.test")
+
+        #expect(server.name == "Secure")
+        #expect(server.url.scheme == "https")
+    }
+
+    @Test func `says when the server isn't Jellyfin`() async {
+        MockServer.register(host: "emby.test") { _ in .publicInfo(version: "4.8.10", product: "Emby Server") }
+
+        await #expect(throws: ServerConnectionError.notJellyfin("Emby Server")) {
+            try await connector.connect(to: "https://emby.test")
+        }
+    }
+
     @Test func `rejects servers older than Jellyfin 12`() async {
         MockServer.register(host: "old.test") { _ in .publicInfo(version: "10.11.2") }
 

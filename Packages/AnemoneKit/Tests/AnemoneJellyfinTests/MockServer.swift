@@ -59,10 +59,15 @@ extension MockServer.Reply {
         Self(status: 200, body: body)
     }
 
-    static func publicInfo(version: String = "12.3.0", wizardDone: Bool = true) -> Self {
+    static func publicInfo(
+        name: String = "Living Room",
+        version: String = "12.3.0",
+        product: String = "Jellyfin Server",
+        wizardDone: Bool = true,
+    ) -> Self {
         .json("""
-        {"Id":"srv1","ServerName":"Living Room","Version":"\(version)",
-         "ProductName":"Jellyfin Server","StartupWizardCompleted":\(wizardDone)}
+        {"Id":"srv1","ServerName":"\(name)","Version":"\(version)",
+         "ProductName":"\(product)","StartupWizardCompleted":\(wizardDone)}
         """)
     }
 

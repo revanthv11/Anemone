@@ -45,6 +45,10 @@ public enum QuickConnectProgress: Equatable, Sendable {
 
 /// Signs users in and out of a Jellyfin server, with a password or Quick Connect.
 public struct Authenticator: Sendable {
+    /// How long to wait for each request. Short enough that a launch with the server offline
+    /// falls back quickly instead of sitting on URLSession's 60-second default.
+    public static let timeout: TimeInterval = 10
+
     private let identity: ClientIdentity
     private let makeSessionConfiguration: @Sendable () -> URLSessionConfiguration
 
@@ -126,7 +130,9 @@ public struct Authenticator: Sendable {
     }
 
     private func client(_ server: URL, token: String? = nil) -> JellyfinClient {
-        identity.makeClient(serverURL: server, accessToken: token, sessionConfiguration: makeSessionConfiguration())
+        let configuration = makeSessionConfiguration()
+        configuration.timeoutIntervalForRequest = Self.timeout
+        return identity.makeClient(serverURL: server, accessToken: token, sessionConfiguration: configuration)
     }
 }
 
