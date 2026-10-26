@@ -38,7 +38,11 @@ public final class PlaybackController: Identifiable {
     public private(set) var state = State.loading
 
     public var hasEnded: Bool {
-        if case .ended = state { true } else { false }
+        if case .ended = state {
+            true
+        } else {
+            false
+        }
     }
 
     @ObservationIgnored private let session: JellyfinSession
