@@ -6,14 +6,12 @@ import SwiftUI
 struct LibraryTab: View {
     let library: Library
 
-    @State private var path = NavigationPath()
+    @State private var stack = PageStack()
 
     var body: some View {
-        NavigationStack(path: $path) {
-            LibraryRoot(library: library, path: $path)
-                .navigationDestination(for: MediaItem.self) { item in
-                    ItemDetailView(item: item)
-                }
+        NavigationStack(path: $stack.path) {
+            LibraryRoot(library: library, path: $stack.path)
+                .itemPages(in: stack)
         }
     }
 }

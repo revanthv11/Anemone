@@ -54,7 +54,7 @@ struct PlaylistPage: View {
             guard !Task.isCancelled else { return }
             backdropEntry = focusedEntry
         }
-        .task(id: playlist.id) {
+        .pageTask(id: playlist.id) {
             let session = browse.session
             let id = playlist.id
             async let canEdit = attempt { try await session.canEditPlaylist(id: id) }

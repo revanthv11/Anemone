@@ -6,13 +6,12 @@ import SwiftUI
 struct HomeView: View {
     @Environment(BrowseModel.self) private var browse
     @Environment(AppModel.self) private var model
+    @State private var stack = PageStack()
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $stack.path) {
             content
-                .navigationDestination(for: MediaItem.self) { item in
-                    ItemDetailView(item: item)
-                }
+                .itemPages(in: stack)
         }
     }
 

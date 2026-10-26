@@ -137,6 +137,7 @@ Tested live in the simulator against the Jellyfin 12.3 demo server profile saved
 - [x] Person page: photo, birth, birthplace, death, overview; Movies, TV Shows and Episodes rows
 - [x] Mark watched or unwatched, and favourite, from item pages
 - [x] Row memory and focus restored after Back, as on the home page
+- [x] Pages reload quietly after Back from a page opened on top of them and when the app returns to the foreground, like Wholphin on resume, so watched and favourite state, seasons, episodes, collections and playlists stay current. Triggered from the stack's path, which each pushed page is handed directly: tvOS doesn't restart a covered page's tasks after Back, and doesn't pass a stack's environment on to the pages pushed on it
 - Play, Resume and Restart play since Phase 3a. Play and Shuffle on series, collections and playlists are still marked as not wired up; they need queues
 - Not yet: trailers, extras, chapters, version and track choice, delete, the context menu, collection sort/filter/view options, Seerr rows, theme music
 
