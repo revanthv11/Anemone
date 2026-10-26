@@ -35,7 +35,14 @@ let package = Package(
                 .product(name: "Get", package: "Get"),
             ],
         ),
-        .target(name: "AnemonePlayback", dependencies: ["AnemoneCore", "AnemoneJellyfin"]),
+        .target(
+            name: "AnemonePlayback",
+            dependencies: [
+                "AnemoneCore",
+                "AnemoneJellyfin",
+                .product(name: "JellyfinAPI", package: "jellyfin-sdk-swift"),
+            ],
+        ),
         .target(name: "AnemoneSeerr", dependencies: ["AnemoneCore"]),
         .target(
             name: "AnemoneUI",
@@ -47,5 +54,12 @@ let package = Package(
         ),
         .testTarget(name: "AnemoneCoreTests", dependencies: ["AnemoneCore"]),
         .testTarget(name: "AnemoneJellyfinTests", dependencies: ["AnemoneJellyfin"]),
+        .testTarget(
+            name: "AnemonePlaybackTests",
+            dependencies: [
+                "AnemonePlayback",
+                .product(name: "JellyfinAPI", package: "jellyfin-sdk-swift"),
+            ],
+        ),
     ],
 )

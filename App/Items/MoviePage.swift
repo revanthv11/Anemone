@@ -1,4 +1,5 @@
 import AnemoneJellyfin
+import AnemonePlayback
 import AnemoneUI
 import SwiftUI
 
@@ -14,6 +15,7 @@ struct MoviePage: View {
     @State private var memory = RowMemory()
     @State private var similar: [ItemDetails] = []
     @State private var alert: ItemAlert?
+    @State private var playback: PlaybackController?
 
     var body: some View {
         ScrollViewReader { scroller in
@@ -45,6 +47,9 @@ struct MoviePage: View {
         }
         .initialFocus($focus, item.isPlayable ? .action(.play) : .action(.played))
         .itemAlert($alert)
+        .player($playback) {
+            await reload()
+        }
         .task(id: item.id) {
             guard !isEpisode, similar.isEmpty else { return }
             let session = browse.session
@@ -95,7 +100,7 @@ struct MoviePage: View {
     private var buttons: some View {
         HStack(spacing: 24) {
             if item.isPlayable {
-                PlaybackButtons(resumePosition: item.userState.resumePosition, focus: $focus, alert: $alert)
+                PlaybackButtons(resumePosition: item.userState.resumePosition, focus: $focus, play: play(from:))
             }
             PlayedButton(isPlayed: item.userState.isPlayed) {
                 Task { await save(.played(!item.userState.isPlayed)) }
@@ -105,10 +110,6 @@ struct MoviePage: View {
                 Task { await save(.favorite(!item.userState.isFavorite)) }
             }
             .focused($focus, equals: .action(.favorite))
-            if item.isPlayable {
-                PlaybackNotWiredNote()
-                    .padding(.leading, 16)
-            }
         }
         .padding(.vertical, 20)
         .focusSection()
@@ -129,6 +130,24 @@ struct MoviePage: View {
                 focus: $focus,
                 memory: memory,
             )
+        }
+    }
+
+    private func play(from position: Duration?) {
+        if item.item.kind == .audio {
+            alert = .musicUnavailable
+        } else {
+            playback = browse.playback(of: item, from: position)
+        }
+    }
+
+    /// After playback, picks up the new resume position, or the item marked watched. A failed
+    /// reload keeps what's showing.
+    private func reload() async {
+        let session = browse.session
+        let id = item.id
+        if let details = await browse.optional(attempt { try await session.itemDetails(id: id) }) {
+            item = details
         }
     }
 

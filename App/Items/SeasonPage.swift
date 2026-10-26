@@ -1,4 +1,5 @@
 import AnemoneJellyfin
+import AnemonePlayback
 import AnemoneUI
 import SwiftUI
 
@@ -15,6 +16,7 @@ struct SeasonPage: View {
     @FocusState private var focus: ItemFocus?
     @State private var memory = RowMemory()
     @State private var alert: ItemAlert?
+    @State private var playback: PlaybackController?
 
     @State private var series: ItemDetails?
     @State private var seasons: [ItemDetails] = []
@@ -52,6 +54,9 @@ struct SeasonPage: View {
         // Wholphin starts on the episode that opened the page.
         .initialFocus($focus, series == nil ? nil : selectedEpisodeID.map(episodeFocus))
         .itemAlert($alert)
+        .player($playback) {
+            await loadEpisodes(of: currentSeasonID)
+        }
         .task {
             await loadSeries()
         }
@@ -159,9 +164,9 @@ struct SeasonPage: View {
                 memory: memory,
                 scrollPosition: $episodeScroll,
             ) { episode in
-                // Wholphin plays an episode when it's selected.
+                // Wholphin plays an episode when it's selected, resuming where it was left.
                 Button {
-                    alert = .playbackUnavailable(resumeAt: episode.userState.resumePosition)
+                    playback = browse.playback(of: episode, from: episode.userState.resumePosition)
                 } label: {
                     ItemCard(details: episode, shape: .thumb, title: episode.item.name, subtitle: episode.numberText)
                 }
@@ -190,7 +195,9 @@ struct SeasonPage: View {
     private var episodeButtons: some View {
         HStack(spacing: 24) {
             if let episode = selectedEpisode {
-                PlaybackButtons(resumePosition: episode.userState.resumePosition, focus: $focus, alert: $alert)
+                PlaybackButtons(resumePosition: episode.userState.resumePosition, focus: $focus) { position in
+                    playback = browse.playback(of: episode, from: position)
+                }
                 PlayedButton(isPlayed: episode.userState.isPlayed) {
                     Task {
                         // Wholphin goes back to the episodes, ready for the next one. After a
@@ -205,8 +212,6 @@ struct SeasonPage: View {
                     Task { await save(.favorite(!episode.userState.isFavorite), for: episode) }
                 }
                 .focused($focus, equals: .action(.favorite))
-                PlaybackNotWiredNote()
-                    .padding(.leading, 16)
             }
         }
         .frame(minHeight: 80)
