@@ -15,6 +15,7 @@ final class BrowseModel {
 
     let session: JellyfinSession
     let server: SavedServer
+    let libraryPreferences: LibraryPreferences
     private(set) var home = HomeState.loading
     /// Kept through reloads, so the sidebar doesn't flicker.
     private(set) var libraries: [Library] = []
@@ -23,6 +24,7 @@ final class BrowseModel {
     init(session: JellyfinSession, server: SavedServer) {
         self.session = session
         self.server = server
+        libraryPreferences = LibraryPreferences(serverID: server.id, userID: session.userID)
     }
 
     func load() async {

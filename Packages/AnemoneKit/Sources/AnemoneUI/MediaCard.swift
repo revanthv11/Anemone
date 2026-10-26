@@ -10,8 +10,11 @@ public struct MediaCard: View {
     private let shape: CardShape
     private let width: CGFloat
     private let progress: Double?
+    private let showsCaption: Bool
 
-    /// - Parameter progress: from 0 to 1; draws a bar along the bottom when above 0.
+    /// - Parameters:
+    ///   - progress: from 0 to 1; draws a bar along the bottom when above 0.
+    ///   - showsCaption: whether the title and subtitle show under the artwork.
     public init(
         title: String,
         subtitle: String? = nil,
@@ -19,6 +22,7 @@ public struct MediaCard: View {
         shape: CardShape,
         width: CGFloat,
         progress: Double? = nil,
+        showsCaption: Bool = true,
     ) {
         self.title = title
         self.subtitle = subtitle
@@ -26,21 +30,24 @@ public struct MediaCard: View {
         self.shape = shape
         self.width = width
         self.progress = progress
+        self.showsCaption = showsCaption
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             artwork
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.caption)
-                    .lineLimit(1)
-                Text(subtitle ?? " ")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+            if showsCaption {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.caption)
+                        .lineLimit(1)
+                    Text(subtitle ?? " ")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .frame(width: width, alignment: .leading)
             }
-            .frame(width: width, alignment: .leading)
         }
     }
 

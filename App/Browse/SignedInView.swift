@@ -9,6 +9,7 @@ struct SignedInView: View {
         case home
         case search
         case library(Library.ID)
+        case moreLibraries
         case settings
     }
 
@@ -25,6 +26,7 @@ struct SignedInView: View {
     }
 
     var body: some View {
+        let libraries = browse.libraryPreferences.pins.arrange(browse.libraries, id: \.id)
         TabView(selection: $selection) {
             Tab("Home", systemImage: "house", value: Destination.home) {
                 HomeView()
@@ -35,9 +37,14 @@ struct SignedInView: View {
             // Hidden until the libraries load, so the sidebar never shows an empty heading.
             if !browse.libraries.isEmpty {
                 TabSection("Libraries") {
-                    ForEach(browse.libraries) { library in
+                    ForEach(libraries.pinned) { library in
                         Tab(library.name, systemImage: library.systemImage, value: Destination.library(library.id)) {
-                            PlaceholderPage(title: library.name, message: "Library grids arrive in Phase 2b.")
+                            LibraryTab(library: library)
+                        }
+                    }
+                    if !libraries.unpinned.isEmpty {
+                        Tab("More", systemImage: "ellipsis.circle", value: Destination.moreLibraries) {
+                            MoreLibrariesView(libraries: libraries.unpinned)
                         }
                     }
                 }
@@ -80,6 +87,9 @@ private struct SettingsView: View {
                     NavigationLink("Profile lock") {
                         ProfileLockView(user: user)
                     }
+                    NavigationLink("Sidebar") {
+                        SidebarSettingsView()
+                    }
                     Button("Sign out") {
                         model.signOut()
                     }
@@ -112,7 +122,7 @@ private struct PlaceholderPage: View {
     }
 }
 
-private extension Library {
+extension Library {
     var systemImage: String {
         switch kind {
         case .movies: "film"

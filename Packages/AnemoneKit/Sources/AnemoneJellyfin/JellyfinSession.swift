@@ -103,7 +103,7 @@ public struct JellyfinSession: Sendable {
     /// Extra fields for cards and the home header.
     private static let fields: [ItemFields] = [.overview]
 
-    private func send<Value: Decodable & Sendable>(_ request: Request<Value>) async throws -> Value {
+    func send<Value: Decodable & Sendable>(_ request: Request<Value>) async throws -> Value {
         do {
             return try await client.send(request).value
         } catch APIError.unacceptableStatusCode(401) {
