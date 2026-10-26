@@ -39,7 +39,7 @@ struct UserListView: View {
                             }
                             .contextMenu {
                                 Button("Remove from this Apple TV", role: .destructive) {
-                                    Task { await model.forget(user, on: server) }
+                                    model.forget(user, on: server)
                                 }
                             }
                             .accessibilityIdentifier("user.\(user.name)")
@@ -110,10 +110,7 @@ struct UserListView: View {
     }
 
     private func imageURL(_ userID: String, tag: String?) -> URL? {
-        guard let tag else { return nil }
-        return server.url
-            .appending(path: "Users/\(userID)/Images/Primary")
-            .appending(queryItems: [.init(name: "tag", value: tag), .init(name: "maxHeight", value: "300")])
+        tag.flatMap { JellyfinURLs.userImage(on: server.url, userID: userID, tag: $0) }
     }
 }
 

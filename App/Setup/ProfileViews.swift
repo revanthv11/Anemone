@@ -26,7 +26,7 @@ struct HomePlaceholderView: View {
                         ProfileLockView(user: user)
                     }
                     Button("Sign out") {
-                        Task { await model.signOut() }
+                        model.signOut()
                     }
                     .accessibilityIdentifier("home.signOut")
                 }
@@ -45,6 +45,7 @@ struct ProfileLockView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var isSettingPIN = false
+    @State private var didSetPIN = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 32) {
@@ -68,12 +69,17 @@ struct ProfileLockView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(80)
-        .sheet(isPresented: $isSettingPIN) {
-            NewPINView { hash in
-                model.setLock(.pin(hash))
+        // Leave this screen only once the PIN sheet has finished dismissing itself.
+        .sheet(isPresented: $isSettingPIN, onDismiss: {
+            if didSetPIN {
                 dismiss()
             }
-        }
+        }, content: {
+            NewPINView { hash in
+                model.setLock(.pin(hash))
+                didSetPIN = true
+            }
+        })
     }
 
     private var isPINLocked: Bool {

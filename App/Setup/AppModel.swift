@@ -30,6 +30,9 @@ final class AppModel {
     let authenticator: Authenticator
     let connector: ServerConnector
     private let repository: AccountRepository
+    /// Set when the Keychain couldn't be read at launch. Saving is then skipped for this run, so a
+    /// temporary failure can't replace the saved accounts with an empty list.
+    private let isStorageUnavailable: Bool
 
     init(repository: AccountRepository = AccountRepository(store: KeychainStore(service: "com.revanthv11.anemone"))) {
         self.repository = repository
@@ -39,7 +42,14 @@ final class AppModel {
                 try? repository.save(AccountStore())
             }
         #endif
-        let accounts = (try? repository.load()) ?? AccountStore()
+        let accounts: AccountStore
+        do {
+            accounts = try repository.load()
+            isStorageUnavailable = false
+        } catch {
+            accounts = AccountStore()
+            isStorageUnavailable = true
+        }
         self.accounts = accounts
 
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
@@ -50,6 +60,9 @@ final class AppModel {
         )
         authenticator = Authenticator(identity: identity)
         connector = ServerConnector(identity: identity)
+        if isStorageUnavailable {
+            notice = "Couldn't read the sign-ins saved on this Apple TV. Changes won't be kept until Anemone restarts."
+        }
     }
 
     /// Restores the last profile if it isn't locked and its token still works; otherwise shows
@@ -63,8 +76,13 @@ final class AppModel {
             screen = .users(server)
             return
         }
-        if await resume(user, on: server) == .unreachable {
+        switch await resume(user, on: server) {
+        case .signedIn:
+            break
+        case .unreachable:
             screen = .servers
+        case .needsSignIn, .needsPIN:
+            screen = .users(server)
         }
     }
 
@@ -78,7 +96,11 @@ final class AppModel {
         showUsers(on: server)
     }
 
+    /// Forgets the server and its profiles, ending their sessions on the server in the background.
     func removeServer(_ server: SavedServer) {
+        for user in accounts.users(on: server.id) {
+            endSessionInBackground(for: user, on: server)
+        }
         accounts.removeServer(id: server.id)
         persist()
     }
@@ -131,21 +153,17 @@ final class AppModel {
         showUsers(on: server)
     }
 
-    func signOut() async {
+    func signOut() {
         guard case let .home(server, user) = screen else { return }
-        if let token = user.accessToken {
-            await authenticator.signOut(from: server.url, token: token)
-        }
+        endSessionInBackground(for: user, on: server)
         accounts.signOut(userID: user.id, on: server.id)
         persist()
         showUsers(on: server)
     }
 
-    /// Removes a profile from this Apple TV, signing it out on the server first.
-    func forget(_ user: SavedUser, on server: SavedServer) async {
-        if let token = user.accessToken {
-            await authenticator.signOut(from: server.url, token: token)
-        }
+    /// Removes a profile from this Apple TV, ending its session on the server in the background.
+    func forget(_ user: SavedUser, on server: SavedServer) {
+        endSessionInBackground(for: user, on: server)
         accounts.removeUser(id: user.id, on: server.id)
         persist()
     }
@@ -161,6 +179,16 @@ final class AppModel {
     }
 
     // MARK: Private
+
+    /// Local state changes right away; telling the server is best effort and may take a while
+    /// when it's offline, so nothing waits on it.
+    private func endSessionInBackground(for user: SavedUser, on server: SavedServer) {
+        guard let token = user.accessToken else { return }
+        let authenticator = authenticator
+        Task.detached {
+            await authenticator.signOut(from: server.url, token: token)
+        }
+    }
 
     private func resume(_ user: SavedUser, on server: SavedServer) async -> SwitchOutcome {
         guard let token = user.accessToken else { return .needsSignIn }
@@ -199,6 +227,7 @@ final class AppModel {
     }
 
     private func persist() {
+        guard !isStorageUnavailable else { return }
         do {
             try repository.save(accounts)
         } catch {
@@ -219,6 +248,8 @@ extension ServerConnectionError {
                 "Anemone needs Jellyfin \(ServerVersion.minimumSupported.major) or later."
         case .setupIncomplete:
             "This server hasn't finished its setup. Finish it in a web browser first."
+        case let .notJellyfin(product):
+            "That address is a \(product), not a Jellyfin server."
         }
     }
 }
