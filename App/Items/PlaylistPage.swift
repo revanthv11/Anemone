@@ -15,6 +15,8 @@ struct PlaylistPage: View {
     @State private var canEdit = false
     /// Set while a move is with the server, so moves go one at a time and in order.
     @State private var isMoving = false
+    /// Numbers entry loads, so only the latest one's result is shown.
+    @State private var entriesLoad = 0
     @State private var problem: String?
     @State private var alert: ItemAlert?
     @State private var focusedIndex = 0
@@ -59,7 +61,10 @@ struct PlaylistPage: View {
             let id = playlist.id
             async let canEdit = attempt { try await session.canEditPlaylist(id: id) }
             await loadEntries()
-            self.canEdit = await browse.optional(canEdit) ?? false
+            // A failed refresh keeps the move buttons as they were.
+            if let canEdit = await browse.optional(canEdit) {
+                self.canEdit = canEdit
+            }
         }
     }
 
@@ -133,6 +138,8 @@ struct PlaylistPage: View {
         else { return }
         isMoving = true
         defer { isMoving = false }
+        // Drops a load still under way, which would put back the order from before the move.
+        entriesLoad += 1
         let entry = reordered.remove(at: index)
         reordered.insert(entry, at: newIndex)
         entries = reordered
@@ -147,14 +154,20 @@ struct PlaylistPage: View {
         await loadEntries()
     }
 
+    /// Loads can overlap when the page refreshes while a move is with the server, and an earlier
+    /// one may have the order from before the move, so only the latest one's result is shown.
     private func loadEntries() async {
+        entriesLoad += 1
+        let load = entriesLoad
         do {
-            entries = try await browse.session.playlistItems(id: playlist.id)
+            let loaded = try await browse.session.playlistItems(id: playlist.id)
+            guard load == entriesLoad else { return }
+            entries = loaded
             problem = nil
         } catch {
             // A failed refresh keeps the entries already showing.
             let message = browse.problem(with: error, doing: "load \(playlist.item.name)")
-            if entries == nil {
+            if load == entriesLoad, entries == nil {
                 problem = message
             }
         }
