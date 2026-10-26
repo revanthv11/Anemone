@@ -62,7 +62,6 @@ private struct HomeRows: View {
     @State private var lastFocusedByRow: [HomeRow.ID: CardID] = [:]
     @State private var headerItem: MediaItem?
     @State private var backdropItem: MediaItem?
-    @State private var didTakeFocus = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -87,18 +86,17 @@ private struct HomeRows: View {
             BackdropImage(url: backdropURL)
                 .ignoresSafeArea()
         }
+        .task {
+            // tvOS puts focus in the sidebar while the page loads, so move it to the first row,
+            // as Wholphin does. Only the first time rows appear for this profile; after that,
+            // focus stays wherever the user put it.
+            guard let first = content.rows.first, browse.claimInitialFocus() else { return }
+            focusedCard = rememberedCard(in: first)
+        }
         .onChange(of: focusedCard) { _, card in
             guard let card, let item = item(for: card) else { return }
             lastFocusedByRow[card.rowID] = card
             headerItem = item
-        }
-        .task {
-            // Like Wholphin, start on the first row once it loads; otherwise focus stays in the
-            // sidebar, where it went while the page was loading. Only once, so coming back from
-            // an item keeps the card it was opened from.
-            guard !didTakeFocus, let first = content.rows.first else { return }
-            didTakeFocus = true
-            focusedCard = rememberedCard(in: first)
         }
         .task(id: focusedCard) {
             // Debounced like Wholphin's backdrop, so moving along a row doesn't load every image.

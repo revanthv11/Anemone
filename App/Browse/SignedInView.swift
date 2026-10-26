@@ -32,10 +32,13 @@ struct SignedInView: View {
             Tab("Search", systemImage: "magnifyingglass", value: Destination.search, role: .search) {
                 PlaceholderPage(title: "Search", message: "Search arrives later in Phase 2.")
             }
-            TabSection("Libraries") {
-                ForEach(browse.libraries) { library in
-                    Tab(library.name, systemImage: library.systemImage, value: Destination.library(library.id)) {
-                        PlaceholderPage(title: library.name, message: "Library grids arrive in Phase 2b.")
+            // Hidden until the libraries load, so the sidebar never shows an empty heading.
+            if !browse.libraries.isEmpty {
+                TabSection("Libraries") {
+                    ForEach(browse.libraries) { library in
+                        Tab(library.name, systemImage: library.systemImage, value: Destination.library(library.id)) {
+                            PlaceholderPage(title: library.name, message: "Library grids arrive in Phase 2b.")
+                        }
                     }
                 }
             }

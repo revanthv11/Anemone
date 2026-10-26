@@ -18,6 +18,7 @@ final class BrowseModel {
     private(set) var home = HomeState.loading
     /// Kept through reloads, so the sidebar doesn't flicker.
     private(set) var libraries: [Library] = []
+    @ObservationIgnored private var didPlaceInitialFocus = false
 
     init(session: JellyfinSession, server: SavedServer) {
         self.session = session
@@ -35,5 +36,17 @@ final class BrowseModel {
         } catch {
             home = .failed
         }
+    }
+
+    /// True the first time it's called: whether the home page should move focus to its first row.
+    func claimInitialFocus() -> Bool {
+        defer { didPlaceInitialFocus = true }
+        return !didPlaceInitialFocus
+    }
+
+    /// Called when a request outside the home page finds the token revoked, so Home shows the
+    /// sign-in prompt.
+    func noteSignedOut() {
+        home = .signedOut
     }
 }

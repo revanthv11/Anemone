@@ -33,6 +33,9 @@ final class AppModel {
     let authenticator: Authenticator
     let connector: ServerConnector
     private let repository: AccountRepository
+    /// One session per profile, reused when switching back to it. The SDK gives no way to close
+    /// a client's URLSession, so a new session for every switch would stay in memory for good.
+    private var sessionsByProfile: [String: JellyfinSession] = [:]
     /// Set when the Keychain couldn't be read at launch. Saving is then skipped for this run, so a
     /// temporary failure can't replace the saved accounts with an empty list.
     private let isStorageUnavailable: Bool
@@ -228,13 +231,24 @@ final class AppModel {
         accounts.lastSession = .init(serverID: server.id, userID: saved.id)
         persist()
         notice = nil
-        session = JellyfinSession(
+        session = profileSession(for: user, on: server)
+        screen = .home(server, saved)
+    }
+
+    private func profileSession(for user: SignedInUser, on server: SavedServer) -> JellyfinSession {
+        let profile = "\(server.id)/\(user.id)"
+        let cached = sessionsByProfile[profile]
+        if let cached, cached.serverURL == server.url, cached.accessToken == user.accessToken {
+            return cached
+        }
+        let session = JellyfinSession(
             serverURL: server.url,
             userID: user.id,
             accessToken: user.accessToken,
             identity: identity,
         )
-        screen = .home(server, saved)
+        sessionsByProfile[profile] = session
+        return session
     }
 
     private func persist() {
