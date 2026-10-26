@@ -6,12 +6,21 @@ import SwiftUI
 struct HomeView: View {
     @Environment(BrowseModel.self) private var browse
     @Environment(AppModel.self) private var model
+    @Environment(\.scenePhase) private var scenePhase
     @State private var stack = PageStack()
 
     var body: some View {
         NavigationStack(path: $stack.path) {
             content
                 .itemPages(in: stack)
+        }
+        .task(id: stack.path.isEmpty && scenePhase == .active) {
+            // Refreshes the rows when Home shows again, after Back from the pages pushed here and
+            // when the app returns to the foreground, like Wholphin's refresh on resume. Watching
+            // the path because tvOS doesn't restart the root page's tasks when a page is popped.
+            // Opening a page or leaving the app cancels a refresh still under way.
+            guard stack.path.isEmpty, scenePhase == .active else { return }
+            await browse.refresh()
         }
     }
 
@@ -52,7 +61,8 @@ struct HomeView: View {
 /// The header, backdrop and rows.
 ///
 /// Rows sit in a plain `VStack`, so none is discarded while scrolled away, and each remembers
-/// its last-focused card through `defaultFocus`; see docs/spikes/home-focus.md.
+/// its last-focused card through `defaultFocus`; see docs/spikes/home-focus.md. A refresh swaps
+/// in new rows under the same view, so that memory and the header stay.
 private struct HomeRows: View {
     let content: HomeContent
 
@@ -92,6 +102,9 @@ private struct HomeRows: View {
             guard let first = content.rows.first, browse.claimInitialFocus() else { return }
             focusedCard = rememberedCard(in: first)
         }
+        .onChange(of: content) { old, new in
+            keepFocus(from: old, to: new)
+        }
         .onChange(of: focusedCard) { _, card in
             guard let card, let item = item(for: card) else { return }
             lastFocusedByRow[card.rowID] = card
@@ -115,11 +128,23 @@ private struct HomeRows: View {
 
     /// Where focus lands on entering a row: the card last focused there, or its first card.
     private func rememberedCard(in row: HomeRow) -> CardID? {
-        lastFocusedByRow[row.id] ?? row.items.first.map { CardID(rowID: row.id, itemID: $0.id) }
+        lastFocusedByRow[row.id] ?? row.firstCard
     }
 
     private func item(for card: CardID) -> MediaItem? {
-        content.rows.first { $0.id == card.rowID }?.items.first { $0.id == card.itemID }
+        content.item(for: card)
+    }
+
+    /// After a refresh, forgets remembered cards whose items left their rows, so those rows start
+    /// from their first card again. If the focused card went, focus moves to its row's first card,
+    /// or to the next row when that row went too, instead of falling back to the sidebar.
+    private func keepFocus(from old: HomeContent, to new: HomeContent) {
+        let remembered = lastFocusedByRow.filter { new.item(for: $0.value) != nil }
+        lastFocusedByRow = remembered
+        guard let card = focusedCard, new.item(for: card) == nil,
+              let row = new.nearestRow(to: card.rowID, in: old)
+        else { return }
+        focusedCard = remembered[row.id] ?? row.firstCard
     }
 }
 
@@ -127,6 +152,27 @@ private struct HomeRows: View {
 private struct CardID: Hashable {
     let rowID: HomeRow.ID
     let itemID: MediaItem.ID
+}
+
+private extension HomeContent {
+    func item(for card: CardID) -> MediaItem? {
+        rows.first { $0.id == card.rowID }?.items.first { $0.id == card.itemID }
+    }
+
+    /// The row with the given ID, or when it's gone, the first row after it in `old` that's still
+    /// here, else the nearest one before it.
+    func nearestRow(to id: HomeRow.ID, in old: HomeContent) -> HomeRow? {
+        let oldIDs = old.rows.map(\.id)
+        let index = oldIDs.firstIndex(of: id) ?? 0
+        let candidates = oldIDs[index...] + oldIDs[..<index].reversed()
+        return candidates.lazy.compactMap { id in rows.first { $0.id == id } }.first ?? rows.first
+    }
+}
+
+private extension HomeRow {
+    var firstCard: CardID? {
+        items.first.map { CardID(rowID: id, itemID: $0.id) }
+    }
 }
 
 private struct HomeHeader: View {

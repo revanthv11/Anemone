@@ -40,6 +40,26 @@ final class BrowseModel {
         }
     }
 
+    /// Loads the home page again behind the one showing, like Wholphin's refresh on resume, so
+    /// Continue Watching and Next Up pick up what was watched elsewhere. Only once Home has
+    /// loaded; a failed refresh keeps the rows already showing.
+    func refresh() async {
+        guard case .loaded = home else { return }
+        do {
+            let content = try await session.home()
+            // Skipped when Home was left meanwhile, or stopped showing rows (reloading, signed out).
+            guard !Task.isCancelled, case let .loaded(current) = home, current != content else { return }
+            if libraries != content.libraries {
+                libraries = content.libraries
+            }
+            home = .loaded(content)
+        } catch SessionError.signedOut {
+            noteSignedOut()
+        } catch {
+            // Keeps what's showing; the next refresh tries again.
+        }
+    }
+
     /// True the first time it's called: whether the home page should move focus to its first row.
     func claimInitialFocus() -> Bool {
         defer { didPlaceInitialFocus = true }
