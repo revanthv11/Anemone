@@ -10,7 +10,7 @@ struct JellyfinSessionTests {
             userID: "u1",
             accessToken: "tok",
             identity: ClientIdentity(deviceName: "Test TV", deviceID: "device-1", appVersion: "0.1.0"),
-            sessionConfiguration: MockServer.sessionConfiguration(),
+            sessionConfiguration: { MockServer.sessionConfiguration() },
         )
     }
 
@@ -139,10 +139,10 @@ struct JellyfinSessionTests {
         }
     }
 
-    @Test func `home fails when the server can't be reached`() async throws {
+    @Test func `home reports an unreachable server as a connection error, not a sign-out`() async throws {
         MockServer.register(host: "offline.test") { _ in nil }
 
-        await #expect(throws: (any Error).self) {
+        await #expect(throws: URLError.self) {
             try await session(host: "offline.test").home()
         }
     }

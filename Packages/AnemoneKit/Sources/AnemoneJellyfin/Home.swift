@@ -49,34 +49,34 @@ public extension JellyfinSession {
     ///
     /// - Throws: when the libraries can't be loaded, or `SessionError.signedOut` from any request.
     func home(itemsPerRow limit: Int = HomeRow.defaultLimit) async throws -> HomeContent {
+        // These two don't need the library list, so they start without waiting for it.
+        async let resumeResult = result { try await continueWatching(limit: limit) }
+        async let nextUpResult = result { try await nextUp(limit: limit) }
         let libraries = try await libraries()
-        let kinds = [HomeRow.Kind.continueWatching, .nextUp]
-            + libraries.filter(\.hasRecentlyAddedRow).map(HomeRow.Kind.recentlyAdded)
+        let latestLibraries = libraries.filter(\.hasRecentlyAddedRow)
 
-        let results = await withTaskGroup(of: (Int, Result<[MediaItem], any Error>).self) { group in
-            for (index, kind) in kinds.enumerated() {
+        let latestResults = await withTaskGroup(of: (Int, ItemsResult).self) { group in
+            for (index, library) in latestLibraries.enumerated() {
                 group.addTask {
-                    do {
-                        return try await (index, .success(items(for: kind, limit: limit)))
-                    } catch {
-                        return (index, .failure(error))
-                    }
+                    await (index, result { try await recentlyAdded(in: library.id, limit: limit) })
                 }
             }
-            var results = [Result<[MediaItem], any Error>?](repeating: nil, count: kinds.count)
+            var results = [ItemsResult](repeating: .success([]), count: latestLibraries.count)
             for await (index, result) in group {
                 results[index] = result
             }
             return results
         }
 
+        let kinds = [HomeRow.Kind.continueWatching, .nextUp] + latestLibraries.map(HomeRow.Kind.recentlyAdded)
+        let results = await [resumeResult, nextUpResult] + latestResults
         var rows: [HomeRow] = []
         var failedRows: [HomeRow.Kind] = []
         for (kind, result) in zip(kinds, results) {
             switch result {
             case let .success(items) where !items.isEmpty:
                 rows.append(HomeRow(kind: kind, items: items))
-            case .success, .none:
+            case .success:
                 break
             case let .failure(error):
                 if error as? SessionError == .signedOut {
@@ -88,14 +88,13 @@ public extension JellyfinSession {
         return HomeContent(libraries: libraries, rows: rows, failedRows: failedRows)
     }
 
-    private func items(for kind: HomeRow.Kind, limit: Int) async throws -> [MediaItem] {
-        switch kind {
-        case .continueWatching:
-            try await continueWatching(limit: limit)
-        case .nextUp:
-            try await nextUp(limit: limit)
-        case let .recentlyAdded(library):
-            try await recentlyAdded(in: library.id, limit: limit)
+    private typealias ItemsResult = Result<[MediaItem], any Error>
+
+    private func result(_ load: () async throws -> [MediaItem]) async -> ItemsResult {
+        do {
+            return try await .success(load())
+        } catch {
+            return .failure(error)
         }
     }
 }

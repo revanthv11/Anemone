@@ -17,23 +17,27 @@ public struct JellyfinSession: Sendable {
 
     public let serverURL: URL
     public let userID: String
+    public let accessToken: String
     private let client: JellyfinClient
 
-    /// - Parameter sessionConfiguration: gets this type's `timeout`.
+    /// - Parameter sessionConfiguration: makes a configuration for this session alone; it gets
+    ///   this type's `timeout`.
     public init(
         serverURL: URL,
         userID: String,
         accessToken: String,
         identity: ClientIdentity,
-        sessionConfiguration: URLSessionConfiguration = .default,
+        sessionConfiguration: () -> URLSessionConfiguration = { .default },
     ) {
         self.serverURL = serverURL
         self.userID = userID
-        sessionConfiguration.timeoutIntervalForRequest = Self.timeout
+        self.accessToken = accessToken
+        let configuration = sessionConfiguration()
+        configuration.timeoutIntervalForRequest = Self.timeout
         client = identity.makeClient(
             serverURL: serverURL,
             accessToken: accessToken,
-            sessionConfiguration: sessionConfiguration,
+            sessionConfiguration: configuration,
         )
     }
 
