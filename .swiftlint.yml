@@ -1,6 +1,7 @@
 included:
   - App
   - TopShelf
+  - UITests
   - Packages/AnemoneKit/Sources
   - Packages/AnemoneKit/Tests
 
