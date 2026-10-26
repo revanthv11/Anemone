@@ -85,7 +85,7 @@ The FSF considers Apple's App Store terms incompatible with the GPL; in practice
 - [x] Repo, GPL-3.0 license, notice, plan
 - [x] Xcode project (tvOS app + Top Shelf extension) and the AnemoneKit package
 - [x] SwiftLint / SwiftFormat config and CI
-- [ ] Spike: home screen with 10 rows × 50 posters. Decide between SwiftUI-only rows and UIKit collection views.
+- [x] Spike: home screen with 10 rows × 50 posters. SwiftUI works with a non-lazy outer stack; hardware timing still open. See [spikes/home-focus.md](spikes/home-focus.md).
 - [ ] Spike: MPVKit on Apple TV hardware with HEVC 10-bit HDR, ASS subtitles and TrueHD
 - [ ] Spike: AVPlayer playing Jellyfin 12 HLS with Dolby Vision
 - [ ] Spike: multicast entitlement and UDP discovery on tvOS
