@@ -16,4 +16,10 @@ struct ClientIdentityTests {
         #expect(configuration.deviceID == "device-1")
         #expect(configuration.version == "0.1.0")
     }
+
+    @Test func `keeps the device name out of header syntax`() {
+        let identity = ClientIdentity(deviceName: #"Alex's TV, "Den"=1"#, deviceID: "d", appVersion: "1")
+
+        #expect(identity.deviceName == "Alex's TV   Den  1")
+    }
 }

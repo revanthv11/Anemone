@@ -19,7 +19,7 @@ Some of Wholphin's device profile code is adapted from the official [jellyfin-an
 | Package | License |
 |---|---|
 | [jellyfin-sdk-swift](https://github.com/jellyfin/jellyfin-sdk-swift) | MPL-2.0 |
-| [Get](https://github.com/kean/Get) (via jellyfin-sdk-swift) | MIT |
+| [Get](https://github.com/kean/Get) | MIT |
 | [swift-nio-transport-services](https://github.com/apple/swift-nio-transport-services) (via jellyfin-sdk-swift) | Apache-2.0 |
 | [swift-nio](https://github.com/apple/swift-nio), [swift-atomics](https://github.com/apple/swift-atomics), [swift-collections](https://github.com/apple/swift-collections), [swift-system](https://github.com/apple/swift-system) (via swift-nio-transport-services) | Apache-2.0 |
 
