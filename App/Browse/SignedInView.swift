@@ -29,7 +29,7 @@ struct SignedInView: View {
         let libraries = browse.libraryPreferences.pins.arrange(browse.libraries, id: \.id)
         TabView(selection: $selection) {
             Tab("Home", systemImage: "house", value: Destination.home) {
-                HomeView()
+                HomeView(isSelected: selection == .home)
             }
             Tab("Search", systemImage: "magnifyingglass", value: Destination.search, role: .search) {
                 PlaceholderPage(title: "Search", message: "Search arrives later in Phase 2.")
