@@ -23,6 +23,13 @@
 			remoteGlobalIDString = 0A0000000000000000000021;
 			remoteInfo = AnemoneTopShelf;
 		};
+		0A0000000000000000000063 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0A0000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0A0000000000000000000020;
+			remoteInfo = Anemone;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -42,6 +49,7 @@
 /* Begin PBXFileReference section */
 		0A0000000000000000000010 /* Anemone.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Anemone.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0A0000000000000000000011 /* AnemoneTopShelf.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = AnemoneTopShelf.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		0A0000000000000000000012 /* AnemoneUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AnemoneUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -68,6 +76,11 @@
 			path = TopShelf;
 			sourceTree = "<group>";
 		};
+		0A0000000000000000000007 /* UITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = UITests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -90,6 +103,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		0A0000000000000000000038 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -98,6 +118,7 @@
 			children = (
 				0A0000000000000000000004 /* App */,
 				0A0000000000000000000005 /* TopShelf */,
+				0A0000000000000000000007 /* UITests */,
 				0A0000000000000000000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -107,6 +128,7 @@
 			children = (
 				0A0000000000000000000010 /* Anemone.app */,
 				0A0000000000000000000011 /* AnemoneTopShelf.appex */,
+				0A0000000000000000000012 /* AnemoneUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -165,6 +187,29 @@
 			productReference = 0A0000000000000000000011 /* AnemoneTopShelf.appex */;
 			productType = "com.apple.product-type.tv-app-extension";
 		};
+		0A0000000000000000000022 /* AnemoneUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0A0000000000000000000073 /* Build configuration list for PBXNativeTarget "AnemoneUITests" */;
+			buildPhases = (
+				0A0000000000000000000037 /* Sources */,
+				0A0000000000000000000038 /* Frameworks */,
+				0A0000000000000000000039 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				0A0000000000000000000062 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				0A0000000000000000000007 /* UITests */,
+			);
+			name = AnemoneUITests;
+			packageProductDependencies = (
+			);
+			productName = AnemoneUITests;
+			productReference = 0A0000000000000000000012 /* AnemoneUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -180,6 +225,10 @@
 					};
 					0A0000000000000000000021 = {
 						CreatedOnToolsVersion = 27.1;
+					};
+					0A0000000000000000000022 = {
+						CreatedOnToolsVersion = 27.1;
+						TestTargetID = 0A0000000000000000000020;
 					};
 				};
 			};
@@ -202,6 +251,7 @@
 			targets = (
 				0A0000000000000000000020 /* Anemone */,
 				0A0000000000000000000021 /* AnemoneTopShelf */,
+				0A0000000000000000000022 /* AnemoneUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -215,6 +265,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		0A0000000000000000000036 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0A0000000000000000000039 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -238,6 +295,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		0A0000000000000000000037 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -245,6 +309,11 @@
 			isa = PBXTargetDependency;
 			target = 0A0000000000000000000021 /* AnemoneTopShelf */;
 			targetProxy = 0A0000000000000000000061 /* PBXContainerItemProxy */;
+		};
+		0A0000000000000000000062 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0A0000000000000000000020 /* Anemone */;
+			targetProxy = 0A0000000000000000000063 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -391,6 +460,36 @@
 			};
 			name = Release;
 		};
+		0A0000000000000000000086 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.revanthv11.anemone.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				TARGETED_DEVICE_FAMILY = 3;
+				TEST_TARGET_NAME = Anemone;
+			};
+			name = Debug;
+		};
+		0A0000000000000000000087 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.revanthv11.anemone.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				TARGETED_DEVICE_FAMILY = 3;
+				TEST_TARGET_NAME = Anemone;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -417,6 +516,15 @@
 			buildConfigurations = (
 				0A0000000000000000000084 /* Debug */,
 				0A0000000000000000000085 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		0A0000000000000000000073 /* Build configuration list for PBXNativeTarget "AnemoneUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0A0000000000000000000086 /* Debug */,
+				0A0000000000000000000087 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
