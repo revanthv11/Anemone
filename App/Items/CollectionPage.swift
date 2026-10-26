@@ -66,7 +66,7 @@ struct CollectionPage: View {
             guard !Task.isCancelled else { return }
             backdropEntry = focusedEntry
         }
-        .task(id: collection.id) {
+        .pageTask(id: collection.id) {
             do {
                 sections = try await browse.session.collectionSections(id: collection.id)
                 problem = nil

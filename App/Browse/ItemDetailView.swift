@@ -30,7 +30,7 @@ struct ItemDetailView: View {
         }
         // Runs again whenever the page comes back into view, like Wholphin's refresh on resume,
         // so changes made on other pages show.
-        .task {
+        .pageTask(id: item.id) {
             await load()
         }
     }
@@ -45,6 +45,18 @@ struct ItemDetailView: View {
             if details == nil {
                 problem = message
             }
+        }
+    }
+}
+
+extension View {
+    /// Opens item pages pushed on `stack`.
+    func itemPages(in stack: PageStack) -> some View {
+        navigationDestination(for: MediaItem.self) { item in
+            ItemDetailView(item: item)
+                // Set on each page, because tvOS doesn't pass the stack's own environment on to
+                // the pages pushed on it.
+                .environment(\.pageStack, stack)
         }
     }
 }

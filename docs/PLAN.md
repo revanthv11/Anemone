@@ -112,6 +112,7 @@ tvOS ignores `.keyboardType(.numberPad)`, so PIN entry uses the full on-screen k
 - [x] Home page with Wholphin's default rows: Continue Watching, Next Up, and Recently Added per library, with new episodes shown as their series; empty rows hidden
 - [x] Focused-item header, and a backdrop that follows focus after 150 ms
 - [x] Row memory and focus restore after Back, per the home-focus spike
+- [x] Rows refresh quietly after Back to Home from an item page, on coming back to Home in the sidebar, and when the app returns to the foreground, like Wholphin on resume, so Continue Watching and Next Up stay current. Row memory and the header survive; if the focused card's item left its row, focus moves to that row's first card, or the next row if the row went, including when the refresh lands before Back has finished. Uses the same `pageTask` as item pages (see 2c), plus the sidebar selection
 - [x] Artwork through Nuke, with Wholphin's image fallbacks
 - [x] Item detail placeholder (title, year, overview) until 2c
 
@@ -137,6 +138,7 @@ Tested live in the simulator against the Jellyfin 12.3 demo server profile saved
 - [x] Person page: photo, birth, birthplace, death, overview; Movies, TV Shows and Episodes rows
 - [x] Mark watched or unwatched, and favourite, from item pages
 - [x] Row memory and focus restored after Back, as on the home page
+- [x] Pages reload quietly after Back from a page opened on top of them and when the app returns to the foreground, like Wholphin on resume, so watched and favourite state, seasons, episodes, collections and playlists stay current. Triggered from the stack's path, which each pushed page is handed directly: tvOS doesn't restart a covered page's tasks after Back, and doesn't pass a stack's environment on to the pages pushed on it
 - Play, Resume and Restart play since Phase 3a. Play and Shuffle on series, collections and playlists are still marked as not wired up; they need queues
 - Not yet: trailers, extras, chapters, version and track choice, delete, the context menu, collection sort/filter/view options, Seerr rows, theme music
 

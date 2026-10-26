@@ -54,7 +54,7 @@ struct SeriesPage: View {
                 : "Mark the entire series as watched?")
         }
         // Seasons reload when the page comes back into view, as Wholphin refreshes them on resume.
-        .task(id: series.id) {
+        .pageTask(id: series.id) {
             let session = browse.session
             let id = series.id
             // Similar series don't change between visits, so they're asked for once, as on the

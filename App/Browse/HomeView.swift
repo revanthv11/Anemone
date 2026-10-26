@@ -4,15 +4,26 @@ import SwiftUI
 
 /// Wholphin's default home page: a header for the focused item over its backdrop, then rows.
 struct HomeView: View {
+    /// Whether Home is the page chosen in the sidebar.
+    let isSelected: Bool
+
     @Environment(BrowseModel.self) private var browse
     @Environment(AppModel.self) private var model
+    @State private var stack = PageStack()
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $stack.path) {
             content
-                .navigationDestination(for: MediaItem.self) { item in
-                    ItemDetailView(item: item)
+                .pageTask(id: isSelected) {
+                    // Refreshes the rows whenever Home shows again: after Back from the pages
+                    // pushed here, on coming back to it in the sidebar, and when the app returns to
+                    // the foreground. Leaving Home cancels a refresh still under way.
+                    guard isSelected else { return }
+                    await browse.refresh()
                 }
+                // Home is the stack's root, which `itemPages(in:)` doesn't reach.
+                .environment(\.pageStack, stack)
+                .itemPages(in: stack)
         }
     }
 
@@ -22,7 +33,7 @@ struct HomeView: View {
         case .loading:
             ProgressView()
         case let .loaded(home) where !home.rows.isEmpty:
-            HomeRows(content: home)
+            HomeRows(content: home, isCovered: !stack.path.isEmpty)
         case let .loaded(home) where home.failedRows.isEmpty:
             HomeMessage(
                 title: "Nothing to show yet",
@@ -53,13 +64,22 @@ struct HomeView: View {
 /// The header, backdrop and rows.
 ///
 /// Rows sit in a plain `VStack`, so none is discarded while scrolled away, and each remembers
-/// its last-focused card through `defaultFocus`; see docs/spikes/home-focus.md.
+/// its last-focused card through `defaultFocus`; see docs/spikes/home-focus.md. A refresh swaps
+/// in new rows under the same view, so that memory and the header stay.
 private struct HomeRows: View {
     let content: HomeContent
+    /// Whether a page is pushed over Home.
+    let isCovered: Bool
 
     @Environment(BrowseModel.self) private var browse
     @FocusState private var focusedCard: CardID?
+    @State private var lastFocusedCard: CardID?
     @State private var lastFocusedByRow: [HomeRow.ID: CardID] = [:]
+    /// Where focus belongs once Back from a page pushed over Home ends: the card that opened it,
+    /// or its stand-in if a refresh removed it first.
+    @State private var returningCard: CardID?
+    /// A card for its row to scroll to, so that it exists before focus moves to it.
+    @State private var scrollTarget: CardID?
     @State private var headerItem: MediaItem?
     @State private var backdropItem: MediaItem?
 
@@ -71,7 +91,7 @@ private struct HomeRows: View {
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: HomeLayout.rowSpacing) {
                     ForEach(content.rows) { row in
-                        HomeRowView(row: row, focusedCard: $focusedCard)
+                        HomeRowView(row: row, focusedCard: $focusedCard, scrollTarget: scrollTarget)
                             .defaultFocus($focusedCard, rememberedCard(in: row), priority: .userInitiated)
                     }
                     if !content.failedRows.isEmpty {
@@ -93,9 +113,27 @@ private struct HomeRows: View {
             guard let first = content.rows.first, browse.claimInitialFocus() else { return }
             focusedCard = rememberedCard(in: first)
         }
+        .onChange(of: isCovered) { _, isCovered in
+            if isCovered {
+                returningCard = focusedCard ?? lastFocusedCard
+            }
+        }
+        .onChange(of: content) { old, new in
+            keepFocus(from: old, to: new)
+        }
         .onChange(of: focusedCard) { _, card in
             guard let card, let item = item(for: card) else { return }
+            if let returningCard, returningCard != card, self.item(for: returningCard) != nil {
+                // tvOS picked another card on coming back, because a refresh removed the one it
+                // meant to focus. Moved once, like the library grid's return to its last card.
+                self.returningCard = nil
+                focusedCard = returningCard
+                return
+            }
+            lastFocusedCard = card
             lastFocusedByRow[card.rowID] = card
+            returningCard = nil
+            scrollTarget = nil
             headerItem = item
         }
         .task(id: focusedCard) {
@@ -116,11 +154,30 @@ private struct HomeRows: View {
 
     /// Where focus lands on entering a row: the card last focused there, or its first card.
     private func rememberedCard(in row: HomeRow) -> CardID? {
-        lastFocusedByRow[row.id] ?? row.items.first.map { CardID(rowID: row.id, itemID: $0.id) }
+        lastFocusedByRow[row.id] ?? row.firstCard
     }
 
     private func item(for card: CardID) -> MediaItem? {
-        content.rows.first { $0.id == card.rowID }?.items.first { $0.id == card.itemID }
+        content.item(for: card)
+    }
+
+    /// After a refresh, forgets remembered cards whose items left their rows, so those rows start
+    /// from their first card again. If the focused card went, focus moves to its row's first card,
+    /// or to the next row when that row went too, instead of falling back to the sidebar. That
+    /// includes the card tvOS is about to focus again after Back, when the refresh lands first.
+    private func keepFocus(from old: HomeContent, to new: HomeContent) {
+        let remembered = lastFocusedByRow.filter { new.item(for: $0.value) != nil }
+        lastFocusedByRow = remembered
+        guard let card = focusedCard ?? returningCard, new.item(for: card) == nil,
+              let row = new.nearestRow(to: card.rowID, in: old)
+        else { return }
+        let target = remembered[row.id] ?? row.firstCard
+        scrollTarget = target
+        if focusedCard == nil {
+            // Back is still under way, and tvOS may focus a card of its own choosing when it ends.
+            returningCard = target
+        }
+        focusedCard = target
     }
 }
 
@@ -128,6 +185,27 @@ private struct HomeRows: View {
 private struct CardID: Hashable {
     let rowID: HomeRow.ID
     let itemID: MediaItem.ID
+}
+
+private extension HomeContent {
+    func item(for card: CardID) -> MediaItem? {
+        rows.first { $0.id == card.rowID }?.items.first { $0.id == card.itemID }
+    }
+
+    /// The row with the given ID, or when it's gone, the first row after it in `old` that's still
+    /// here, else the nearest one before it.
+    func nearestRow(to id: HomeRow.ID, in old: HomeContent) -> HomeRow? {
+        let oldIDs = old.rows.map(\.id)
+        let index = oldIDs.firstIndex(of: id) ?? 0
+        let candidates = oldIDs[index...] + oldIDs[..<index].reversed()
+        return candidates.lazy.compactMap { id in rows.first { $0.id == id } }.first ?? rows.first
+    }
+}
+
+private extension HomeRow {
+    var firstCard: CardID? {
+        items.first.map { CardID(rowID: id, itemID: $0.id) }
+    }
 }
 
 private struct HomeHeader: View {
@@ -159,6 +237,7 @@ private struct HomeHeader: View {
 private struct HomeRowView: View {
     let row: HomeRow
     let focusedCard: FocusState<CardID?>.Binding
+    let scrollTarget: CardID?
 
     @Environment(BrowseModel.self) private var browse
     @Environment(\.displayScale) private var displayScale
@@ -167,27 +246,35 @@ private struct HomeRowView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(row.title)
                 .font(.headline)
-            ScrollView(.horizontal) {
-                LazyHStack(spacing: HomeLayout.cardSpacing) {
-                    ForEach(row.items) { item in
-                        NavigationLink(value: item) {
-                            MediaCard(
-                                title: item.displayTitle,
-                                subtitle: item.subtitle ?? item.year.map(String.init),
-                                imageURL: imageURL(for: item),
-                                shape: row.shape,
-                                width: row.shape.cardWidth,
-                                progress: item.progress,
-                            )
+            ScrollViewReader { scroller in
+                ScrollView(.horizontal) {
+                    LazyHStack(spacing: HomeLayout.cardSpacing) {
+                        ForEach(row.items) { item in
+                            NavigationLink(value: item) {
+                                MediaCard(
+                                    title: item.displayTitle,
+                                    subtitle: item.subtitle ?? item.year.map(String.init),
+                                    imageURL: imageURL(for: item),
+                                    shape: row.shape,
+                                    width: row.shape.cardWidth,
+                                    progress: item.progress,
+                                )
+                            }
+                            .buttonStyle(.borderless)
+                            .focused(focusedCard, equals: CardID(rowID: row.id, itemID: item.id))
+                            .accessibilityIdentifier("card.\(row.id).\(item.id)")
                         }
-                        .buttonStyle(.borderless)
-                        .focused(focusedCard, equals: CardID(rowID: row.id, itemID: item.id))
-                        .accessibilityIdentifier("card.\(row.id).\(item.id)")
                     }
+                    .padding(.vertical, HomeLayout.focusPadding)
                 }
-                .padding(.vertical, HomeLayout.focusPadding)
+                .scrollClipDisabled()
+                .onChange(of: scrollTarget) { _, card in
+                    // Cards far back along the row may not exist yet, and focus can't move to them
+                    // until they do.
+                    guard let card, card.rowID == row.id else { return }
+                    scroller.scrollTo(card.itemID)
+                }
             }
-            .scrollClipDisabled()
         }
         .focusSection()
     }

@@ -57,10 +57,10 @@ struct SeasonPage: View {
         .player($playback) {
             await loadEpisodes(of: currentSeasonID)
         }
-        .task {
+        .pageTask(id: seriesID) {
             await loadSeries()
         }
-        .task(id: currentSeasonID) {
+        .pageTask(id: currentSeasonID) {
             await loadEpisodes(of: currentSeasonID)
         }
         .onChange(of: focus) { _, focus in

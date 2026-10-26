@@ -48,10 +48,10 @@ struct SidebarSettingsView: View {
 struct MoreLibrariesView: View {
     let libraries: [Library]
 
-    @State private var path = NavigationPath()
+    @State private var stack = PageStack()
 
     var body: some View {
-        NavigationStack(path: $path) {
+        NavigationStack(path: $stack.path) {
             List(libraries) { library in
                 NavigationLink(value: library) {
                     Label(library.name, systemImage: library.systemImage)
@@ -59,11 +59,9 @@ struct MoreLibrariesView: View {
             }
             .navigationTitle("More")
             .navigationDestination(for: Library.self) { library in
-                LibraryRoot(library: library, path: $path)
+                LibraryRoot(library: library, path: $stack.path)
             }
-            .navigationDestination(for: MediaItem.self) { item in
-                ItemDetailView(item: item)
-            }
+            .itemPages(in: stack)
         }
     }
 }
