@@ -1,0 +1,140 @@
+import AnemoneJellyfin
+import AnemoneUI
+import SwiftUI
+
+/// Wholphin's movie page (`MovieDetails`): title or logo, details, overview and actions, then
+/// the cast and crew and similar items. Videos and other types without a page of their own use
+/// it too, and so do episodes outside a season, which get Wholphin's `EpisodeDetails` header
+/// and no rows.
+struct MoviePage: View {
+    @Binding var item: ItemDetails
+
+    @Environment(BrowseModel.self) private var browse
+    @FocusState private var focus: ItemFocus?
+    @State private var memory = RowMemory()
+    @State private var similar: [ItemDetails] = []
+    @State private var alert: ItemAlert?
+
+    var body: some View {
+        ScrollViewReader { scroller in
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: ItemLayout.sectionSpacing) {
+                    header
+                    buttons
+                    if !isEpisode {
+                        rows
+                    }
+                }
+                .padding(.horizontal, ItemLayout.horizontalInset)
+                .padding(.top, ItemLayout.topInset)
+                .padding(.bottom, ItemLayout.focusPadding)
+                // Scrolling here shows the header with its top margin.
+                .id(ItemLayout.headerID)
+            }
+            .onChange(of: focus) { _, focus in
+                memory.note(focus)
+                // Like Wholphin's `bringIntoView`: the whole header shows with its buttons.
+                if focus?.isInHeader == true {
+                    withAnimation { scroller.scrollTo(ItemLayout.headerID, anchor: .top) }
+                }
+            }
+        }
+        .background {
+            BackdropImage(url: browse.imageURL(item.item.backdropImage, width: ItemLayout.backdropPixelWidth))
+                .ignoresSafeArea()
+        }
+        .initialFocus($focus, item.isPlayable ? .action(.play) : .action(.played))
+        .itemAlert($alert)
+        .task(id: item.id) {
+            guard !isEpisode, similar.isEmpty else { return }
+            let session = browse.session
+            let id = item.id
+            similar = await browse.optional(attempt { try await session.similarItems(to: id) }) ?? []
+        }
+    }
+
+    private var isEpisode: Bool {
+        item.item.kind == .episode
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if isEpisode {
+                // Wholphin's `EpisodeDetailsHeader`: the series, then the episode.
+                Text(item.item.episode?.seriesName ?? "")
+                    .font(.title.bold())
+                    .lineLimit(1)
+                    .accessibilityIdentifier("detail.title")
+                Text(item.item.name)
+                    .font(.title3)
+                    .lineLimit(1)
+            } else {
+                ItemTitle(title: item.item.name, logo: item.logo)
+            }
+            QuickDetails(details: item)
+            if !item.genres.isEmpty {
+                NameList(names: item.genres)
+            }
+            if let tagline = item.tagline {
+                Text(tagline)
+                    .font(.callout)
+                    .italic()
+            }
+            if let overview = item.item.overview {
+                OverviewButton(title: item.item.name, overview: overview)
+                    .focused($focus, equals: .overview)
+            }
+            if !item.directors.isEmpty {
+                Text("Directed by \(item.directors.joined(separator: ", "))")
+                    .font(.callout)
+            }
+        }
+        .frame(maxWidth: ItemLayout.textWidth, alignment: .leading)
+    }
+
+    private var buttons: some View {
+        HStack(spacing: 24) {
+            if item.isPlayable {
+                PlaybackButtons(resumePosition: item.userState.resumePosition, focus: $focus, alert: $alert)
+            }
+            PlayedButton(isPlayed: item.userState.isPlayed) {
+                Task { await save(.played(!item.userState.isPlayed)) }
+            }
+            .focused($focus, equals: .action(.played))
+            FavoriteButton(isFavorite: item.userState.isFavorite) {
+                Task { await save(.favorite(!item.userState.isFavorite)) }
+            }
+            .focused($focus, equals: .action(.favorite))
+            if item.isPlayable {
+                PlaybackNotWiredNote()
+                    .padding(.leading, 16)
+            }
+        }
+        .padding(.vertical, 20)
+        .focusSection()
+    }
+
+    @ViewBuilder
+    private var rows: some View {
+        if !item.people.isEmpty {
+            PeopleRow(id: "people", title: "People", people: item.people, focus: $focus, memory: memory)
+        }
+        if !similar.isEmpty {
+            // Wholphin shows posters only when the page is a movie's.
+            ItemRow(
+                id: "similar",
+                title: "More Like This",
+                items: similar,
+                shape: item.item.kind == .movie ? .poster : .thumb,
+                focus: $focus,
+                memory: memory,
+            )
+        }
+    }
+
+    private func save(_ change: UserStateChange) async {
+        if let state = await browse.save(change, for: item, failed: { alert = $0 }) {
+            item.apply(state)
+        }
+    }
+}

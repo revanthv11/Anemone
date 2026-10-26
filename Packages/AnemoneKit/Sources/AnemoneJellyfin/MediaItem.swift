@@ -9,6 +9,8 @@ public struct MediaItem: Hashable, Identifiable, Sendable {
         case season
         case episode
         case collection
+        case playlist
+        case person
         case video
         case musicVideo
         case musicAlbum
@@ -204,6 +206,8 @@ private extension MediaItem.Kind {
         .season: .season,
         .episode: .episode,
         .boxSet: .collection,
+        .playlist: .playlist,
+        .person: .person,
         .video: .video,
         .musicVideo: .musicVideo,
         .musicAlbum: .musicAlbum,

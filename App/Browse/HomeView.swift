@@ -111,9 +111,7 @@ private struct HomeRows: View {
     }
 
     private var backdropURL: URL? {
-        (backdropItem ?? firstItem)?.backdropImage.flatMap {
-            browse.session.imageURL(for: $0, maxWidth: HomeLayout.backdropPixelWidth)
-        }
+        browse.imageURL((backdropItem ?? firstItem)?.backdropImage, width: HomeLayout.backdropPixelWidth)
     }
 
     /// Where focus lands on entering a row: the card last focused there, or its first card.
@@ -195,9 +193,7 @@ private struct HomeRowView: View {
     }
 
     private func imageURL(for item: MediaItem) -> URL? {
-        item.image(for: row.shape).flatMap {
-            browse.session.imageURL(for: $0, maxWidth: Int(row.shape.cardWidth * displayScale))
-        }
+        browse.imageURL(item.image(for: row.shape), width: row.shape.cardWidth * displayScale)
     }
 }
 
@@ -235,7 +231,7 @@ private enum HomeLayout {
     /// Room above and below each row so the focus lift isn't clipped.
     static let focusPadding: CGFloat = 30
     /// Backdrops are faded and dimmed, so 1080p is plenty even on a 4K screen.
-    static let backdropPixelWidth = 1920
+    static let backdropPixelWidth: CGFloat = 1920
 }
 
 private extension HomeRow {
