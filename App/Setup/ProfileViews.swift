@@ -1,43 +1,6 @@
 import AnemoneCore
 import SwiftUI
 
-/// Stand-in for the home screen until browsing lands in Phase 2.
-struct HomePlaceholderView: View {
-    let server: SavedServer
-    let user: SavedUser
-
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 32) {
-                Text("Signed in as \(user.name)")
-                    .font(.largeTitle.bold())
-                    .accessibilityIdentifier("home.signedInAs")
-                Text("\(server.name) · Jellyfin \(server.version)")
-                    .foregroundStyle(.secondary)
-                Text("Browsing your libraries arrives in Phase 2.")
-                    .foregroundStyle(.tertiary)
-                HStack(spacing: 40) {
-                    Button("Switch user") {
-                        model.switchUser()
-                    }
-                    NavigationLink("Profile lock") {
-                        ProfileLockView(user: user)
-                    }
-                    Button("Sign out") {
-                        model.signOut()
-                    }
-                    .accessibilityIdentifier("home.signOut")
-                }
-                .padding(.top, 40)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .padding(80)
-        }
-    }
-}
-
 /// What it takes to switch to this profile: nothing, a PIN, or signing in again.
 struct ProfileLockView: View {
     let user: SavedUser
