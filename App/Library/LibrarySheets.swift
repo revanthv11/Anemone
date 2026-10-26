@@ -7,6 +7,7 @@ import SwiftUI
 struct FilterSheet: View {
     let library: Library
     @Binding var filter: LibraryFilter
+    let cache: FilterChoiceCache
 
     var body: some View {
         NavigationStack {
@@ -24,7 +25,7 @@ struct FilterSheet: View {
             }
             .navigationTitle("Filter")
             .navigationDestination(for: LibraryFilter.Kind.self) { kind in
-                FilterChoices(library: library, kind: kind, filter: $filter)
+                FilterChoices(library: library, kind: kind, filter: $filter, cache: cache)
             }
         }
     }
@@ -58,6 +59,7 @@ private struct FilterChoices: View {
     let library: Library
     let kind: LibraryFilter.Kind
     @Binding var filter: LibraryFilter
+    let cache: FilterChoiceCache
 
     @Environment(BrowseModel.self) private var browse
     @State private var options: [FilterOption]?
@@ -97,8 +99,14 @@ private struct FilterChoices: View {
     }
 
     private func load() async {
+        if let cached = cache.options[kind] {
+            options = cached
+            return
+        }
         do {
-            options = try await choices()
+            let loaded = try await choices()
+            cache.options[kind] = loaded
+            options = loaded
         } catch SessionError.signedOut {
             browse.noteSignedOut()
             failed = true
@@ -161,6 +169,12 @@ private struct FilterChoices: View {
         case .decade: Int(id).map { filter.decades.formSymmetricDifference([$0]) }
         }
     }
+}
+
+/// A library's filter choices, fetched once while its page is open, as Wholphin's
+/// `FilterOptionCache` keeps them.
+final class FilterChoiceCache {
+    var options: [LibraryFilter.Kind: [FilterOption]] = [:]
 }
 
 /// Wholphin's view options, the ones that fit a TV grid: card shape, columns and titles.

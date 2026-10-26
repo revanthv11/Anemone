@@ -11,6 +11,16 @@ struct LibraryDisplaySettings: Codable, Hashable {
     var view: GridViewOptions?
 }
 
+extension LibraryDisplaySettings {
+    /// Field by field, so one part that no longer decodes doesn't throw away the others.
+    init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        sort = (try? values.decodeIfPresent(LibrarySort.self, forKey: .sort)) ?? .default
+        filter = (try? values.decodeIfPresent(LibraryFilter.self, forKey: .filter)) ?? LibraryFilter()
+        view = try? values.decodeIfPresent(GridViewOptions.self, forKey: .view)
+    }
+}
+
 /// A profile's per-library settings and sidebar pins.
 ///
 /// Kept in UserDefaults for now, which tvOS may clear when storage runs low. Syncing them to

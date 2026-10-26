@@ -35,3 +35,13 @@ struct GridViewOptions: Codable, Hashable {
         max(((width - spacing * CGFloat(columns - 1)) / CGFloat(columns)).rounded(.down), 1)
     }
 }
+
+extension GridViewOptions {
+    /// Options saved before a field existed get that field's default.
+    init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        shape = try values.decode(CardShape.self, forKey: .shape)
+        columns = try values.decode(Int.self, forKey: .columns)
+        showTitles = try values.decodeIfPresent(Bool.self, forKey: .showTitles) ?? true
+    }
+}

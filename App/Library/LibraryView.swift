@@ -48,6 +48,7 @@ struct LibraryScreen: View {
     @State private var isReloading = false
     @State private var showsFilters = false
     @State private var showsViewOptions = false
+    @State private var filterChoices = FilterChoiceCache()
 
     private enum Content {
         case loading
@@ -83,7 +84,7 @@ struct LibraryScreen: View {
             await load()
         }
         .sheet(isPresented: $showsFilters) {
-            FilterSheet(library: library, filter: filterBinding)
+            FilterSheet(library: library, filter: filterBinding, cache: filterChoices)
         }
         .sheet(isPresented: $showsViewOptions) {
             ViewOptionsSheet(options: viewOptionsBinding, defaults: GridViewOptions.defaults(for: library.kind))
@@ -101,7 +102,7 @@ struct LibraryScreen: View {
                 return try await browse.session.position(of: letter, in: query, count: pager.count)
             },
             imageURL: { item, shape, pixels in
-                item.image(for: shape).flatMap { browse.session.imageURL(for: $0, maxWidth: pixels) }
+                browse.imageURL(item.image(for: shape), width: CGFloat(pixels))
             },
             onSelect: { path.append($0) },
             header: {
@@ -116,6 +117,19 @@ struct LibraryScreen: View {
         .overlay {
             if isReloading {
                 ProgressView()
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if pager.error != nil {
+                // Cleared when a page loads; cards retry their page as they come back on screen.
+                NoticeText("Some items couldn't be loaded from \(browse.server.name).")
+                    .padding(.bottom, 60)
+            }
+        }
+        .onChange(of: pager.error as? SessionError) { _, error in
+            if error == .signedOut {
+                browse.noteSignedOut()
+                content = .signedOut
             }
         }
     }

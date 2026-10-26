@@ -161,6 +161,17 @@ struct LibraryItemsTests {
         #expect(decoded == filter)
     }
 
+    @Test func `filters saved without some fields keep the fields they have`() throws {
+        let saved = Data(#"{"favorite":true,"years":[2001]}"#.utf8)
+
+        let decoded = try JSONDecoder().decode(LibraryFilter.self, from: saved)
+
+        var expected = LibraryFilter()
+        expected.favorite = true
+        expected.years = [2001]
+        #expect(decoded == expected)
+    }
+
     // MARK: Filter values
 
     @Test func `loads genre, studio, year and rating choices for a library`() async throws {
@@ -221,6 +232,15 @@ struct LibraryItemsTests {
         #expect(sentQuery["enableTotalRecordCount"] == ["true"])
         #expect(sentQuery["isFavorite"] == ["true"])
         #expect(sentQuery["sortBy"] == ["SortName", "ProductionYear"])
+    }
+
+    @Test func `a letter with nothing at or after it has nowhere to jump`() async throws {
+        _ = recordItemsRequests(host: "jump-end.test", total: 500)
+
+        let position = try await session(host: "jump-end.test")
+            .position(of: "Z", in: LibraryQuery(library: movies), count: 500)
+
+        #expect(position == 500)
     }
 
     @Test func `jumping to # goes to the top without asking the server`() async throws {

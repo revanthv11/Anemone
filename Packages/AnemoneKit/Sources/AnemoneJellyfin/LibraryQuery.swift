@@ -178,3 +178,21 @@ public struct FilterOption: Hashable, Identifiable, Sendable {
         self.name = name
     }
 }
+
+/// Saved filters decode field by field, so a filter added later (or one a later version drops)
+/// doesn't throw away the rest.
+public extension LibraryFilter {
+    init(from decoder: any Decoder) throws {
+        self.init()
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        played = try? values.decodeIfPresent(Bool.self, forKey: .played)
+        favorite = try? values.decodeIfPresent(Bool.self, forKey: .favorite)
+        genres = (try? values.decodeIfPresent(Set<String>.self, forKey: .genres)) ?? []
+        studios = (try? values.decodeIfPresent(Set<String>.self, forKey: .studios)) ?? []
+        minCommunityRating = try? values.decodeIfPresent(Int.self, forKey: .minCommunityRating)
+        officialRatings = (try? values.decodeIfPresent(Set<String>.self, forKey: .officialRatings)) ?? []
+        videoTypes = (try? values.decodeIfPresent(Set<VideoType>.self, forKey: .videoTypes)) ?? []
+        years = (try? values.decodeIfPresent(Set<Int>.self, forKey: .years)) ?? []
+        decades = (try? values.decodeIfPresent(Set<Int>.self, forKey: .decades)) ?? []
+    }
+}

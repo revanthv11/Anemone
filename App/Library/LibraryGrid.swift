@@ -74,12 +74,13 @@ struct LibraryGrid<Header: View>: View {
             // focus move take seconds while accessibility is on (docs/spikes/home-focus.md).
             let returning = focusTracking.hasLeftGrid
             focusTracking.hasLeftGrid = false
-            if returning, index != lastFocused, isOnScreen(lastFocused, near: index) {
-                focusedIndex = lastFocused
-                return
-            }
+            let remembered = lastFocused
             lastFocused = index
             onFocus(index)
+            // If the card can't take focus after all, focus stays here and is counted here.
+            if returning, index != remembered, isOnScreen(remembered, near: index) {
+                focusedIndex = remembered
+            }
         }
     }
 
@@ -87,8 +88,9 @@ struct LibraryGrid<Header: View>: View {
     /// as fit in the grid's height.
     private func isOnScreen(_ index: Int, near other: Int) -> Bool {
         let cardWidth = options.cardWidth(in: scrollSize.width - GridLayout.horizontalInset - trailingInset)
-        let rowHeight = cardWidth / options.shape.aspectRatio + options.spacing
-        let rows = max(Int(scrollSize.height / rowHeight), 1)
+        // The measured card includes its caption; before any card is measured, the artwork alone.
+        let cardHeight = measured.cardHeight > 0 ? measured.cardHeight : cardWidth / options.shape.aspectRatio
+        let rows = max(Int(scrollSize.height / (cardHeight + options.spacing)), 1)
         return abs(index / options.columns - other / options.columns) < rows
     }
 
@@ -99,7 +101,8 @@ struct LibraryGrid<Header: View>: View {
             count: options.columns,
         )
         return LazyVGrid(columns: columns, alignment: .leading, spacing: options.spacing) {
-            ForEach(0 ..< pager.count, id: \.self) { index in
+            // No cards until the width is known, so none are laid out (and fetch artwork) at 1 pt.
+            ForEach(0 ..< (scrollSize.width > 0 ? pager.count : 0), id: \.self) { index in
                 GridCard(
                     index: index,
                     pager: pager,

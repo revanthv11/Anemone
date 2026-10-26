@@ -82,6 +82,7 @@ public extension JellyfinSession {
     /// grid's own query so the index matches what's paged in. `#` stands for anything before A.
     ///
     /// - Parameter count: how many items the grid holds.
+    /// - Returns: `count` when nothing is filed under the letter or past it, so there's nowhere to go.
     func position(of letter: Character, in query: LibraryQuery, count: Int) async throws -> Int {
         let ascending = query.sort.direction == .ascending
         // Descending, the letter's items start after everything filed under later letters.
@@ -94,7 +95,7 @@ public extension JellyfinSession {
         parameters.enableUserData = false
         parameters.enableImages = false
         let before = try await send(Paths.getItems(parameters: parameters)).totalRecordCount ?? 0
-        return min(max(ascending ? before : count - before, 0), max(count - 1, 0))
+        return min(max(ascending ? before : count - before, 0), count)
     }
 
     func genres(in library: Library) async throws -> [FilterOption] {
