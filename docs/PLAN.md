@@ -100,15 +100,34 @@ The FSF considers Apple's App Store terms incompatible with the GPL; in practice
 - [x] Everything stored in one Keychain item; last profile restored on launch unless it's locked
 - [x] Sign out via `/Sessions/Logout` (the SDK's `signOut()` needs admin rights)
 
-Tested live against the Jellyfin 12.3 demo server: adding the server, the profile list and getting a Quick Connect code. Password sign-in, session restore and profile locks are covered by unit tests but haven't had a live run yet.
+Tested live against the Jellyfin 12.3 demo server (adding the server, the profile list, getting a Quick Connect code) and against the maintainer's own Jellyfin 12.2 server: password sign-in, session restore, PIN lock and unlock, a locked profile not being restored on launch, and sign-out.
+
+tvOS ignores `.keyboardType(.numberPad)`, so PIN entry uses the full on-screen keyboard. A custom PIN pad is an idea for later.
 
 ### Phase 2: browsing
 
-- Sidebar navigation with pinned libraries
-- Home page: all row types (Continue Watching, Next Up, combined, Recently Added / Released, Genres, Studios, Favorites, Live TV rows, Suggestions, ByParent, GetItems, CustomEndpoint), customization, server sync, companion plugin
+#### 2a: sidebar and home rows
+
+- [x] Sidebar navigation (`TabView` with `.sidebarAdaptable`): Home, Search (placeholder), the user's libraries (placeholders), Settings
+- [x] Home page with Wholphin's default rows: Continue Watching, Next Up, and Recently Added per library, with new episodes shown as their series; empty rows hidden
+- [x] Focused-item header, and a backdrop that follows focus after 150 ms
+- [x] Row memory and focus restore after Back, per the home-focus spike
+- [x] Artwork through Nuke, with Wholphin's image fallbacks
+- [x] Item detail placeholder (title, year, overview) until 2c
+
+#### 2b: libraries
+
 - Library grids: filters, sorts, view options, alphabet jump bar
+- Pinned libraries in the sidebar
+
+#### 2c: item pages
+
 - Movie, series, season, episode, collection, playlist and person pages
-- Search, favorites, context menu, dynamic backdrop
+
+#### Later in Phase 2
+
+- Home page: the other row types (combined Continue Watching and Next Up, Recently Released, Genres, Studios, Favorites, Live TV rows, Suggestions, ByParent, GetItems, CustomEndpoint), customization, server sync, companion plugin
+- Search, favorites, context menu
 
 ### Phase 3: playback v1 (AVPlayer)
 

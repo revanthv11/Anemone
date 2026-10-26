@@ -24,12 +24,18 @@ final class AppModel {
 
     private(set) var screen = Screen.loading
     private(set) var accounts: AccountStore
+    /// The signed-in user's connection, set while `screen` is `.home`.
+    private(set) var session: JellyfinSession?
     /// One line for the current screen, such as why a saved session couldn't be restored.
     var notice: String?
 
+    let identity: ClientIdentity
     let authenticator: Authenticator
     let connector: ServerConnector
     private let repository: AccountRepository
+    /// One session per profile, reused when switching back to it. The SDK gives no way to close
+    /// a client's URLSession, so a new session for every switch would stay in memory for good.
+    private var sessionsByProfile: [String: JellyfinSession] = [:]
     /// Set when the Keychain couldn't be read at launch. Saving is then skipped for this run, so a
     /// temporary failure can't replace the saved accounts with an empty list.
     private let isStorageUnavailable: Bool
@@ -53,7 +59,7 @@ final class AppModel {
         self.accounts = accounts
 
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
-        let identity = ClientIdentity(
+        identity = ClientIdentity(
             deviceName: UIDevice.current.name,
             deviceID: accounts.deviceID,
             appVersion: version,
@@ -68,11 +74,11 @@ final class AppModel {
     /// Restores the last profile if it isn't locked and its token still works; otherwise shows
     /// the user list for the last server, or the server list.
     func start() async {
-        guard let session = accounts.lastSession, let server = accounts.server(id: session.serverID) else {
+        guard let last = accounts.lastSession, let server = accounts.server(id: last.serverID) else {
             screen = .servers
             return
         }
-        guard let user = accounts.user(id: session.userID, on: server.id), user.lock == .unlocked else {
+        guard let user = accounts.user(id: last.userID, on: server.id), user.lock == .unlocked else {
             screen = .users(server)
             return
         }
@@ -150,6 +156,7 @@ final class AppModel {
     /// Back to the profile list. The current profile stays signed in.
     func switchUser() {
         guard case let .home(server, _) = screen else { return }
+        session = nil
         showUsers(on: server)
     }
 
@@ -158,6 +165,7 @@ final class AppModel {
         endSessionInBackground(for: user, on: server)
         accounts.signOut(userID: user.id, on: server.id)
         persist()
+        session = nil
         showUsers(on: server)
     }
 
@@ -223,7 +231,24 @@ final class AppModel {
         accounts.lastSession = .init(serverID: server.id, userID: saved.id)
         persist()
         notice = nil
+        session = profileSession(for: user, on: server)
         screen = .home(server, saved)
+    }
+
+    private func profileSession(for user: SignedInUser, on server: SavedServer) -> JellyfinSession {
+        let profile = "\(server.id)/\(user.id)"
+        let cached = sessionsByProfile[profile]
+        if let cached, cached.serverURL == server.url, cached.accessToken == user.accessToken {
+            return cached
+        }
+        let session = JellyfinSession(
+            serverURL: server.url,
+            userID: user.id,
+            accessToken: user.accessToken,
+            identity: identity,
+        )
+        sessionsByProfile[profile] = session
+        return session
     }
 
     private func persist() {

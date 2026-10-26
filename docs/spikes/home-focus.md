@@ -54,4 +54,4 @@ The expected item for row memory was `r0-i30`.
 
 - [ ] Scrolling smoothness on real hardware, especially Apple TV HD (A8, the slowest device that runs tvOS 26). Use Instruments' hitch and animation tools while holding the remote's right arrow on a full row.
 - [ ] The same tests on a tvOS 26 simulator. The deployment target is tvOS 26, and only tvOS 27 was tested.
-- [ ] Real images through Nuke instead of drawn placeholders.
+- [x] Real images through Nuke instead of drawn placeholders: the Phase 2a home page, checked in the simulator only.

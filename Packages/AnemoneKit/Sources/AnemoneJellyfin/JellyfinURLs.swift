@@ -9,6 +9,16 @@ public enum JellyfinURLs {
         url(for: Paths.getUserImage(parameters: .init(userID: userID, tag: tag)), on: server)
     }
 
+    /// The server scales the image down to `maxWidth` pixels, keeping its aspect ratio. Quality
+    /// 96 matches Wholphin.
+    public static func itemImage(on server: URL, image: ItemImage, maxWidth: Int) -> URL? {
+        let parameters = Paths.GetItemImageParameters(maxWidth: maxWidth, quality: 96, tag: image.tag)
+        return url(
+            for: Paths.getItemImage(itemID: image.itemID, imageType: image.kind.rawValue, parameters: parameters),
+            on: server,
+        )
+    }
+
     /// Mirrors Get's `APIClient`: appends the request path to the server URL, keeping any
     /// reverse-proxy path, then adds the query.
     static func url(for request: Request<some Any>, on server: URL) -> URL? {

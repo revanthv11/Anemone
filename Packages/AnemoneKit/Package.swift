@@ -22,6 +22,8 @@ let package = Package(
         .package(url: "https://github.com/jellyfin/jellyfin-sdk-swift", exact: "3.3.0"),
         // The SDK's HTTP client; imported directly to match on its status-code errors.
         .package(url: "https://github.com/kean/Get", from: "2.2.1"),
+        // Image loading and caching for artwork.
+        .package(url: "https://github.com/kean/Nuke", from: "13.2.0"),
     ],
     targets: [
         .target(name: "AnemoneCore"),
@@ -35,7 +37,14 @@ let package = Package(
         ),
         .target(name: "AnemonePlayback", dependencies: ["AnemoneCore", "AnemoneJellyfin"]),
         .target(name: "AnemoneSeerr", dependencies: ["AnemoneCore"]),
-        .target(name: "AnemoneUI", dependencies: ["AnemoneCore"]),
+        .target(
+            name: "AnemoneUI",
+            dependencies: [
+                "AnemoneCore",
+                .product(name: "Nuke", package: "Nuke"),
+                .product(name: "NukeUI", package: "Nuke"),
+            ],
+        ),
         .testTarget(name: "AnemoneCoreTests", dependencies: ["AnemoneCore"]),
         .testTarget(name: "AnemoneJellyfinTests", dependencies: ["AnemoneJellyfin"]),
     ],

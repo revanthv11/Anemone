@@ -22,7 +22,11 @@ struct RootView: View {
                     UserListView(server: server)
                         .id(server.id)
                 case let .home(server, user):
-                    HomePlaceholderView(server: server, user: user)
+                    if let session = model.session {
+                        // Keyed by profile, so changing its lock keeps the loaded home page.
+                        SignedInView(server: server, user: user, session: session)
+                            .id("\(server.id)/\(user.id)")
+                    }
                 }
             }
             .environment(model)
