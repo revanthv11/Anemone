@@ -195,19 +195,22 @@ extension MediaItem {
 
 private extension MediaItem.Kind {
     init(_ kind: BaseItemKind?) {
-        switch kind {
-        case .movie: self = .movie
-        case .series: self = .series
-        case .season: self = .season
-        case .episode: self = .episode
-        case .boxSet: self = .collection
-        case .video: self = .video
-        case .musicVideo: self = .musicVideo
-        case .musicAlbum: self = .musicAlbum
-        case .audio: self = .audio
-        case .photo: self = .photo
-        case .folder, .collectionFolder, .photoAlbum: self = .folder
-        default: self = .other
-        }
+        self = kind.flatMap { Self.byItemKind[$0] } ?? .other
     }
+
+    static let byItemKind: [BaseItemKind: Self] = [
+        .movie: .movie,
+        .series: .series,
+        .season: .season,
+        .episode: .episode,
+        .boxSet: .collection,
+        .video: .video,
+        .musicVideo: .musicVideo,
+        .musicAlbum: .musicAlbum,
+        .audio: .audio,
+        .photo: .photo,
+        .folder: .folder,
+        .collectionFolder: .folder,
+        .photoAlbum: .folder,
+    ]
 }

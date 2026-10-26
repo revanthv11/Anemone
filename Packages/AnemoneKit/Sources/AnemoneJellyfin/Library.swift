@@ -58,21 +58,25 @@ extension Library {
 
 private extension Library.Kind {
     init(_ type: CollectionType?) {
-        switch type {
-        case .movies: self = .movies
-        case .tvshows: self = .shows
-        case .music: self = .music
-        case .musicvideos: self = .musicVideos
-        case .homevideos: self = .homeVideos
-        case .photos: self = .photos
-        case .boxsets: self = .collections
-        case .playlists: self = .playlists
-        case .livetv: self = .liveTV
-        case .folders: self = .folders
-        case .books: self = .books
-        case .trailers: self = .trailers
-        case nil: self = .mixed
-        case .unknown: self = .other
+        guard let type else {
+            self = .mixed
+            return
         }
+        self = Self.byCollectionType[type] ?? .other
     }
+
+    static let byCollectionType: [CollectionType: Self] = [
+        .movies: .movies,
+        .tvshows: .shows,
+        .music: .music,
+        .musicvideos: .musicVideos,
+        .homevideos: .homeVideos,
+        .photos: .photos,
+        .boxsets: .collections,
+        .playlists: .playlists,
+        .livetv: .liveTV,
+        .folders: .folders,
+        .books: .books,
+        .trailers: .trailers,
+    ]
 }
