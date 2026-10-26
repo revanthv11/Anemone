@@ -20,6 +20,8 @@ let package = Package(
     dependencies: [
         // Pinned: 3.3.1 uses `any Error?` syntax that only compiles with Xcode 27, and CI runs Xcode 26.
         .package(url: "https://github.com/jellyfin/jellyfin-sdk-swift", exact: "3.3.0"),
+        // The SDK's HTTP client; imported directly to match on its status-code errors.
+        .package(url: "https://github.com/kean/Get", from: "2.2.1"),
     ],
     targets: [
         .target(name: "AnemoneCore"),
@@ -28,6 +30,7 @@ let package = Package(
             dependencies: [
                 "AnemoneCore",
                 .product(name: "JellyfinAPI", package: "jellyfin-sdk-swift"),
+                .product(name: "Get", package: "Get"),
             ],
         ),
         .target(name: "AnemonePlayback", dependencies: ["AnemoneCore", "AnemoneJellyfin"]),

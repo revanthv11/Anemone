@@ -12,13 +12,33 @@ public struct ClientIdentity: Sendable {
     public let deviceID: String
     public let appVersion: String
 
+    /// - Parameter deviceName: the Apple TV's name. The SDK writes the `Authorization` header
+    ///   fields without quoting or escaping, so the name is reduced to printable ASCII (`’` → `'`,
+    ///   `ä` → `a`) and commas, quotes and `=` become spaces.
     public init(deviceName: String, deviceID: String, appVersion: String) {
-        self.deviceName = deviceName
+        self.deviceName = Self.headerSafe(deviceName)
         self.deviceID = deviceID
         self.appVersion = appVersion
     }
 
-    public func makeClient(serverURL: URL, accessToken: String? = nil) -> JellyfinClient {
+    static func headerSafe(_ name: String) -> String {
+        let ascii = name.applyingTransform(StringTransform("Any-Latin; Latin-ASCII"), reverse: false) ?? name
+        let separators: Set<Character> = [",", "\"", "="]
+        let cleaned = ascii.compactMap { character -> Character? in
+            guard character.isASCII, !character.isNewline, character.asciiValue.map({ $0 >= 0x20 }) == true else {
+                return nil
+            }
+            return separators.contains(character) ? " " : character
+        }
+        let trimmed = String(cleaned).trimmingCharacters(in: .whitespaces)
+        return trimmed.isEmpty ? "Apple TV" : trimmed
+    }
+
+    public func makeClient(
+        serverURL: URL,
+        accessToken: String? = nil,
+        sessionConfiguration: URLSessionConfiguration = .default,
+    ) -> JellyfinClient {
         JellyfinClient(
             configuration: .init(
                 url: serverURL,
@@ -28,6 +48,7 @@ public struct ClientIdentity: Sendable {
                 deviceID: deviceID,
                 version: appVersion,
             ),
+            sessionConfiguration: sessionConfiguration,
         )
     }
 }

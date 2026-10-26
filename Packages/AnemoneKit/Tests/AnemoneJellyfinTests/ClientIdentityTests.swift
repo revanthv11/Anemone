@@ -16,4 +16,17 @@ struct ClientIdentityTests {
         #expect(configuration.deviceID == "device-1")
         #expect(configuration.version == "0.1.0")
     }
+
+    @Test(arguments: [
+        (#"Alex's TV, "Den"=1"#, "Alex's TV   Den  1"),
+        ("Alex’s Apple TV", "Alex's Apple TV"),
+        ("Gerät im Wohnzimmer", "Gerat im Wohnzimmer"),
+        ("Living Room 📺", "Living Room"),
+        ("📺", "Apple TV"),
+    ])
+    func `makes the device name safe for the auth header`(name: String, expected: String) {
+        let identity = ClientIdentity(deviceName: name, deviceID: "d", appVersion: "1")
+
+        #expect(identity.deviceName == expected)
+    }
 }

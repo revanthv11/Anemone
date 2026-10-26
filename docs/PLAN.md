@@ -93,10 +93,14 @@ The FSF considers Apple's App Store terms incompatible with the GPL; in practice
 
 ### Phase 1: foundation
 
-- Add a server by URL; discovery if the spike works
-- Login by password and Quick Connect
-- Multi-server and multi-user; switch users with PIN (hashed) or required login
-- Keychain storage and session restore
+- [x] Add a server by URL: HTTPS first, then Jellyfin's default port; reverse-proxy paths kept; Jellyfin 12+ and finished-setup checks
+- [ ] Server discovery (waits on the multicast spike)
+- [x] Sign in with a password or Quick Connect
+- [x] Multiple servers and profiles; switching protected by a hashed PIN or by requiring sign-in
+- [x] Everything stored in one Keychain item; last profile restored on launch unless it's locked
+- [x] Sign out via `/Sessions/Logout` (the SDK's `signOut()` needs admin rights)
+
+Tested live against the Jellyfin 12.3 demo server: adding the server, the profile list and getting a Quick Connect code. Password sign-in, session restore and profile locks are covered by unit tests but haven't had a live run yet.
 
 ### Phase 2: browsing
 
