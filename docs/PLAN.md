@@ -162,7 +162,7 @@ Tested live in the simulator against the Jellyfin 12.3 demo server: resuming a m
 
 Resuming a transcode waits for the server to restart the transcode at the resume point, which took 9–14 s on the demo server; starting the seek before the stream is ready didn't help there. If the resume jump fails, playback stops with an error rather than starting over and overwriting the saved position.
 
-Not yet: skip-back on resume, keeping playback going across the app going to the background, version choice, and a bitrate setting. Series, collection and playlist Play and Shuffle wait for queues. The home page's Continue Watching row only refreshes on launch, so it shows the old position after playback until then.
+Not yet: skip-back on resume, keeping playback going across the app going to the background, version choice, and a bitrate setting. Series, collection and playlist Play and Shuffle wait for queues.
 
 #### Later in Phase 3
 
