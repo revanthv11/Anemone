@@ -18,7 +18,8 @@ let package = Package(
         .library(name: "AnemoneUI", targets: ["AnemoneUI"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/jellyfin/jellyfin-sdk-swift", from: "3.3.0"),
+        // Pinned: 3.3.1 uses `any Error?` syntax that only compiles with Xcode 27, and CI runs Xcode 26.
+        .package(url: "https://github.com/jellyfin/jellyfin-sdk-swift", exact: "3.3.0"),
     ],
     targets: [
         .target(name: "AnemoneCore"),
