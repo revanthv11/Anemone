@@ -45,36 +45,29 @@ public struct MediaCard: View {
     }
 
     private var artwork: some View {
-        ZStack {
-            Rectangle()
-                .fill(.quaternary)
-            Image(systemName: placeholderSymbol)
-                .font(.system(size: 48))
-                .foregroundStyle(.tertiary)
-            ArtworkImage(url: imageURL)
-        }
-        .frame(width: width, height: width / shape.aspectRatio)
-        .overlay(alignment: .bottom) {
-            if let progress, progress > 0 {
-                ProgressBar(progress: progress, width: width - 2 * Self.progressInset)
-                    .padding(.bottom, Self.progressInset)
+        ShapedArtwork(url: imageURL, shape: shape, width: width)
+            .overlay(alignment: .bottom) {
+                if let progress, progress > 0 {
+                    ProgressBar(progress: progress, width: width - 2 * Self.progressInset)
+                        .padding(.bottom, Self.progressInset)
+                }
             }
-        }
-        .clipShape(.rect(cornerRadius: 12))
-        #if os(tvOS)
-            .hoverEffect(.highlight)
-        #endif
-    }
-
-    private var placeholderSymbol: String {
-        switch shape {
-        case .poster: "film"
-        case .thumb: "tv"
-        case .square: "music.note"
-        }
+            .liftOnFocus()
     }
 
     private static let progressInset: CGFloat = 12
+}
+
+private extension View {
+    /// The TV app's focus lift; tvOS only.
+    @ViewBuilder
+    func liftOnFocus() -> some View {
+        #if os(tvOS)
+            hoverEffect(.highlight)
+        #else
+            self
+        #endif
+    }
 }
 
 private struct ProgressBar: View {
