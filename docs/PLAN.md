@@ -137,7 +137,7 @@ Tested live in the simulator against the Jellyfin 12.3 demo server profile saved
 - [x] Person page: photo, birth, birthplace, death, overview; Movies, TV Shows and Episodes rows
 - [x] Mark watched or unwatched, and favourite, from item pages
 - [x] Row memory and focus restored after Back, as on the home page
-- Play, Resume, Restart and Shuffle are marked as not wired up; Resume shows the resume position. They play in Phase 3
+- Play, Resume and Restart play since Phase 3a. Play and Shuffle on series, collections and playlists are still marked as not wired up; they need queues
 - Not yet: trailers, extras, chapters, version and track choice, delete, the context menu, collection sort/filter/view options, Seerr rows, theme music
 
 #### Later in Phase 2
@@ -147,13 +147,29 @@ Tested live in the simulator against the Jellyfin 12.3 demo server profile saved
 
 ### Phase 3: playback v1 (AVPlayer)
 
-- PlaybackInfo with the AVPlayer profile; direct play or HLS; fallback to transcode on error
-- Progress reports every 5 s; resume and optional skip-back on resume
+#### 3a: first playback
+
+- [x] PlaybackInfo with an AVPlayer device profile, adapted from Swiftfin's: direct play of MP4 and MOV; HEVC, AV1 and Dolby Vision offered only when VideoToolbox decodes them; HEVC only when tagged `hvc1` or `dvh1`; transcodes as HLS in fragmented MP4; 100 Mbit/s limit, Wholphin's default
+- [x] The file itself when the server allows direct play, otherwise the server's HLS stream (direct stream or transcode). The token goes in the stream URL, since AVPlayer can't add headers
+- [x] Wholphin's fallback: when direct play or direct stream fails, a transcode from the same position; when a transcode fails, an error page
+- [x] Progress reports as in Wholphin: start once playback is under way, progress every 5 s and on pause or resume, stop with the final position. Reports go out in order, and a slow server doesn't pile them up
+- [x] Play, Resume (an exact seek to the resume position) and Restart on movie, video and episode pages; selecting an episode card plays it from its resume position, as in Wholphin. The page reloads after playback, so Resume shows the new position
+- [x] The system player (`AVPlayerViewController`) until Anemone's overlay: its transport bar and scrubbing, the title, episode and overview in its info panel, and Now Playing. At the end it closes, as Wholphin does with nothing up next
+
+Tested live in the simulator against the Jellyfin 12.3 demo server: resuming a movie by direct play, the same movie forced through an HLS transcode, and closing with Menu, after which the page showed the new resume position. The demo server restores its data on a schedule, so positions there don't last between runs. A position isn't saved when the app is killed mid-play; Jellyfin keeps it with the play session until the session ends.
+
+Resuming a transcode waits for the server to restart the transcode at the resume point, which took 9–14 s on the demo server; starting the seek before the stream is ready didn't help there. If the resume jump fails, playback stops with an error rather than starting over and overwriting the saved position.
+
+Not yet: skip-back on resume, keeping playback going across the app going to the background, version choice, and a bitrate setting. Series, collection and playlist Play and Shuffle wait for queues. The home page's Continue Watching row only refreshes on launch, so it shows the old position after playback until then.
+
+#### Later in Phase 3
+
 - Audio/subtitle choice, ported from `StreamChoiceService` (per-item and per-series persistence)
 - Plex-style overlay: D-pad seek with acceleration, chapters, queue, trickplay
 - Media segments (intro, credits, recap, preview, commercial): ignore / ask / auto-skip
 - Next up with autoplay countdown and pass-out protection
-- Now Playing integration, frame-rate and HDR matching
+- Queues: Play and Shuffle for series, collections and playlists
+- Now Playing artwork and remote commands, frame-rate and HDR matching
 - First TestFlight builds start here
 
 ### Phase 4: playback v2 (MPV)

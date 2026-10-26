@@ -175,8 +175,7 @@ extension MediaItem {
             episode: episode,
             year: dto.productionYear,
             overview: dto.overview,
-            // Jellyfin counts in 100-nanosecond ticks.
-            runtime: dto.runTimeTicks.map { .microseconds($0 / 10) },
+            runtime: dto.runTimeTicks.map(Duration.init(ticks:)),
             officialRating: dto.officialRating,
             progress: dto.userData?.playedPercentage.flatMap { $0 > 0 ? min($0 / 100, 1) : nil },
             artwork: Artwork(

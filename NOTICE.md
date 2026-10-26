@@ -14,6 +14,13 @@ Anemone is a Swift rewrite for tvOS. Behaviour, data models, and logic are porte
 
 Some of Wholphin's device profile code is adapted from the official [jellyfin-androidtv](https://github.com/jellyfin/jellyfin-androidtv) client (GPL-2.0). Any of it that is ported keeps that attribution.
 
+## Swiftfin
+
+Anemone's AVPlayer device profile is adapted from [Swiftfin](https://github.com/jellyfin/Swiftfin), the official Jellyfin client for Apple platforms.
+
+- Copyright (c) Jellyfin & Jellyfin Contributors
+- Licensed under the Mozilla Public License, version 2.0, which allows combining it into this GPL-3.0 work
+
 ## Third-party packages
 
 | Package | License |

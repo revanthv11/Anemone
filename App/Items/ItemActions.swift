@@ -36,28 +36,27 @@ private struct ActionLabel: View {
 }
 
 /// Play, or Resume and Restart, for a playable item.
-///
-/// Playback is Phase 3, so these don't play anything yet: they say so instead, and a note beside
-/// them says it up front.
 struct PlaybackButtons: View {
     let resumePosition: Duration?
     let focus: FocusState<ItemFocus?>.Binding
-    @Binding var alert: ItemAlert?
+    /// Plays from a position, or from the beginning when `nil`.
+    let play: (Duration?) -> Void
 
     var body: some View {
         if let resumePosition {
             ActionButton(title: "Resume from \(resumePosition.clockText)", systemImage: "play.fill") {
-                alert = .playbackUnavailable(resumeAt: resumePosition)
+                play(resumePosition)
             }
             .focused(focus, equals: .action(.play))
             .accessibilityIdentifier("action.resume")
             ActionButton(title: "Restart", systemImage: "arrow.counterclockwise") {
-                alert = .playbackUnavailable(resumeAt: nil)
+                play(nil)
             }
             .focused(focus, equals: .action(.restart))
+            .accessibilityIdentifier("action.restart")
         } else {
             ActionButton(title: "Play", systemImage: "play.fill") {
-                alert = .playbackUnavailable(resumeAt: nil)
+                play(nil)
             }
             .focused(focus, equals: .action(.play))
             .accessibilityIdentifier("action.play")
@@ -65,10 +64,11 @@ struct PlaybackButtons: View {
     }
 }
 
-/// Marks the play buttons as not wired up yet.
+/// Marks Play and Shuffle on series, collections and playlists as not wired up yet: they need a
+/// queue, which comes later in Phase 3.
 struct PlaybackNotWiredNote: View {
     var body: some View {
-        Label("Playback isn't wired up yet (Phase 3)", systemImage: "info.circle")
+        Label("Play and Shuffle here aren't wired up yet (later in Phase 3)", systemImage: "info.circle")
             .font(.caption)
             .foregroundStyle(.secondary)
     }
@@ -107,22 +107,26 @@ struct FavoriteButton: View {
 
 /// What an item page's alert says.
 enum ItemAlert: Hashable {
-    case playbackUnavailable(resumeAt: Duration?)
+    /// Play or Shuffle for a series, collection or playlist, which needs a queue.
+    case queueUnavailable
+    /// Music plays in Phase 5.
+    case musicUnavailable
     case failed(String)
 
     var title: String {
         switch self {
-        case .playbackUnavailable: "Playback isn't available yet"
+        case .queueUnavailable, .musicUnavailable: "Playback isn't available yet"
         case .failed: "Something went wrong"
         }
     }
 
     var message: String {
         switch self {
-        case let .playbackUnavailable(position?):
-            "Anemone can't play anything until Phase 3. This would resume from \(position.clockText)."
-        case .playbackUnavailable(nil):
-            "Anemone can't play anything until Phase 3."
+        case .queueUnavailable:
+            "Playing a whole series, collection or playlist comes later in Phase 3. "
+                + "Play an item from its own page for now."
+        case .musicUnavailable:
+            "Music plays in Phase 5."
         case let .failed(message):
             message
         }

@@ -285,24 +285,6 @@ struct ItemPagesTests {
     """#
 }
 
-/// The last request a test's fake server saw.
-private final class Recorder: Sendable {
-    let last = Mutex<SentRequest?>(nil)
-}
-
-/// What a test saw of a request.
-private struct SentRequest: Sendable {
-    let method: String?
-    /// The SDK repeats a key for each value of a list; they're joined with commas here.
-    let query: [String: String]
-
-    init(_ request: URLRequest) {
-        method = request.httpMethod
-        let items = request.url.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false)?.queryItems } ?? []
-        query = Dictionary(items.map { ($0.name, $0.value ?? "") }) { "\($0),\($1)" }
-    }
-}
-
 private extension MockServer.Reply {
     static func items(_ items: String...) -> Self {
         .json(#"{"Items":[\#(items.joined(separator: ","))]}"#)

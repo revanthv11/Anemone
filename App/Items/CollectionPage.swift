@@ -108,12 +108,12 @@ struct CollectionPage: View {
     private var buttons: some View {
         HStack(spacing: 24) {
             ActionButton(title: "Play", systemImage: "play.fill") {
-                alert = .playbackUnavailable(resumeAt: nil)
+                alert = .queueUnavailable
             }
             .focused($focus, equals: .action(.play))
             .accessibilityIdentifier("action.play")
             ActionButton(title: "Shuffle", systemImage: "shuffle") {
-                alert = .playbackUnavailable(resumeAt: nil)
+                alert = .queueUnavailable
             }
             .focused($focus, equals: .action(.shuffle))
             FavoriteButton(isFavorite: collection.userState.isFavorite) {

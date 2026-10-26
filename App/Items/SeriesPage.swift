@@ -93,12 +93,12 @@ struct SeriesPage: View {
         HStack(spacing: 24) {
             // Wholphin plays the next episode up, or the first one.
             ActionButton(title: "Play", systemImage: "play.fill") {
-                alert = .playbackUnavailable(resumeAt: nil)
+                alert = .queueUnavailable
             }
             .focused($focus, equals: .action(.play))
             .accessibilityIdentifier("action.play")
             ActionButton(title: "Shuffle", systemImage: "shuffle") {
-                alert = .playbackUnavailable(resumeAt: nil)
+                alert = .queueUnavailable
             }
             .focused($focus, equals: .action(.shuffle))
             PlayedButton(isPlayed: series.userState.isPlayed) {

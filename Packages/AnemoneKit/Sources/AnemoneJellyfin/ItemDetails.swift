@@ -268,8 +268,7 @@ extension ItemDetails.UserState {
         self.init(
             isPlayed: data?.isPlayed ?? false,
             isFavorite: data?.isFavorite ?? false,
-            // Jellyfin counts in 100-nanosecond ticks.
-            resumePosition: data?.playbackPositionTicks.flatMap { $0 > 0 ? .microseconds($0 / 10) : nil },
+            resumePosition: data?.playbackPositionTicks.flatMap { $0 > 0 ? Duration(ticks: $0) : nil },
             unplayedCount: data?.unplayedItemCount,
             // The same reading as `MediaItem.progress`.
             progress: data?.playedPercentage.flatMap { $0 > 0 ? min($0 / 100, 1) : nil },
