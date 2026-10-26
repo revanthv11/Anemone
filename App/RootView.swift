@@ -2,15 +2,19 @@ import SwiftUI
 
 /// Routes between setup, sign-in and the signed-in app.
 ///
-/// Passing `-homeSpike <variant>` opens one of the Phase 0 home-screen prototypes instead
-/// (see docs/spikes/home-focus.md).
+/// Passing `-homeSpike <variant>` opens one of the Phase 0 home-screen prototypes instead, and
+/// `-libraryGridSpike <count>` the Phase 2b grid on a synthetic library (see
+/// docs/spikes/home-focus.md).
 struct RootView: View {
     @State private var model = AppModel()
     private let spike = UserDefaults.standard.string(forKey: "homeSpike")
+    private let gridSpikeCount = UserDefaults.standard.integer(forKey: "libraryGridSpike")
 
     var body: some View {
         if let spike {
             spikeView(spike)
+        } else if gridSpikeCount > 0 {
+            LibraryGridSpike(count: gridSpikeCount)
         } else {
             Group {
                 switch model.screen {

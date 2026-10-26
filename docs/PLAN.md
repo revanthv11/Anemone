@@ -117,8 +117,15 @@ tvOS ignores `.keyboardType(.numberPad)`, so PIN entry uses the full on-screen k
 
 #### 2b: libraries
 
-- Library grids: filters, sorts, view options, alphabet jump bar
-- Pinned libraries in the sidebar
+- [x] Library grids, paged 100 items at a time ahead of focus, per the grid check in [spikes/home-focus.md](spikes/home-focus.md#library-grid-phase-2b)
+- [x] Wholphin's sorts per library type; picking the current sort again reverses it
+- [x] Filters: played, favorites, genres, studios (TV), community rating, parental rating, video type, year, decade
+- [x] View options: card shape, columns, titles; defaults per library type
+- [x] Alphabet jump bar when sorted by name, position footer, Back to jump to the top, random pick
+- [x] Sort, filter and view options kept per library in UserDefaults (server sync later)
+- [x] Pinned libraries in the sidebar: choose and order them in Settings › Sidebar; the rest go under More
+
+Tested live in the simulator against the Jellyfin 12.3 demo server profile saved there in Phase 2a. Live TV keeps a placeholder until the guide in Phase 5. Not ported yet: Wholphin's other library tabs (Recommended, Collections, Genres, Studios), list layouts, the details header and backdrop options, and page jumps with the remote.
 
 #### 2c: item pages
 
