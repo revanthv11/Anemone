@@ -1,0 +1,14 @@
+included:
+  - App
+  - TopShelf
+  - Packages/AnemoneKit/Sources
+  - Packages/AnemoneKit/Tests
+
+disabled_rules:
+  # SwiftFormat owns formatting; these rules disagree with it.
+  - trailing_comma
+  - opening_brace
+
+line_length:
+  warning: 120
+  error: 160
