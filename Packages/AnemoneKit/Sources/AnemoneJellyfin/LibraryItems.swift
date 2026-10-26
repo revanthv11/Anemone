@@ -143,7 +143,9 @@ public enum LibraryJump {
     /// anything else that isn't A to Z.
     public static func letter(for sortName: String?) -> Character? {
         guard let first = sortName?.first?.uppercased().first else { return nil }
-        if first.isASCII, first.isNumber { return "#" }
+        if first.isASCII, first.isNumber {
+            return "#"
+        }
         return letters.contains(first) && first != "#" ? first : nil
     }
 
