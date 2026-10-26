@@ -83,6 +83,20 @@ struct AccountStoreTests {
         #expect(loaded.deviceID == fresh.deviceID)
     }
 
+    @Test func `sets aside saved data it can't decode instead of losing it`() throws {
+        let secureStore = InMemorySecureStore()
+        let unreadable = Data(#"{"deviceID":"device-7","servers":"from a future format"}"#.utf8)
+        try secureStore.set(unreadable, for: "accounts")
+        let repository = AccountRepository(store: secureStore)
+
+        let loaded = try repository.load()
+        try repository.save(loaded)
+
+        #expect(loaded.servers.isEmpty)
+        #expect(loaded.deviceID == "device-7")
+        #expect(try secureStore.data(for: "accounts.unreadable") == unreadable)
+    }
+
     private func user(
         _ id: String,
         on server: SavedServer,

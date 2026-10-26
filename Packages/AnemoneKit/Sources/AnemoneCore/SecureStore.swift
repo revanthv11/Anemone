@@ -83,7 +83,9 @@ public final class InMemorySecureStore: SecureStore {
 
 /// Loads and saves the `AccountStore` as one JSON item in a `SecureStore`.
 public struct AccountRepository: Sendable {
-    private static let key = "accounts"
+    static let key = "accounts"
+    /// Where an item that no longer decodes is kept, so the next save can't destroy it.
+    static let unreadableKey = "accounts.unreadable"
 
     private let store: any SecureStore
 
@@ -92,12 +94,29 @@ public struct AccountRepository: Sendable {
     }
 
     /// The saved accounts, or a fresh store (with a new device ID) on first launch.
+    ///
+    /// If the saved item no longer decodes (say, after a format change), it's set aside under
+    /// `unreadableKey` and a fresh store is returned that keeps the old device ID where possible.
+    ///
+    /// - Throws: when the store itself can't be read. Callers must not save over the item then.
     public func load() throws -> AccountStore {
         guard let data = try store.data(for: Self.key) else { return AccountStore() }
-        return try JSONDecoder().decode(AccountStore.self, from: data)
+        do {
+            return try JSONDecoder().decode(AccountStore.self, from: data)
+        } catch {
+            if try store.data(for: Self.unreadableKey) == nil {
+                try store.set(data, for: Self.unreadableKey)
+            }
+            let deviceID = try? JSONDecoder().decode(DeviceIDOnly.self, from: data).deviceID
+            return AccountStore(deviceID: deviceID ?? UUID().uuidString)
+        }
     }
 
     public func save(_ accounts: AccountStore) throws {
         try store.set(JSONEncoder().encode(accounts), for: Self.key)
+    }
+
+    private struct DeviceIDOnly: Decodable {
+        let deviceID: String
     }
 }
