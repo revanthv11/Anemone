@@ -7,7 +7,7 @@ struct AVPlayerProfileTests {
     private static let appleTVHD = VideoDecoders(hevc: false, av1: false, dolbyVision: false)
     private static let appleTV4K = VideoDecoders(hevc: true, av1: false, dolbyVision: true)
 
-    @Test func `Apple TV HD is offered H.264 only`() {
+    @Test func `an Apple TV HD is offered H.264 only`() {
         let profile = AVPlayerProfile.deviceProfile(decoders: Self.appleTVHD)
 
         #expect(profile.directPlayProfiles?.map(\.videoCodec) == ["h264,mpeg4", "h264,mpeg4,mjpeg"])
@@ -16,7 +16,7 @@ struct AVPlayerProfileTests {
         #expect(AVPlayerProfile.videoRanges(Self.appleTVHD) == [.sdr, .doviWithSDR])
     }
 
-    @Test func `Apple TV 4K is offered HEVC, HDR and Dolby Vision`() {
+    @Test func `an Apple TV 4K is offered HEVC, HDR and Dolby Vision`() {
         let profile = AVPlayerProfile.deviceProfile(decoders: Self.appleTV4K)
 
         #expect(profile.directPlayProfiles?.first?.videoCodec == "h264,mpeg4,hevc")
@@ -39,7 +39,7 @@ struct AVPlayerProfileTests {
         #expect(tag.isRequired == true)
     }
 
-    @Test func `Dolby Vision without its own layer needs a Dolby Vision decoder`() {
+    @Test func `without a Dolby Vision decoder, only Dolby Vision with an HDR base layer is offered`() {
         let hdrOnly = VideoDecoders(hevc: true, av1: false, dolbyVision: false)
 
         let ranges = AVPlayerProfile.videoRanges(hdrOnly)
