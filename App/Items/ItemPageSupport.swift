@@ -82,7 +82,7 @@ extension ItemDetails {
     var cardSubtitle: String? {
         switch item.kind {
         case .episode:
-            [item.episodeLabel, item.name].compactMap(\.self).joined(separator: " · ")
+            item.subtitle
         case .series:
             seriesYears
         default:

@@ -193,9 +193,11 @@ struct SeasonPage: View {
                 PlaybackButtons(resumePosition: episode.userState.resumePosition, focus: $focus, alert: $alert)
                 PlayedButton(isPlayed: episode.userState.isPlayed) {
                     Task {
-                        await save(.played(!episode.userState.isPlayed), for: episode)
-                        // Wholphin goes back to the episodes, ready for the next one.
-                        focus = episodeFocus(episode.id)
+                        // Wholphin goes back to the episodes, ready for the next one. After a
+                        // failure, focus stays put behind the error.
+                        if await save(.played(!episode.userState.isPlayed), for: episode) {
+                            focus = episodeFocus(episode.id)
+                        }
                     }
                 }
                 .focused($focus, equals: .action(.played))
@@ -241,9 +243,13 @@ struct SeasonPage: View {
             pickedSeasonID = season.id
         }
     }
+}
 
-    private func loadSeries() async {
-        guard series == nil else { return }
+/// Loading and saving.
+private extension SeasonPage {
+    /// Runs again whenever the page comes back into view, like Wholphin's refresh on resume. A
+    /// failed refresh keeps what's showing.
+    func loadSeries() async {
         let session = browse.session
         let seriesID = seriesID
         async let series = attempt { try await session.itemDetails(id: seriesID) }
@@ -252,19 +258,30 @@ struct SeasonPage: View {
         case let .success(series):
             self.series = series
         case let .failure(error):
-            problem = browse.problem(with: error, doing: "load this series from \(browse.server.name)")
+            let message = browse.problem(with: error, doing: "load this series from \(browse.server.name)")
+            if self.series == nil {
+                problem = message
+            }
         }
-        self.seasons = await browse.optional(seasons) ?? []
+        if let seasons = await browse.optional(seasons) {
+            self.seasons = seasons
+        }
     }
 
-    private func loadEpisodes(of seasonID: MediaItem.ID) async {
-        // Already loaded, such as when coming back from a person's page.
-        guard episodesSeasonID != seasonID else { return }
+    func loadEpisodes(of seasonID: MediaItem.ID) async {
+        // Coming back to the page refreshes the season in place, keeping the selected episode.
+        let isRefresh = episodesSeasonID == seasonID
         let isFirstSeason = episodesSeasonID == nil
-        episodes = nil
-        episodesProblem = nil
+        if !isRefresh {
+            episodes = nil
+            episodesProblem = nil
+        }
         do {
             let loaded = try await browse.session.episodes(ofSeries: seriesID, season: seasonID)
+            guard !isRefresh else {
+                episodes = loaded
+                return
+            }
             // The first season shown starts on the episode that opened the page; others start
             // at their first episode.
             let start = isFirstSeason ? loaded.index(ofID: episodeID, number: nil) : 0
@@ -278,15 +295,21 @@ struct SeasonPage: View {
                 focus = episodeFocus(selected)
             }
         } catch {
-            episodesProblem = browse.problem(with: error, doing: "load this season's episodes")
+            let message = browse.problem(with: error, doing: "load this season's episodes")
+            if !isRefresh {
+                episodesProblem = message
+            }
         }
     }
 
-    private func save(_ change: UserStateChange, for episode: ItemDetails) async {
-        guard let state = await browse.save(change, for: episode, failed: { alert = $0 }),
-              let index = episodes?.firstIndex(where: { $0.id == episode.id })
-        else { return }
-        episodes?[index].userState = state
+    /// Returns whether the server saved the change.
+    @discardableResult
+    func save(_ change: UserStateChange, for episode: ItemDetails) async -> Bool {
+        guard let state = await browse.save(change, for: episode, failed: { alert = $0 }) else { return false }
+        if let index = episodes?.firstIndex(where: { $0.id == episode.id }) {
+            episodes?[index].apply(state)
+        }
+        return true
     }
 }
 

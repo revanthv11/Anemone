@@ -57,12 +57,15 @@ struct SeriesPage: View {
         .task(id: series.id) {
             let session = browse.session
             let id = series.id
+            // Similar series don't change between visits, so they're asked for once, as on the
+            // movie page.
+            let needsSimilar = similar.isEmpty
             async let seasons = attempt { try await session.seasons(ofSeries: id) }
-            async let similar = attempt { try await session.similarItems(to: id) }
+            async let similar = needsSimilar ? attempt { try await session.similarItems(to: id) } : .success([])
             if let seasons = await browse.optional(seasons) {
                 self.seasons = seasons
             }
-            if let similar = await browse.optional(similar) {
+            if needsSimilar, let similar = await browse.optional(similar) {
                 self.similar = similar
             }
         }
@@ -142,7 +145,7 @@ struct SeriesPage: View {
 
     private func setFavorite(_ isFavorite: Bool) async {
         if let state = await browse.save(.favorite(isFavorite), for: series, failed: { alert = $0 }) {
-            series.userState = state
+            series.apply(state)
         }
     }
 

@@ -157,7 +157,7 @@ struct CollectionPage: View {
 
     private func setFavorite(_ isFavorite: Bool) async {
         if let state = await browse.save(.favorite(isFavorite), for: collection, failed: { alert = $0 }) {
-            collection.userState = state
+            collection.apply(state)
         }
     }
 }

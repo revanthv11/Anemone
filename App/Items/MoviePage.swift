@@ -134,7 +134,7 @@ struct MoviePage: View {
 
     private func save(_ change: UserStateChange) async {
         if let state = await browse.save(change, for: item, failed: { alert = $0 }) {
-            item.userState = state
+            item.apply(state)
         }
     }
 }

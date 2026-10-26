@@ -13,6 +13,8 @@ struct PlaylistPage: View {
     @State private var entries: [ItemDetails]?
     /// Whether the user may reorder the playlist, which shows Wholphin's move buttons.
     @State private var canEdit = false
+    /// Set while a move is with the server, so moves go one at a time and in order.
+    @State private var isMoving = false
     @State private var problem: String?
     @State private var alert: ItemAlert?
     @State private var focusedIndex = 0
@@ -59,6 +61,14 @@ struct PlaylistPage: View {
             await loadEntries()
             self.canEdit = await browse.optional(canEdit) ?? false
         }
+    }
+
+    /// Whether an item is in the playlist more than once. The server moves an entry by its item,
+    /// taking the first copy it finds, so such a playlist can't be reordered reliably and gets no
+    /// move buttons.
+    private var hasRepeats: Bool {
+        let ids = entries?.map(\.id) ?? []
+        return Set(ids).count != ids.count
     }
 
     private var focusedEntry: ItemDetails? {
@@ -117,8 +127,12 @@ struct PlaylistPage: View {
     /// Wholphin does. When that button is disabled at the end of the list, focus goes to the
     /// entry itself.
     private func move(from index: Int, to newIndex: Int, button: String) async {
-        guard var reordered = entries, reordered.indices.contains(index), reordered.indices.contains(newIndex)
+        // A press while the last move is still with the server is dropped, rather than racing it.
+        guard !isMoving, var reordered = entries, reordered.indices.contains(index),
+              reordered.indices.contains(newIndex)
         else { return }
+        isMoving = true
+        defer { isMoving = false }
         let entry = reordered.remove(at: index)
         reordered.insert(entry, at: newIndex)
         entries = reordered
@@ -159,7 +173,7 @@ struct PlaylistPage: View {
                             .buttonStyle(HighlightButtonStyle())
                             .focused($focus, equals: entryFocus(index))
                             .accessibilityIdentifier("entry.\(index)")
-                            if canEdit {
+                            if canEdit, !hasRepeats {
                                 moveButtons(index: index, count: entries.count)
                             }
                         }

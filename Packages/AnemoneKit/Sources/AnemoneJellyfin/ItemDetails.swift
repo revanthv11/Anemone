@@ -15,17 +15,21 @@ public struct ItemDetails: Hashable, Identifiable, Sendable {
         public var resumePosition: Duration?
         /// For series, seasons and collections: how many of their episodes or items are unwatched.
         public var unplayedCount: Int?
+        /// How much has been watched, from 0 to 1, as `MediaItem.progress` holds it.
+        public var progress: Double?
 
         public init(
             isPlayed: Bool = false,
             isFavorite: Bool = false,
             resumePosition: Duration? = nil,
             unplayedCount: Int? = nil,
+            progress: Double? = nil,
         ) {
             self.isPlayed = isPlayed
             self.isFavorite = isFavorite
             self.resumePosition = resumePosition
             self.unplayedCount = unplayedCount
+            self.progress = progress
         }
     }
 
@@ -113,6 +117,13 @@ public struct ItemDetails: Hashable, Identifiable, Sendable {
 
     public var id: MediaItem.ID {
         item.id
+    }
+
+    /// Takes the user's new state from the server, keeping the card's progress bar in step:
+    /// marking an item watched clears its resume position and progress.
+    public mutating func apply(_ state: UserState) {
+        userState = state
+        item.progress = state.progress
     }
 
     /// A season's or episode's number within its parent.
@@ -260,6 +271,8 @@ extension ItemDetails.UserState {
             // Jellyfin counts in 100-nanosecond ticks.
             resumePosition: data?.playbackPositionTicks.flatMap { $0 > 0 ? .microseconds($0 / 10) : nil },
             unplayedCount: data?.unplayedItemCount,
+            // The same reading as `MediaItem.progress`.
+            progress: data?.playedPercentage.flatMap { $0 > 0 ? min($0 / 100, 1) : nil },
         )
     }
 }

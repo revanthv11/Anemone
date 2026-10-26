@@ -31,6 +31,19 @@ struct ItemDetailsTests {
         #expect(movie.timeRemaining == nil)
     }
 
+    @Test func `applying a new state updates the card's progress`() {
+        var episode = ItemDetails(
+            item: MediaItem(id: "e", name: "Pilot", kind: .episode, progress: 0.56),
+            userState: .init(resumePosition: .seconds(900), progress: 0.56),
+        )
+
+        episode.apply(.init(isPlayed: true))
+
+        #expect(episode.userState.isPlayed)
+        #expect(episode.userState.resumePosition == nil)
+        #expect(episode.item.progress == nil)
+    }
+
     @Test func `finds seasons and episodes by id, then by number`() {
         let episodes = [1, 2, 4].map { (number: Int) in
             ItemDetails(item: MediaItem(

@@ -49,6 +49,8 @@ struct PersonPage: View {
         .initialFocus($focus, person.item.overview == nil ? .action(.favorite) : .overview)
         .itemAlert($alert)
         .task(id: person.id) {
+            // A person's credits don't change between visits, so coming back doesn't reload them.
+            guard filmography.isEmpty else { return }
             let session = browse.session
             let id = person.id
             let rows = FilmographyRow.allCases.filter(person.creditCounts.mayHave)
@@ -128,7 +130,7 @@ struct PersonPage: View {
 
     private func setFavorite(_ isFavorite: Bool) async {
         if let state = await browse.save(.favorite(isFavorite), for: person, failed: { alert = $0 }) {
-            person.userState = state
+            person.apply(state)
         }
     }
 }
