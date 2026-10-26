@@ -104,14 +104,15 @@ struct LibraryScreen: View {
                 item.image(for: shape).flatMap { browse.session.imageURL(for: $0, maxWidth: pixels) }
             },
             onSelect: { path.append($0) },
-        ) {
-            header(count: pager.count) {
-                Button("Random", systemImage: "dice") {
-                    openRandom(from: pager)
+            header: {
+                header(count: pager.count) {
+                    Button("Random", systemImage: "dice") {
+                        openRandom(from: pager)
+                    }
+                    .disabled(pager.count == 0)
                 }
-                .disabled(pager.count == 0)
-            }
-        }
+            },
+        )
         .overlay {
             if isReloading {
                 ProgressView()

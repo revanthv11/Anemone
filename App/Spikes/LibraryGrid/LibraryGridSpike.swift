@@ -64,15 +64,16 @@ struct LibraryGridSpike: View {
                         placeholderFocusCount += 1
                     }
                 },
-            ) {
-                HStack(spacing: 40) {
-                    Text("Spike library")
-                        .font(.title2.bold())
-                    Spacer()
-                    Button("Sort") {}
-                    Button("Filter") {}
-                }
-            }
+                header: {
+                    HStack(spacing: 40) {
+                        Text("Spike library")
+                            .font(.title2.bold())
+                        Spacer()
+                        Button("Sort") {}
+                        Button("Filter") {}
+                    }
+                },
+            )
             .overlay(alignment: .topLeading) {
                 // Pinned, so it stays readable in screenshots wherever the grid has scrolled.
                 HStack(spacing: 24) {
