@@ -45,9 +45,10 @@ final class BrowseModel {
     func load() async {
         home = .loading
         do {
-            let resolution = try await session.resolveHomeSettings()
+            let resolution = try await session.resolveHomeSettings(cache: homeCache)
             let content = try await session.home(
                 rows: resolution.settings?.rows,
+                removedFromNextUp: resolution.removedFromNextUp,
                 options: homeOptions(isRefresh: false),
             )
             homeRows = content.configs
@@ -141,7 +142,7 @@ extension BrowseModel {
         await homeSave?.value
         try await homeWriter.forgetHomePageSettings()
         homeSaveProblem = nil
-        let resolution = try await session.resolveHomeSettings()
+        let resolution = try await session.resolveHomeSettings(cache: homeCache)
         homeRows = resolution.settings?.rows ?? HomePageSettings.defaultRows(for: libraries)
         homeRowsSource = resolution.source
     }

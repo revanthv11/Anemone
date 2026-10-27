@@ -116,8 +116,14 @@ public actor HomeCache {
     private var datePlayed: [String: (date: Date, expiry: Date)] = [:]
     private var suggestions: [String: (ids: [String], expiry: Date)] = [:]
     private var genreArt: [String: GenreArt] = [:]
+    /// Whether the server has the companion plugin, once it has said.
+    private(set) var isServerPluginInstalled: Bool?
 
     public init() {}
+
+    func setServerPluginInstalled(_ installed: Bool) {
+        isServerPluginInstalled = installed
+    }
 
     func datePlayed(for key: String, now: Date = .now) -> Date? {
         datePlayed[key].flatMap { $0.expiry > now ? $0.date : nil }
@@ -157,11 +163,20 @@ public extension JellyfinSession {
     /// Loads the home page's rows, as Wholphin's `HomeViewModel.loadHomeRows`: four at a time,
     /// one failing doesn't stop the others, and a row whose library is gone (a 404) is empty.
     ///
-    /// - Parameter configs: the rows to show; Wholphin's default rows when `nil`.
+    /// - Parameters:
+    ///   - configs: the rows to show; Wholphin's default rows when `nil`.
+    ///   - removed: the series taken out of Next Up, when they were just read with the rows;
+    ///     read here when `nil` and a row needs them.
     /// - Throws: when the libraries can't be loaded, or `SessionError.signedOut` from any request.
-    func home(rows configs: [HomeRowConfig]? = nil, options: HomeOptions = HomeOptions()) async throws -> HomeContent {
+    func home(
+        rows configs: [HomeRowConfig]? = nil,
+        removedFromNextUp removed: RemovedFromNextUp? = nil,
+        options: HomeOptions = HomeOptions(),
+    ) async throws -> HomeContent {
         let needsRemoved = configs?.contains { $0.kind == .nextUp || $0.kind == .continueWatchingCombined } ?? true
-        async let removedResult = needsRemoved ? attempt { try await removedFromNextUp() } : .success(.init())
+        async let removedResult = needsRemoved && removed == nil
+            ? attempt { try await removedFromNextUp() }
+            : .success(removed ?? .init())
         let libraries = try await libraries()
         let configs = configs ?? HomePageSettings.defaultRows(for: libraries)
         // A failed read shows every series, as if none were removed.
