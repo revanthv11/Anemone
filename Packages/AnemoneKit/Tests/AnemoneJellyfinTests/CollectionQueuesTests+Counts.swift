@@ -34,6 +34,34 @@ extension CollectionQueuesTests {
         #expect(asked.map { $0.query["limit"] } == ["2", "1"])
     }
 
+    @Test(.timeLimit(.minutes(1)))
+    func `a server that ignores where to start isn't asked for the same episodes again and again`() async throws {
+        // As above, but the series' first episodes come back wherever they're asked to start.
+        let movies = (1 ... 97).map { Self.movie("m\($0)") }
+        let episodes = ["e1", "e2", "e3", "e4"].map(Self.episode)
+        let recorder = register(host: "collection-series-ignores-start.test") { request in
+            guard request.query["limit"] != "0" else { return #"{"Items":[],"TotalRecordCount":101}"# }
+            switch request.query["parentId"] {
+            case "c1":
+                return Self.items([Self.episode("e1")] + movies + [Self.series("s1")])
+            case "s1":
+                let limit = request.query["limit"].flatMap { Int($0) } ?? episodes.count
+                return Self.items(Array(episodes.prefix(limit)))
+            default:
+                return nil
+            }
+        }
+
+        let session = try session(host: "collection-series-ignores-start.test")
+        let found = try await session.collectionQueue(id: "c1", shuffled: false)
+
+        // Before, e1 was asked for again and again, for ever.
+        #expect(found.items.count == 99)
+        #expect(found.items.last?.id == "e2")
+        let asked = recorder.requests.filter { $0.query["parentId"] == "s1" }
+        #expect(asked.map { $0.query["startIndex"] } == [nil, "2"])
+    }
+
     @Test func `play and shuffle count each song of an album in a collection`() async throws {
         let host = "collection-album.test"
         _ = register(host: host) { request in

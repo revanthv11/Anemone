@@ -257,31 +257,40 @@ extension JellyfinSession {
     /// A series' or season's episodes, as many as fit, asked for again from where the last
     /// answer ended while there's room: episodes already queued, such as one the page lists on
     /// its own, don't take the place of the ones after them.
+    ///
+    /// A server that sends nothing it hasn't sent already, such as one that ignores where to
+    /// start and sends the first episodes again, isn't asked again. Nor is any server asked more
+    /// times than a queue has places: each answer gone on from has an episode not sent before,
+    /// which is queued then or already was.
     private func addEpisodes(
         in containerID: MediaItem.ID,
         to walk: inout CollectionWalk,
         filter: LibraryFilter,
     ) async throws {
         var start = 0
-        while !walk.isFull {
+        var sent: Set<MediaItem.ID> = []
+        for _ in 0 ..< Self.queueLimit {
+            guard !walk.isFull else { return }
             let limit = walk.room
             let page = try await episodes(in: containerID, filter: filter, from: start, limit: limit)
             walk.add(page.episodes)
+            let isNew = !sent.isSuperset(of: page.sentIDs)
+            sent.formUnion(page.sentIDs)
             // Fewer than asked for: those were the last.
-            guard page.sentCount == limit else { return }
+            guard page.sentIDs.count == limit, isNew else { return }
             start += limit
         }
     }
 
     /// A series' or season's episodes in order, the Specials season's first, with the page's
-    /// filters, as Wholphin's Play All filters what's inside a collection; and how many the
-    /// server sent, before any are left out.
+    /// filters, as Wholphin's Play All filters what's inside a collection; and the IDs of all
+    /// the server sent, before any are left out.
     private func episodes(
         in containerID: MediaItem.ID,
         filter: LibraryFilter,
         from start: Int,
         limit: Int,
-    ) async throws -> (episodes: [ItemDetails], sentCount: Int) {
+    ) async throws -> (episodes: [ItemDetails], sentIDs: [MediaItem.ID]) {
         var parameters = Paths.GetItemsParameters(userID: userID)
         filter.apply(to: &parameters)
         parameters.parentID = containerID
@@ -296,7 +305,7 @@ extension JellyfinSession {
         parameters.fields = Self.queueFields
         parameters.enableUserData = true
         let items = try await send(Paths.getItems(parameters: parameters)).items
-        return (items.available, items?.count ?? 0)
+        return (items.available, items?.compactMap(\.id) ?? [])
     }
 
     /// How many items, or items of `kinds`, are in a collection and what's inside it, as the
@@ -327,55 +336,6 @@ extension JellyfinSession {
         parameters.filters = [.isNotFolder]
         parameters.excludeLocationTypes = [.virtual]
         return parameters
-    }
-}
-
-/// What a walk through a collection's page has queued so far.
-private struct CollectionWalk {
-    private(set) var items: [ItemDetails] = []
-    /// What's been queued or gone into, so each counts once.
-    private var seen: Set<MediaItem.ID>
-    /// What the walk can't queue: items listed that aren't videos, such as music or an album,
-    /// and collections too deep inside to go into.
-    private var leftOut: Set<MediaItem.ID> = []
-
-    /// A walk through `collection`'s page, which it never goes into again from inside.
-    init(collection: MediaItem.ID) {
-        seen = [collection]
-    }
-
-    /// How many more videos fit in the queue.
-    var room: Int {
-        JellyfinSession.queueLimit - items.count
-    }
-
-    var isFull: Bool {
-        room <= 0
-    }
-
-    /// How many items it left out, each once, not counting a collection gone into after all
-    /// from a place less deep.
-    var leftOutCount: Int {
-        leftOut.subtracting(seen).count
-    }
-
-    func hasSeen(_ id: MediaItem.ID) -> Bool {
-        seen.contains(id)
-    }
-
-    /// Whether a series, season or collection is new to the walk, to go into.
-    mutating func enter(_ id: MediaItem.ID) -> Bool {
-        seen.insert(id).inserted
-    }
-
-    mutating func leaveOut(_ id: MediaItem.ID) {
-        leftOut.insert(id)
-    }
-
-    mutating func add(_ videos: [ItemDetails]) {
-        for video in videos where !isFull && seen.insert(video.id).inserted {
-            items.append(video)
-        }
     }
 }
 

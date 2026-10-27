@@ -324,7 +324,7 @@ Not verified live: seeking back out of the credits while Up Next shows (the card
 
 Final polish (FPa):
 
-- [x] A series or season in a collection's own order is asked for again from where the server's last answer ended while the queue has room, so episodes already queued (one the page lists on its own, say) no longer cut it short with the rest uncounted
+- [x] A series or season in a collection's own order is asked for again from where the server's last answer ended while the queue has room, so episodes already queued (one the page lists on its own, say) no longer cut it short with the rest uncounted; a server whose answer has nothing it hasn't sent already (one that ignores where to start, say) isn't asked again
 - [x] Play and Shuffle count what they leave out alike, as the server counts it: each song of an album in a collection, where Play counted the album once. A collection nested deeper than four levels counts as left out rather than passing without a word. Play's two counts, and Shuffle's videos and its count, are asked for together
 - [x] With no countdown, Up Next moving on as the credits start leaves no segment or skip button of the old entry behind (`SegmentSkipping`), and another entry's `loaded` starts without them
 
