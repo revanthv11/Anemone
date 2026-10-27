@@ -112,3 +112,46 @@ private struct HomeCategoryCard: View {
             .accessibilityElement(children: .combine)
     }
 }
+
+extension CardShape {
+    var cardWidth: CGFloat {
+        switch self {
+        case .poster: 200
+        case .thumb: 340
+        case .square: 240
+        }
+    }
+}
+
+extension MediaItem {
+    func image(for shape: CardShape) -> ItemImage? {
+        switch shape {
+        case .poster: posterImage
+        case .thumb: thumbImage
+        case .square: squareImage
+        }
+    }
+
+    /// The episode ("S1:E3 · Pilot") or season shown under the series name.
+    var subtitle: String? {
+        switch kind {
+        case .episode:
+            [episodeLabel, name].compactMap(\.self).joined(separator: " · ")
+        case .season:
+            name
+        default:
+            nil
+        }
+    }
+
+    /// Year, running time and age rating, such as "2024 · 1h 52m · PG-13".
+    var details: String {
+        [
+            year.map(String.init),
+            runtime.map { $0.formatted(.units(allowed: [.hours, .minutes], width: .narrow)) },
+            officialRating,
+        ]
+        .compactMap(\.self)
+        .joined(separator: " · ")
+    }
+}

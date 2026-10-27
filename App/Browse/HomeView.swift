@@ -2,6 +2,7 @@ import AnemoneCore
 import AnemoneJellyfin
 import AnemoneUI
 import SwiftUI
+import UIKit
 
 /// Wholphin's home page: a header for the focused item over its backdrop, then the rows chosen
 /// in Settings › Home.
@@ -87,6 +88,12 @@ private struct HomeRows: View {
     @State private var returningCard: CardID?
     /// A card for its row to scroll to, so that it exists before focus moves to it.
     @State private var scrollTarget: CardID?
+    /// The card focus last left for something outside the rows: its long-press menu, the
+    /// sidebar or a page.
+    @State private var cardLeft: CardID?
+    /// The stand-in for a card a refresh removed while focus was outside the rows, which focus
+    /// goes to if nothing has it once a menu closes.
+    @State private var orphanedFocus: CardID?
     @State private var headerItem: MediaItem?
     @State private var backdropItem: MediaItem?
 
@@ -128,8 +135,14 @@ private struct HomeRows: View {
         .onChange(of: content) { old, new in
             keepFocus(from: old, to: new)
         }
-        .onChange(of: focusedCard) { _, card in
-            guard let card, let item = item(for: card) else { return }
+        .onChange(of: focusedCard) { old, card in
+            guard let card else {
+                cardLeft = old
+                return
+            }
+            cardLeft = nil
+            orphanedFocus = nil
+            guard let item = item(for: card) else { return }
             if let returningCard, returningCard != card, self.item(for: returningCard) != nil {
                 // tvOS picked another card on coming back, because a refresh removed the one it
                 // meant to focus. Moved once, like the library grid's return to its last card.
@@ -148,6 +161,27 @@ private struct HomeRows: View {
             try? await Task.sleep(for: .milliseconds(150))
             guard !Task.isCancelled, let focusedCard, let item = item(for: focusedCard) else { return }
             backdropItem = item
+        }
+        .task(id: orphanedFocus) {
+            // A card's menu removed it from its row, say with Remove from Next Up, and the refresh
+            // landed before the menu closed: tvOS has nowhere to put focus then. Once nothing has
+            // focus, it goes to the stand-in; focus elsewhere, such as in the sidebar, stays put.
+            guard let target = orphanedFocus else { return }
+            for _ in 0 ..< 12 {
+                try? await Task.sleep(for: .milliseconds(250))
+                guard !Task.isCancelled, focusedCard == nil, item(for: target) != nil else { return }
+                if !Self.isAnythingFocused {
+                    focusedCard = target
+                    return
+                }
+            }
+        }
+    }
+
+    /// Whether anything in the app has focus.
+    private static var isAnythingFocused: Bool {
+        UIApplication.shared.connectedScenes.contains { scene in
+            (scene as? UIWindowScene)?.focusSystem?.focusedItem != nil
         }
     }
 
@@ -171,15 +205,22 @@ private struct HomeRows: View {
     /// After a refresh, forgets remembered cards whose items left their rows, so those rows start
     /// from their first card again. If the focused card went, focus moves to its row's first card,
     /// or to the next row when that row went too, instead of falling back to the sidebar. That
-    /// includes the card tvOS is about to focus again after Back, when the refresh lands first.
+    /// includes the card tvOS is about to focus again after Back, when the refresh lands first,
+    /// and the card whose long-press menu took it out of its row.
     private func keepFocus(from old: HomeContent, to new: HomeContent) {
         let remembered = lastFocusedByRow.filter { new.item(for: $0.value) != nil }
         lastFocusedByRow = remembered
-        guard let card = focusedCard ?? returningCard, new.item(for: card) == nil,
+        guard let card = focusedCard ?? returningCard ?? cardLeft, new.item(for: card) == nil,
               let row = new.nearestRow(to: card.rowID, in: old)
         else { return }
         let target = remembered[row.id] ?? row.firstCard
         scrollTarget = target
+        if focusedCard == nil, returningCard == nil {
+            // Focus is outside the rows, most likely in the card's own menu, so it isn't taken
+            // from there now.
+            orphanedFocus = target
+            return
+        }
         if focusedCard == nil {
             // Back is still under way, and tvOS may focus a card of its own choosing when it ends.
             returningCard = target
@@ -339,47 +380,4 @@ private enum HomeLayout {
     static let focusPadding: CGFloat = 30
     /// Backdrops are faded and dimmed, so 1080p is plenty even on a 4K screen.
     static let backdropPixelWidth: CGFloat = 1920
-}
-
-extension CardShape {
-    var cardWidth: CGFloat {
-        switch self {
-        case .poster: 200
-        case .thumb: 340
-        case .square: 240
-        }
-    }
-}
-
-extension MediaItem {
-    func image(for shape: CardShape) -> ItemImage? {
-        switch shape {
-        case .poster: posterImage
-        case .thumb: thumbImage
-        case .square: squareImage
-        }
-    }
-
-    /// The episode ("S1:E3 · Pilot") or season shown under the series name.
-    var subtitle: String? {
-        switch kind {
-        case .episode:
-            [episodeLabel, name].compactMap(\.self).joined(separator: " · ")
-        case .season:
-            name
-        default:
-            nil
-        }
-    }
-
-    /// Year, running time and age rating, such as "2024 · 1h 52m · PG-13".
-    var details: String {
-        [
-            year.map(String.init),
-            runtime.map { $0.formatted(.units(allowed: [.hours, .minutes], width: .narrow)) },
-            officialRating,
-        ]
-        .compactMap(\.self)
-        .joined(separator: " · ")
-    }
 }
