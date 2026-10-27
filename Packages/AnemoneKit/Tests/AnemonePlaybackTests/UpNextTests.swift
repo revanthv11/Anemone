@@ -5,62 +5,11 @@ import Synchronization
 import Testing
 
 /// Up Next, autoplay and pass-out protection, driven through a controller and a fake engine.
-/// A second of countdown takes 10 ms here.
+/// `UpNextCreditsTests` has Up Next at the credits.
 @MainActor
-struct UpNextTests {
-    private let engine = FakeEngine()
-    private let log = EventLog()
-
-    private func player(
-        _ ids: [String] = ["e1", "e2", "e3"],
-        skipped: Int = 0,
-        countdown: Duration = .seconds(3),
-        autoplays: Bool = true,
-        timing: UpNextTiming = .endOfPlayback,
-        passOutCount: Int = 0,
-        testCreditsStart: Duration? = nil,
-        others: [any PlaybackFeature] = [],
-    ) throws -> (PlaybackController, UpNext) {
-        var queue = try #require(PlaybackQueue(entries: ids.map { .item($0) }))
-        queue.skippedCount = skipped
-        let upNext = UpNext(
-            settings: UpNext.Settings(
-                autoplays: autoplays,
-                countdown: countdown,
-                timing: timing,
-                passOutCount: passOutCount,
-                stillWatchingTimeout: .seconds(5),
-                testCreditsStart: testCreditsStart,
-            ),
-            second: .milliseconds(10),
-        )
-        let playback = PlaybackController(
-            request: PlaybackRequest(queue: queue),
-            engine: engine,
-            features: others + [log, upNext],
-            positionInterval: .milliseconds(10),
-            loadStream: FakeStreams().load,
-        )
-        return (playback, upNext)
-    }
-
-    /// Starts playback and gets the first entry under way.
-    private func play(_ playback: PlaybackController) async {
-        await playback.start()
-        await getUnderWay(loads: 1)
-    }
-
-    /// Gets the latest entry loaded under way.
-    private func getUnderWay(loads: Int) async {
-        _ = await eventually { engine.loads.count == loads }
-        engine.send(.ready)
-        _ = await eventually { log.events.count(where: { $0.hasPrefix("started") }) == loads }
-    }
-
-    private func perform(_ actionID: String, on playback: PlaybackController) throws {
-        let card = try #require(playback.accessories.card)
-        try #require(card.actions.first { $0.id == actionID }).perform()
-    }
+struct UpNextTests: UpNextHarness {
+    let engine = FakeEngine()
+    let log = EventLog()
 
     @Test func `at the end, Up Next counts down and plays the next entry`() async throws {
         let (playback, upNext) = try player()
@@ -142,86 +91,22 @@ struct UpNextTests {
         #expect(playback.accessories.card == nil)
     }
 
-    @Test func `during the credits, Up Next shows while playing and Cancel keeps them playing`() async throws {
-        let (playback, upNext) = try player(countdown: .seconds(100), timing: .duringCredits)
+    @Test func `closing the player during the countdown at the end stops it`() async throws {
+        let (playback, upNext) = try player(countdown: .seconds(5))
         await play(playback)
-
-        upNext.creditsStarted()
-        #expect(playback.accessories.card?.id == UpNext.upNextCard)
-        try perform("upNext.cancel", on: playback)
-
-        #expect(playback.accessories.card == nil)
-        #expect(!playback.hasEnded)
-        #expect(engine.isPlaying)
-        // Once each entry, then again at the end, as in Wholphin.
-        upNext.creditsStarted()
-        #expect(playback.accessories.card == nil)
         engine.send(.ended)
-        #expect(await eventually { playback.accessories.card?.id == UpNext.upNextCard })
-        try perform("upNext.cancel", on: playback)
-        #expect(playback.hasEnded)
-    }
-
-    @Test func `at the end of playback, the credits don't bring Up Next early`() async throws {
-        let (playback, upNext) = try player(timing: .endOfPlayback)
-        await play(playback)
-
-        upNext.creditsStarted()
-
-        #expect(playback.accessories.card == nil)
-    }
-
-    @Test func `an Up Next shown during the credits carries on past the end`() async throws {
-        let (playback, upNext) = try player(countdown: .seconds(100), timing: .duringCredits)
-        await play(playback)
-        upNext.creditsStarted()
-
-        engine.send(.ended)
+        _ = await eventually { playback.accessories.card?.id == UpNext.upNextCard }
+        // The session ended with the entry, so closing brings no `stopped`.
         _ = await eventually { log.events.last == "stopped 100.0 seconds" }
 
-        #expect(playback.accessories.card?.id == UpNext.upNextCard)
-        #expect(!playback.hasEnded)
-        // Cancel now closes the player, as it does at the end.
-        try perform("upNext.cancel", on: playback)
-        #expect(playback.hasEnded)
-    }
-
-    @Test func `during the credits, the outro segment brings Up Next`() async throws {
-        let outro = MediaSegment(id: "o1", kind: .outro, start: .seconds(20), end: .seconds(100))
-        let segments = SegmentSkipping(load: { _ in [outro] }, behavior: { _ in .ignore })
-        let (playback, _) = try player(countdown: .seconds(100), timing: .duringCredits, others: [segments])
-        await play(playback)
-        try await Task.sleep(for: .milliseconds(50))
-        #expect(playback.accessories.card == nil)
-
-        engine.currentTime = .seconds(21)
-
-        #expect(await eventually { playback.accessories.card?.id == UpNext.upNextCard })
-        #expect(segments.current == outro)
-    }
-
-    @Test func `at the end of playback, the outro segment doesn't bring Up Next`() async throws {
-        let outro = MediaSegment(id: "o1", kind: .outro, start: .seconds(20), end: .seconds(100))
-        let segments = SegmentSkipping(load: { _ in [outro] }, behavior: { _ in .ignore })
-        let (playback, _) = try player(timing: .endOfPlayback, others: [segments])
-        await play(playback)
-
-        engine.currentTime = .seconds(21)
-        _ = await eventually { segments.current == outro }
-        try await Task.sleep(for: .milliseconds(50))
+        await playback.stop()
 
         #expect(playback.accessories.card == nil)
-    }
-
-    @Test func `the test credits start brings Up Next at that position`() async throws {
-        let (playback, _) = try player(countdown: .seconds(100), testCreditsStart: .seconds(20))
-        await play(playback)
-        try await Task.sleep(for: .milliseconds(50))
+        // Past the end of the countdown: it didn't come back, or play anything.
+        try await Task.sleep(for: .milliseconds(100))
         #expect(playback.accessories.card == nil)
-
-        engine.currentTime = .seconds(21)
-
-        #expect(await eventually { playback.accessories.card?.id == UpNext.upNextCard })
+        #expect(upNext.autoplaysWithoutInput == 0)
+        #expect(engine.loads.count == 1)
     }
 
     @Test func `after enough autoplays with no press, Still watching stops playback`() async throws {
@@ -290,7 +175,7 @@ struct UpNextTests {
     @Test func `closing the player takes Up Next down`() async throws {
         let (playback, _) = try player(countdown: .seconds(100), timing: .duringCredits)
         await play(playback)
-        playback.feature(UpNext.self)?.creditsStarted()
+        playback.feature(UpNext.self)?.creditsStarted(id: "c1")
         #expect(playback.accessories.card != nil)
 
         await playback.stop()
@@ -304,7 +189,28 @@ struct UpNextTests {
 
         #expect(playback.accessories.card?.id == UpNext.skippedCard)
         #expect(playback.accessories.card?.title == "Skipping 2 items")
+        #expect(playback.accessories.card?.message == "Only videos play here for now.")
         #expect(await eventually { playback.accessories.card == nil })
+    }
+
+    @Test func `a queue that didn't hold everything says how much plays`() async throws {
+        let (playback, _) = try player(overLimit: 30)
+        await play(playback)
+
+        #expect(playback.accessories.card?.id == UpNext.skippedCard)
+        #expect(playback.accessories.card?.title == "Playing 3 of 33 items")
+        #expect(playback.accessories.card?.message == "A queue holds up to 100 items.")
+    }
+
+    @Test func `the note gives every reason items were left out`() throws {
+        var queue = try #require(PlaybackQueue(entries: [.item("m1"), .item("m2")]))
+        queue.skippedCount = 1
+        queue.overLimitCount = 30
+
+        let note = UpNext.skippedNote(for: queue)
+
+        #expect(note.title == "Playing 2 of 33 items")
+        #expect(note.message == "A queue holds up to 100 items.\nOnly videos play here for now.")
     }
 
     @Test func `the stop report goes out before the next entry's start`() async throws {
@@ -320,6 +226,70 @@ struct UpNextTests {
 
         #expect(await eventually { sent.lines.contains("start e2") })
         #expect(sent.lines.filter { !$0.hasPrefix("progress") } == ["start e1", "stop e1", "start e2"])
+    }
+}
+
+/// What the Up Next tests share: a player with Up Next, a fake engine and a log of events. A
+/// second of countdown takes 10 ms here.
+@MainActor
+protocol UpNextHarness {
+    var engine: FakeEngine { get }
+    var log: EventLog { get }
+}
+
+extension UpNextHarness {
+    /// A player for `ids`, with `others` hearing events before the log and Up Next.
+    func player(
+        _ ids: [String] = ["e1", "e2", "e3"],
+        skipped: Int = 0,
+        overLimit: Int = 0,
+        countdown: Duration = .seconds(3),
+        autoplays: Bool = true,
+        timing: UpNextTiming = .endOfPlayback,
+        passOutCount: Int = 0,
+        testCreditsStart: Duration? = nil,
+        others: [any PlaybackFeature] = [],
+    ) throws -> (PlaybackController, UpNext) {
+        var queue = try #require(PlaybackQueue(entries: ids.map { .item($0) }))
+        queue.skippedCount = skipped
+        queue.overLimitCount = overLimit
+        let upNext = UpNext(
+            settings: UpNext.Settings(
+                autoplays: autoplays,
+                countdown: countdown,
+                timing: timing,
+                passOutCount: passOutCount,
+                stillWatchingTimeout: .seconds(5),
+                testCreditsStart: testCreditsStart,
+            ),
+            second: .milliseconds(10),
+        )
+        let playback = PlaybackController(
+            request: PlaybackRequest(queue: queue),
+            engine: engine,
+            features: others + [log, upNext],
+            positionInterval: .milliseconds(10),
+            loadStream: FakeStreams().load,
+        )
+        return (playback, upNext)
+    }
+
+    /// Starts playback and gets the first entry under way.
+    func play(_ playback: PlaybackController) async {
+        await playback.start()
+        await getUnderWay(loads: 1)
+    }
+
+    /// Gets the latest entry loaded under way.
+    func getUnderWay(loads: Int) async {
+        _ = await eventually { engine.loads.count == loads }
+        engine.send(.ready)
+        _ = await eventually { log.events.count(where: { $0.hasPrefix("started") }) == loads }
+    }
+
+    func perform(_ actionID: String, on playback: PlaybackController) throws {
+        let card = try #require(playback.accessories.card)
+        try #require(card.actions.first { $0.id == actionID }).perform()
     }
 }
 
