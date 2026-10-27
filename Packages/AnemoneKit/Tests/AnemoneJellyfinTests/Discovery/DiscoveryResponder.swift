@@ -33,6 +33,18 @@ final class DiscoveryResponder: Sendable {
         heard.withLock { $0.map { String(data: $0.data, encoding: .utf8) ?? "" } }
     }
 
+    /// The probes heard once `count` have arrived, or once `timeout` is up. The responder reads on
+    /// a thread of its own, which a busy machine may not have run yet when a search that got no
+    /// answer ends, so a test that checks right away can find nothing heard.
+    func probes(count: Int, timeout: Duration = .seconds(3)) async throws -> [String] {
+        let clock = ContinuousClock()
+        let deadline = clock.now + timeout
+        while heard.withLock({ $0.count }) < count, clock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        return probes
+    }
+
     /// The ports the probes came from: the searches' own sockets.
     var probePorts: [UInt16] {
         heard.withLock { $0.map { UInt16(bigEndian: $0.sender.sin_port) } }
