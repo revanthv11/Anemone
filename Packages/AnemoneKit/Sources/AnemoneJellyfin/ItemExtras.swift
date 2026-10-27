@@ -239,6 +239,13 @@ public extension JellyfinSession {
         )
     }
 
+    /// Whether the user may delete an item, for a page that needs nothing else from
+    /// `itemExtras(id:)`, such as a collection's: one request, without asking for trailers or
+    /// special features.
+    func canDelete(id: MediaItem.ID) async throws -> Bool {
+        try await send(Paths.getItem(itemID: id, userID: userID)).canDelete ?? false
+    }
+
     /// Deletes an item from the library and from the server's disk. The server refuses unless
     /// the item's `canDelete` is set for the user.
     func deleteItem(id: MediaItem.ID) async throws {
@@ -260,6 +267,10 @@ public extension JellyfinSession {
 
     /// A collection's items, ordered and narrowed as its page's sort and filter options say, like
     /// Wholphin's `CollectionViewModel`. The default order is the collection's own.
+    ///
+    /// One request, which `CollectionSection.sections(_:)` splits by type for the page's rows.
+    /// Wholphin asks once per type, which needs a workaround for nested collections
+    /// (jellyfin/jellyfin#16454).
     func collectionItems(
         id: MediaItem.ID,
         sort: LibrarySort,

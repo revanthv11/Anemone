@@ -19,7 +19,7 @@ struct CollectionPage: View {
     @State private var focusedEntry: ItemDetails?
     /// Follows `focusedEntry` after a pause, like the home page's backdrop.
     @State private var backdropEntry: ItemDetails?
-    @State private var extras = ItemExtras()
+    @State private var canDelete = false
     /// `nil` until read from storage.
     @State private var display: CollectionDisplay?
 
@@ -70,7 +70,12 @@ struct CollectionPage: View {
             guard !Task.isCancelled else { return }
             backdropEntry = focusedEntry
         }
-        .itemExtras($extras, of: collection.id)
+        // Of the extras other pages load, this one shows only Delete.
+        .task(id: collection.id) {
+            let session = browse.session
+            let id = collection.id
+            canDelete = await browse.optional(attempt { try await session.canDelete(id: id) }) ?? false
+        }
         .collectionDisplay($display, for: collection.id)
         // Runs again when the sort or filter changes.
         .pageTask(id: display?.query) {
@@ -132,7 +137,7 @@ struct CollectionPage: View {
                 Task { await setFavorite(!collection.userState.isFavorite) }
             }
             .focused($focus, equals: .action(.favorite))
-            DeleteButton(item: collection, canDelete: extras.canDelete).focused($focus, equals: .action(.delete))
+            DeleteButton(item: collection, canDelete: canDelete).focused($focus, equals: .action(.delete))
             PlaybackNotWiredNote()
                 .padding(.leading, 16)
             CollectionOptionsButtons(collection: collection, display: $display, focus: $focus)

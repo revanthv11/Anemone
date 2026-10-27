@@ -181,6 +181,25 @@ struct ItemExtrasTests {
         #expect(!kept.canDelete)
     }
 
+    @Test func `asking only whether an item can be deleted sends one request`() async throws {
+        let paths = register(host: "can-delete-only.test", replies: [
+            "/Items/c1": .json(#"{"Id":"c1","Name":"Saga","Type":"BoxSet","CanDelete":true,"LocalTrailerCount":1}"#),
+            "/Items/c2": .json(#"{"Id":"c2","Name":"Other Saga","Type":"BoxSet"}"#),
+            "/Items/c1/LocalTrailers": .json("[]"),
+            "/Items/c1/SpecialFeatures": .json("[]"),
+            "/Items/c2/SpecialFeatures": .json("[]"),
+        ])
+        let session = try session(host: "can-delete-only.test")
+
+        let deletable = try await session.canDelete(id: "c1")
+        let kept = try await session.canDelete(id: "c2")
+
+        #expect(deletable)
+        #expect(!kept)
+        #expect(paths.sent.withLock { $0.keys.sorted() } == ["/Items/c1", "/Items/c2"])
+        #expect(paths.request("/Items/c1")?.query["userId"] == "u1")
+    }
+
     @Test func `deleting sends DELETE for the item`() async throws {
         let paths = register(host: "delete.test", replies: ["/Items/m1": MockServer.Reply(status: 204, body: "")])
 
