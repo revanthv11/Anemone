@@ -11,6 +11,11 @@ final class FakeMPVClient: MPVClient {
     var properties: [String: String] = [:]
     private(set) var sets: [(name: String, value: String)] = []
     private(set) var commands: [[String]] = []
+    /// The playlist entry IDs given to the files loaded, oldest first; libmpv's start-file and
+    /// end-file events name them.
+    private(set) var entries: [Int64] = []
+    /// Refuses `loadfile`, as libmpv does with arguments it can't parse.
+    var refusesLoads = false
     private(set) var isDestroyed = false
 
     init() {
@@ -24,6 +29,15 @@ final class FakeMPVClient: MPVClient {
 
     func command(_ arguments: [String]) {
         commands.append(arguments)
+    }
+
+    func loadFile(_ arguments: [String]) -> Int64? {
+        commands.append(arguments)
+        guard !refusesLoads else { return nil }
+        // libmpv numbers entries from 1 and never reuses one.
+        let entry = Int64(entries.count + 1)
+        entries.append(entry)
+        return entry
     }
 
     func string(_ name: String) -> String? {
@@ -95,10 +109,11 @@ extension MPVPlayerEngine {
         PlayerEventLog(load(URL(filePath: "/m.mkv"), from: nil, metadata: PlaybackMetadata(title: "M")))
     }
 
-    /// Loads `url` as libmpv would: the file starts, loads, and plays from its start.
-    func loadAndStart(_ url: URL = URL(filePath: "/movie.mkv"), from position: Duration? = nil) -> PlayerEventLog {
-        let log = PlayerEventLog(load(url, from: position, metadata: PlaybackMetadata(title: "Movie")))
-        handle(.fileLoaded)
+    /// Loads a file as libmpv would through `client`, this engine's: the file starts, loads, and
+    /// plays from its start.
+    func loadAndStart(on client: FakeMPVClient) -> PlayerEventLog {
+        let log = loadLog()
+        handle(.startFile(entry: client.entries.last ?? 0))
         handle(.playbackRestart)
         return log
     }

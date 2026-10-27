@@ -37,6 +37,9 @@ public final class MPVPlayerEngine: PlayerEngine {
     private struct Load {
         let events: AsyncStream<PlayerEvent>.Continuation
         let start: Duration?
+        /// The playlist entry libmpv made for it, which tells its start and end apart from those
+        /// of the file it replaced.
+        let entry: Int64
         /// libmpv started on this file; anything it says about the file before belongs to the
         /// one this replaced.
         var hasStarted = false
@@ -80,11 +83,6 @@ public final class MPVPlayerEngine: PlayerEngine {
             return stream
         }
         let start = position.flatMap { $0 > .zero ? $0 : nil }
-        current = Load(events: events, start: start)
-        lastTime = start ?? .zero
-        reportedStatus = nil
-        isHDR = false
-        events.yield(.status(.paused))
         // Nothing plays until `play()`, as with AVPlayer.
         client.set("pause", true)
         var options = ["force-media-title=\(Self.escaped(metadata.title))"]
@@ -92,7 +90,17 @@ public final class MPVPlayerEngine: PlayerEngine {
             options.append("start=\(Self.seconds(start))")
         }
         // The index argument (-1) only matters when inserting; options come after it.
-        client.command(["loadfile", url.absoluteString, "replace", "-1", options.joined(separator: ",")])
+        let arguments = ["loadfile", url.absoluteString, "replace", "-1", options.joined(separator: ",")]
+        guard let entry = client.loadFile(arguments) else {
+            events.yield(.failed(PlayerError.streamFailed(underlying: MPVError.refused)))
+            events.finish()
+            return stream
+        }
+        current = Load(events: events, start: start, entry: entry)
+        lastTime = start ?? .zero
+        reportedStatus = nil
+        isHDR = false
+        events.yield(.status(.paused))
         return stream
     }
 
@@ -192,12 +200,14 @@ public final class MPVPlayerEngine: PlayerEngine {
 
     func handle(_ event: MPVEvent) {
         switch event {
-        case .fileLoaded:
-            current?.hasStarted = true
+        case let .startFile(entry):
+            if current?.entry == entry {
+                current?.hasStarted = true
+            }
         case .playbackRestart:
             restarted()
-        case let .endFile(reason):
-            ended(reason)
+        case let .endFile(entry, reason):
+            ended(entry, reason)
         case let .property(name, value):
             changed(name, to: value)
         case .shutdown:
@@ -219,8 +229,10 @@ public final class MPVPlayerEngine: PlayerEngine {
         finishSeeks { $0 == seekCount }
     }
 
-    private func ended(_ reason: MPVEndReason) {
-        guard let load = current, load.hasStarted else { return }
+    /// A file that won't open (the server's error, a format libmpv doesn't know) ends with an
+    /// error before it ever loads, so its entry, not how far it got, says it's this stream's.
+    private func ended(_ entry: Int64, _ reason: MPVEndReason) {
+        guard let load = current, load.entry == entry else { return }
         switch reason {
         case let .failed(message):
             load.events.yield(.failed(PlayerError.streamFailed(underlying: MPVError(reason: message))))
@@ -288,16 +300,6 @@ public final class MPVPlayerEngine: PlayerEngine {
         }
     }
 
-    /// In debug builds, what libmpv decodes, for live checks in the console.
-    private func logDecoding() {
-        #if DEBUG
-            guard let client else { return }
-            let names = ["video-codec", "hwdec-current", "audio-codec-name", "audio-params/hr-channels", "sid", "vo"]
-            let values = names.map { "\($0)=\(client.string($0) ?? "-")" }.joined(separator: " ")
-            Logger.mpv.info("playing: \(values, privacy: .public)")
-        #endif
-    }
-
     /// Ends the current stream's events; seeks waiting for it didn't get there.
     private func endLoad() {
         finishSeeks { _ in false }
@@ -311,6 +313,18 @@ public final class MPVPlayerEngine: PlayerEngine {
         for seek in waiting {
             seek.done.resume(returning: landed(seek.id))
         }
+    }
+}
+
+extension MPVPlayerEngine {
+    /// In debug builds, what libmpv decodes, for live checks in the console.
+    private func logDecoding() {
+        #if DEBUG
+            guard let client else { return }
+            let names = ["video-codec", "hwdec-current", "audio-codec-name", "audio-params/hr-channels", "sid", "vo"]
+            let values = names.map { "\($0)=\(client.string($0) ?? "-")" }.joined(separator: " ")
+            Logger.mpv.info("playing: \(values, privacy: .public)")
+        #endif
     }
 
     /// Seconds as libmpv reads them.

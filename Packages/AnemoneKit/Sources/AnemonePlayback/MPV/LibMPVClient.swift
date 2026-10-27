@@ -54,18 +54,32 @@ import os
 
         func command(_ arguments: [String]) {
             guard !isDestroyed else { return }
-            // libmpv takes a NULL-terminated array of C strings.
-            var pointers: [UnsafePointer<CChar>?] = arguments.map { strdup($0).map { UnsafePointer($0) } }
-            pointers.append(nil)
-            defer {
-                for pointer in pointers {
-                    free(UnsafeMutablePointer(mutating: pointer))
-                }
-            }
-            let status = mpv_command(handle.mpv, &pointers)
+            let status = Self.withCStrings(arguments) { mpv_command(handle.mpv, $0) }
             if status < 0 {
                 Logger.mpv.warning("\(arguments.first ?? "", privacy: .public): \(Self.describe(status))")
             }
+        }
+
+        /// `loadfile` answers with the new entry's `playlist_entry_id` (mpv's input.rst).
+        func loadFile(_ arguments: [String]) -> Int64? {
+            guard !isDestroyed else { return nil }
+            var result = mpv_node()
+            let status = Self.withCStrings(arguments) { mpv_command_ret(handle.mpv, $0, &result) }
+            guard status >= 0 else {
+                Logger.mpv.warning("loadfile: \(Self.describe(status), privacy: .public)")
+                return nil
+            }
+            defer { mpv_free_node_contents(&result) }
+            guard result.format == MPV_FORMAT_NODE_MAP, let map = result.u.list?.pointee else { return nil }
+            for index in 0 ..< Int(map.num) {
+                let value = map.values[index]
+                if let key = map.keys[index], String(cString: key) == "playlist_entry_id",
+                   value.format == MPV_FORMAT_INT64
+                {
+                    return value.u.int64
+                }
+            }
+            return nil
         }
 
         func string(_ name: String) -> String? {
@@ -82,6 +96,21 @@ import os
 
         nonisolated static func describe(_ status: CInt) -> String {
             String(cString: mpv_error_string(status))
+        }
+
+        /// libmpv takes a command as a NULL-terminated array of C strings.
+        private static func withCStrings(
+            _ strings: [String],
+            _ body: (UnsafeMutablePointer<UnsafePointer<CChar>?>) -> CInt,
+        ) -> CInt {
+            var pointers: [UnsafePointer<CChar>?] = strings.map { strdup($0).map { UnsafePointer($0) } }
+            pointers.append(nil)
+            defer {
+                for pointer in pointers {
+                    free(UnsafeMutablePointer(mutating: pointer))
+                }
+            }
+            return body(&pointers)
         }
     }
 
@@ -134,12 +163,18 @@ import os
 
         private static func convert(_ event: mpv_event) -> MPVEvent? {
             switch event.event_id {
-            case MPV_EVENT_FILE_LOADED:
-                return .fileLoaded
+            case MPV_EVENT_START_FILE:
+                guard let start = event.data?.assumingMemoryBound(to: mpv_event_start_file.self).pointee else {
+                    return nil
+                }
+                return .startFile(entry: start.playlist_entry_id)
             case MPV_EVENT_PLAYBACK_RESTART:
                 return .playbackRestart
             case MPV_EVENT_END_FILE:
-                return .endFile(endReason(of: event))
+                guard let end = event.data?.assumingMemoryBound(to: mpv_event_end_file.self).pointee else {
+                    return nil
+                }
+                return .endFile(entry: end.playlist_entry_id, endReason(of: end))
             case MPV_EVENT_PROPERTY_CHANGE:
                 guard let property = event.data?.assumingMemoryBound(to: mpv_event_property.self).pointee else {
                     return nil
@@ -163,17 +198,14 @@ import os
             Logger.mpv.warning("[\(prefix, privacy: .public)] \(text, privacy: .public)")
         }
 
-        private static func endReason(of event: mpv_event) -> MPVEndReason {
-            guard let end = event.data?.assumingMemoryBound(to: mpv_event_end_file.self).pointee else {
-                return .stopped
-            }
+        private static func endReason(of end: mpv_event_end_file) -> MPVEndReason {
             switch end.reason {
             case MPV_END_FILE_REASON_EOF:
-                return .endOfFile
+                .endOfFile
             case MPV_END_FILE_REASON_ERROR:
-                return .failed(LibMPVClient.describe(end.error))
+                .failed(LibMPVClient.describe(end.error))
             default:
-                return .stopped
+                .stopped
             }
         }
 

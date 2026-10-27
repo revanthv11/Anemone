@@ -34,17 +34,19 @@ struct MPVPlayerEngineTests {
         #expect(client.commands.last?.last == "force-media-title=%1%M")
     }
 
-    @Test func `it's ready once the file has loaded and playback has restarted at its start`() async {
+    @Test func `it's ready once its file has started and playback has restarted at its start`() async {
         let client = FakeMPVClient()
         let engine = MPVPlayerEngine.testing(client)
+        _ = engine.loadLog()
+        engine.handle(.startFile(entry: client.entries[0]))
         let log = engine.loadLog()
 
         // What libmpv says about the file this one replaced comes first, and doesn't count.
-        engine.handle(.endFile(.stopped))
         engine.handle(.playbackRestart)
+        engine.handle(.endFile(entry: client.entries[0], .failed("loading failed")))
         #expect(await eventually { log.events == ["paused"] })
 
-        engine.handle(.fileLoaded)
+        engine.handle(.startFile(entry: client.entries[1]))
         engine.handle(.playbackRestart)
 
         #expect(await eventually { log.events == ["paused", "ready", "paused"] })
@@ -53,7 +55,7 @@ struct MPVPlayerEngineTests {
     @Test func `pausing, buffering and seeking set the status once it's ready`() async {
         let client = FakeMPVClient()
         let engine = MPVPlayerEngine.testing(client)
-        let log = engine.loadAndStart()
+        let log = engine.loadAndStart(on: client)
 
         engine.play()
         #expect(client.lastSet("pause") == "no")
@@ -70,23 +72,27 @@ struct MPVPlayerEngineTests {
     }
 
     @Test func `the end of the file ends the stream once, keeping the last frame up`() async {
-        let engine = MPVPlayerEngine.testing(FakeMPVClient())
-        let log = engine.loadAndStart()
+        let client = FakeMPVClient()
+        let engine = MPVPlayerEngine.testing(client)
+        let log = engine.loadAndStart(on: client)
 
         engine.handle(.property("eof-reached", .flag(true)))
         engine.handle(.property("eof-reached", .flag(true)))
-        engine.handle(.endFile(.endOfFile))
+        engine.handle(.endFile(entry: client.entries[0], .endOfFile))
 
         #expect(await eventually { log.events.last == "ended" })
         #expect(log.events.filter { $0 == "ended" }.count == 1)
     }
 
-    @Test func `a file libmpv can't play fails with libmpv's reason`() async throws {
-        let engine = MPVPlayerEngine.testing(FakeMPVClient())
+    /// A server error or a format libmpv doesn't know: libmpv starts the file and ends it with
+    /// the error, without ever loading it or restarting playback.
+    @Test func `a file that won't open fails with libmpv's reason`() async throws {
+        let client = FakeMPVClient()
+        let engine = MPVPlayerEngine.testing(client)
         let log = engine.loadLog()
 
-        engine.handle(.fileLoaded)
-        engine.handle(.endFile(.failed("unrecognized file format")))
+        engine.handle(.startFile(entry: client.entries[0]))
+        engine.handle(.endFile(entry: client.entries[0], .failed("unrecognized file format")))
 
         #expect(await eventually { log.isFinished })
         #expect(log.events == ["paused", "failed"])
@@ -96,6 +102,58 @@ struct MPVPlayerEngineTests {
             return
         }
         #expect(underlying as? MPVError == MPVError(reason: "unrecognized file format"))
+    }
+
+    @Test func `a file that fails while playing fails the stream`() async {
+        let client = FakeMPVClient()
+        let engine = MPVPlayerEngine.testing(client)
+        let log = engine.loadAndStart(on: client)
+
+        engine.handle(.endFile(entry: client.entries[0], .failed("loading failed")))
+
+        #expect(await eventually { log.isFinished })
+        #expect(log.events == ["paused", "ready", "paused", "failed"])
+    }
+
+    @Test func `a load libmpv refuses fails at once`() async throws {
+        let client = FakeMPVClient()
+        client.refusesLoads = true
+        let engine = MPVPlayerEngine.testing(client)
+
+        let log = engine.loadLog()
+
+        #expect(await eventually { log.isFinished })
+        #expect(log.events == ["failed"])
+        let error = try #require(log.errors.first as? PlayerError)
+        guard case let .streamFailed(underlying) = error else {
+            Issue.record("expected a stream failure, got \(error)")
+            return
+        }
+        #expect(underlying as? MPVError == .refused)
+    }
+
+    /// Wholphin's retry as a transcode, through the MPV engine: a direct play libmpv can't open
+    /// gets another try as a transcode.
+    @Test func `a direct play that won't open is retried as a transcode`() async {
+        let client = FakeMPVClient()
+        let engine = MPVPlayerEngine.testing(client)
+        let streams = FakeStreams()
+        let playback = PlaybackController(
+            request: PlaybackRequest(.item("m1")),
+            engine: engine,
+            features: [],
+            positionInterval: .milliseconds(10),
+            loadStream: streams.load,
+        )
+        await playback.start()
+        #expect(client.commands.last?[1] == FakeStreams.stream("m1", method: .directPlay).url.absoluteString)
+
+        engine.handle(.startFile(entry: client.entries[0]))
+        engine.handle(.endFile(entry: client.entries[0], .failed("loading failed")))
+
+        #expect(await eventually { client.entries.count == 2 })
+        #expect(streams.received.last?.allowsDirect == false)
+        #expect(client.commands.last?[1] == FakeStreams.stream("m1", method: .transcode).url.absoluteString)
     }
 
     @Test func `without libmpv every load fails`() async {
@@ -110,7 +168,7 @@ struct MPVPlayerEngineTests {
     @Test func `a seek lands exactly when playback restarts, and a newer seek replaces it`() async {
         let client = FakeMPVClient()
         let engine = MPVPlayerEngine.testing(client)
-        _ = engine.loadAndStart()
+        _ = engine.loadAndStart(on: client)
 
         let first = Task { await engine.seek(to: .seconds(30)) }
         #expect(await eventually { client.commands.count == 2 })
@@ -129,7 +187,7 @@ struct MPVPlayerEngineTests {
     @Test func `a seek waiting when the engine stops didn't get there`() async {
         let client = FakeMPVClient()
         let engine = MPVPlayerEngine.testing(client)
-        _ = engine.loadAndStart()
+        _ = engine.loadAndStart(on: client)
 
         async let seek = engine.seek(to: .seconds(30))
         #expect(await eventually { client.commands.count == 2 })

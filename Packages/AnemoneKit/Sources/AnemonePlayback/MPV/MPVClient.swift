@@ -10,8 +10,11 @@ protocol MPVClient: AnyObject {
 
     /// Sets a property, or an option before the file loads, as `--name=value` would.
     func set(_ name: String, _ value: String)
-    /// Runs a command such as `loadfile` or `seek`, as an input.conf line would.
+    /// Runs a command such as `seek`, as an input.conf line would.
     func command(_ arguments: [String])
+    /// Runs `loadfile` and returns the playlist entry ID libmpv gave the file, which its
+    /// start-file and end-file events carry. `nil` when libmpv refused the command.
+    func loadFile(_ arguments: [String]) -> Int64?
     /// A property's value as text, or `nil` when it has none now, such as `time-pos` with
     /// nothing loaded.
     func string(_ name: String) -> String?
@@ -48,13 +51,15 @@ extension MPVClient {
 
 /// What libmpv sends, reduced to what the engine follows.
 enum MPVEvent: Equatable, Sendable {
-    /// A file opened; its tracks and duration are known.
-    case fileLoaded
+    /// libmpv began opening a playlist entry. What it says from here until the next entry
+    /// starts is about this one.
+    case startFile(entry: Int64)
     /// Playback restarted after loading or after a seek: the picture is at the new position.
     case playbackRestart
-    /// The file was unloaded: it failed (with libmpv's reason), or something replaced or
-    /// stopped it. With `keep-open`, reaching the end doesn't unload it; `eof-reached` says so.
-    case endFile(MPVEndReason)
+    /// The entry was unloaded: it failed (with libmpv's reason), or something replaced or
+    /// stopped it. A file that won't open fails this way without ever loading. With
+    /// `keep-open`, reaching the end doesn't unload it; `eof-reached` says so.
+    case endFile(entry: Int64, MPVEndReason)
     /// An observed property changed; see `LibMPVClient.observed`.
     case property(String, MPVValue)
     /// libmpv is shutting down.
@@ -102,6 +107,8 @@ public struct MPVError: LocalizedError, Equatable {
 
     /// libmpv itself couldn't start.
     public static let unavailable = Self(reason: "The MPV player couldn't start.")
+    /// libmpv wouldn't take the stream to load.
+    public static let refused = Self(reason: "The MPV player couldn't load the stream.")
 
     public var errorDescription: String? {
         reason
