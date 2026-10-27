@@ -21,6 +21,12 @@ public struct RemovedFromNextUp: Hashable, Sendable {
         dates = Dictionary(entries) { first, _ in first }
     }
 
+    /// From a DisplayPreferences entry's custom prefs. A list that can't be read counts as none
+    /// removed, as when the home page can't read the entry.
+    init(customPrefs prefs: [String: String]) {
+        self = (try? prefs[HomeDisplayPreferences.removedNextUpKey].map(Self.init(json:))) ?? Self()
+    }
+
     public func json() throws -> String {
         let value = Dictionary(uniqueKeysWithValues: dates
             .map { (JellyfinID.dashed($0.key), Self.text(for: $0.value)) })
