@@ -1,4 +1,5 @@
 import AnemoneJellyfin
+import AnemonePlayback
 import AnemoneUI
 import SwiftUI
 
@@ -19,6 +20,7 @@ struct PlaylistPage: View {
     @State private var entriesLoad = 0
     @State private var problem: String?
     @State private var alert: ItemAlert?
+    @State private var playback: PlaybackRequest?
     @State private var focusedIndex = 0
     /// Follows the focused entry after a pause, like the home page's backdrop.
     @State private var backdropEntry: ItemDetails?
@@ -45,6 +47,9 @@ struct PlaylistPage: View {
         // Wholphin starts on the list once it has loaded.
         .initialFocus($focus, entries.map { $0.isEmpty ? .action(.play) : entryFocus(0) })
         .itemAlert($alert)
+        .player($playback) {
+            await loadEntries()
+        }
         .onChange(of: focus) { _, focus in
             memory.note(focus)
             if case let .card(_, item) = focus, let index = Int(item) {
@@ -96,18 +101,23 @@ struct PlaylistPage: View {
             }
             HStack(spacing: 24) {
                 ActionButton(title: "Play", systemImage: "play.fill") {
-                    alert = .queueUnavailable
+                    play(shuffled: false)
                 }
                 .focused($focus, equals: .action(.play))
                 .accessibilityIdentifier("action.play")
                 ActionButton(title: "Shuffle", systemImage: "shuffle") {
-                    alert = .queueUnavailable
+                    play(shuffled: true)
                 }
                 .focused($focus, equals: .action(.shuffle))
-                PlaybackNotWiredNote()
-                    .padding(.leading, 16)
+                .accessibilityIdentifier("action.shuffle")
             }
             .focusSection()
+        }
+    }
+
+    private func play(shuffled: Bool) {
+        Task {
+            await browse.playQueue(of: playlist, shuffled: shuffled) { playback = $0 } failed: { alert = $0 }
         }
     }
 

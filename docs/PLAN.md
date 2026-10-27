@@ -83,7 +83,7 @@ The FSF considers Apple's App Store terms incompatible with the GPL; in practice
 So the rest of the plan can be built in separate files, side by side:
 
 - **Player engine:** `PlaybackController` drives a `PlayerEngine`, never AVPlayer itself. An engine loads a URL at a start position, plays, pauses, seeks exactly, reports the time, duration and rate, sends status, end and failure events, lists and selects audio and subtitle tracks, and gives the UI its video output. `AVPlayerEngine` is the only one so far; MPV will conform the same way, as Swiftfin's AVPlayer and MPV players do.
-- **Queue:** the controller plays a `PlaybackQueue` of entries (item, start position, metadata). Pages ask for playback with a `PlaybackRequest` (a queue, and whether to shuffle) from the builders in `App/Playback/PlaybackSupport.swift`, and `.player($request)` builds the controller. Every queue holds one item for now. `play(entryAt:)` and `playNext()` play another entry with its own PlaybackInfo and play session, after ending the current session.
+- **Queue:** the controller plays a `PlaybackQueue` of entries (item, start position, metadata). Pages ask for playback with a `PlaybackRequest` (a queue, whether to shuffle, and what follows) from the builders in `App/Playback/PlaybackSupport.swift`, and `.player($request)` builds the controller. `play(entryAt:)` and `playNext()` play another entry with its own PlaybackInfo and play session, after ending the current session.
 - **Playback features:** each `PlaybackFeature` hears the controller's events in order (loaded, started, position once a second, paused, resumed, ended, failed, stopped), acts through the controller, and shows controls through `PlayerAccessories`: actions, transport-bar menus and a card. The system player shows them as `contextualActions`, `transportBarCustomMenuItems` and a card over the video; Anemone's overlay will show the same. Features are listed in `PlaybackController.features(for:)`; the first is `ProgressReporting`. At the end of an entry the player closes, unless a feature played another entry or set `closesAtEnd` to `false`; `finish()` closes it.
 - **Settings:** `App/Settings/SettingsView.swift` has the account (switch user, profile lock, sign out) and a page each for Sidebar, Home, Playback, Subtitles, Appearance and About. Playback links to a page per part of playback. A setting is a `Preference` (a UserDefaults key and a default, with Wholphin's name and default where it has one), declared in an extension of `Preferences` next to what uses it, read with `value()` and bound with `@AppStorage(Preferences.someSetting)`.
 - **Library kinds:** Live TV, music and photo libraries open `App/LiveTV`, `App/Music` and `App/Photos`.
@@ -107,7 +107,8 @@ Apart from Settings, now a list with a page for each part of the app, nothing vi
 ### Phase 1: foundation
 
 - [x] Add a server by URL: HTTPS first, then Jellyfin's default port; reverse-proxy paths kept; Jellyfin 12+ and finished-setup checks
-- [ ] Server discovery (waits on the multicast spike)
+- [x] Server discovery in AnemoneJellyfin: `ServerDiscovery` sends Jellyfin's "who is JellyfinServer?" to UDP port 7359 at each network's broadcast address and 255.255.255.255, then for 5 s lists each server that answers, once, from its JSON reply (id, name and address). BSD sockets, since a Network.framework connection only hears from the address it sends to; the port and addresses can be set, so tests answer on 127.0.0.1
+- [ ] Discovered servers on the add-server screen: waits on Apple's multicast entitlement and the multicast spike
 - [x] Sign in with a password or Quick Connect
 - [x] Multiple servers and profiles; switching protected by a hashed PIN or by requiring sign-in
 - [x] Everything stored in one Keychain item; last profile restored on launch unless it's locked
@@ -116,6 +117,10 @@ Apart from Settings, now a list with a page for each part of the app, nothing vi
 Tested live against the Jellyfin 12.3 demo server (adding the server, the profile list, getting a Quick Connect code) and against the maintainer's own Jellyfin 12.2 server: password sign-in, session restore, PIN lock and unlock, a locked profile not being restored on launch, and sign-out.
 
 tvOS ignores `.keyboardType(.numberPad)`, so PIN entry uses the full on-screen keyboard. A custom PIN pad is an idea for later.
+
+Server discovery is tested only by unit tests on macOS, against a stand-in server on 127.0.0.1 at a port the system picks: the probe's text, a reply becoming a server, a server answering twice listed once, stray datagrams ignored, a nameless server going by its host, the search ending on time, stopping early closing its socket, and which interfaces' broadcast addresses are used. Not verified: a real Jellyfin server answering a broadcast, and anything on Apple TV. Nothing in the app calls it yet.
+
+Not yet: the multicast entitlement (`com.apple.developer.networking.multicast`), which iOS needs to send a broadcast and tvOS may too (the multicast spike checks on hardware). It's a user and Apple step: the maintainer asks Apple for it (developer.apple.com/contact/request/networking-multicast), then it goes in the app's entitlements and provisioning profile. After that, a "found nearby" list on the add-server screen, each server added through `ServerConnector` like a typed address, as Wholphin's server list does.
 
 ### Phase 2: browsing
 
@@ -152,7 +157,7 @@ Tested live in the simulator against the Jellyfin 12.3 demo server profile saved
 - [x] Mark watched or unwatched, and favourite, from item pages
 - [x] Row memory and focus restored after Back, as on the home page
 - [x] Pages reload quietly after Back from a page opened on top of them and when the app returns to the foreground, like Wholphin on resume, so watched and favourite state, seasons, episodes, collections and playlists stay current. Triggered from the stack's path, which each pushed page is handed directly: tvOS doesn't restart a covered page's tasks after Back, and doesn't pass a stack's environment on to the pages pushed on it
-- Play, Resume and Restart play since Phase 3a. Play and Shuffle on series, collections and playlists are still marked as not wired up; they need queues
+- Play, Resume and Restart play since Phase 3a; Play and Shuffle on series, collections and playlists since 3b
 - Not yet: trailers, extras, chapters, version and track choice, delete, the context menu, collection sort/filter/view options, Seerr rows, theme music
 
 #### 2d: search
@@ -220,7 +225,15 @@ Not yet: chapters for episodes outside a season, Wholphin's "Show media manageme
 
 #### 2h: Favorites page and card context menu
 
-Not started. The Favorites destination is in the sidebar, before the libraries as in Wholphin's drawer, and hidden until this lands.
+- [x] Favorites page in the sidebar, before the libraries as in Wholphin's drawer: a row per type where Wholphin has a tab per type, in its order, for the types the user's libraries can hold (up to 100 per row, by name), with a header and backdrop for the focused card. It reloads when it shows again and after a card's menu changes something; a row that fails is left out with a notice
+- [x] Card context menu on a long press of Select, in Wholphin's order: Go to, Play or Resume and Restart, Add to playlist, Remove from Continue Watching, Remove from Next Up (Home's, from 2e), Mark as watched or unwatched, Add to or remove from favorites, and Go to series; people get Go to and favourites. `MediaCard` says what it shows, `CardRow` opens the menu on the card's button, and one handler set in `SignedInView` does the work, so every card on item pages and in Search has it
+- [x] A change from the menu shows at once on every card of that item, until the card's page reloads with newer state
+- [x] Add to playlist lists the 25 newest playlists the user may edit, as Wholphin does. One that already holds the item has a check, and choosing it takes the item out again; Wholphin doesn't look inside, so it can add an item twice
+- Cards that hold only a `MediaItem` don't know whether it's watched or a favourite, so their menu offers both ways. Home and library grids don't pass their items to the menu yet, and Home sets which of its rows are Continue Watching and Next Up (`cardMenuSource`)
+
+Tested live in the simulator against the Jellyfin 12.3 demo server, with throwaway UI tests: on The Great Train Robbery's card on a person page, the menu added it to favorites and marked it unwatched and watched again, with the card's heart and check following each time; the Favorites page then listed it under Movies, and removing it there from the card's menu took it off the page. "Go to series" on a Pioneer One episode card on the season page opened the series page, and Back returned to the season page. Add to playlist added the movie to playlist "123", showed the check the next time, and took it out again. Play from the menu played the movie and closed back to the page. Long-pressing a person card shows no menu. Not verified live: Resume and Restart, Remove from Continue Watching and Next Up (Home doesn't pass its items to the menu yet), the menu in Search results, and an item whose state the card doesn't know.
+
+Not yet: Home rows and library grids passing their items (and Home its row types) to the menu; creating a playlist from Add to playlist; Wholphin's person card menu; delete (with 2g's option); after playing from a menu, focus returns to the page's first control rather than the card.
 
 ### Phase 3: playback v1 (AVPlayer)
 
@@ -237,11 +250,17 @@ Tested live in the simulator against the Jellyfin 12.3 demo server: resuming a m
 
 Resuming a transcode waits for the server to restart the transcode at the resume point, which took 9–14 s on the demo server; starting the seek before the stream is ready didn't help there. If the resume jump fails, playback stops with an error rather than starting over and overwriting the saved position.
 
-Not yet: skip-back on resume, keeping playback going across the app going to the background, version choice, and a bitrate setting. Series, collection and playlist Play and Shuffle wait for queues.
+Not yet: skip-back on resume, keeping playback going across the app going to the background, version choice, and a bitrate setting.
 
 #### 3b: queues and Up Next with pass-out protection
 
-Not started. Play and Shuffle for series, seasons, collections and playlists; Up Next with an autoplay countdown, and pass-out protection.
+- [x] Play and Shuffle on series, collections and playlists, ported from Wholphin's `PlaylistCreator`. Series Play starts at the episode next up, at its resume position, or at the first episode when nothing is next up, then goes on in order across seasons. Specials are left out: when Jellyfin's next up is a special it places between seasons, Play starts at the regular episode after it, and the fallback is the first regular episode, where Wholphin would play the special. Series Shuffle has the server pick up to 100 random episodes, specials included as in Wholphin. Season Play and Shuffle are built for the card context menu (2h); the season page has no buttons for them, as in Wholphin
+- [x] Collections play what's in them, with the episodes of any series in them, in the order and with the filters their page shows (as Wholphin's Play All takes them) or at random. Playlists play in their own order from `/Playlists/{id}/Items`, or shuffled. Items that aren't videos, such as music or photos, are skipped and the player says how many; with nothing else to play, the page says so
+- [x] An episode goes on through the episodes after it however it starts, as in Wholphin. They're found once it's loading, so it starts as quickly as before
+- [x] Each entry has its own PlaybackInfo, play session and reports, and its stop report goes out before the next one's start report. Entries after the first start from the beginning, as in Wholphin
+- [x] Up Next, from Wholphin's `PlaybackPage`: when an entry with another after it ends, a card over the last frame shows the next one's still and title and counts down (15 s by default) to playing it. Play Now plays it at once; Cancel closes the player. With "During the credits", it comes when segment skipping (3c) finds the outro playing: Cancel keeps the credits playing, and the card comes back at the end, as in Wholphin. Wholphin has no rule for showing it some time before the end: its choices are the end of playback (the default), the credits, or never. "Never" isn't ported
+- [x] Pass-out protection: once 3 entries (by default) in a row have played on their own with no press on the remote, the card asks "Still watching?" instead, and playback stops when nobody answers within 60 s. Wholphin counts hours since the last press instead (2 by default). Presses are noticed at the window while the player shows, since the system player keeps them to itself; resuming from a pause counts too
+- [x] Settings › Playback › Autoplay: when Up Next shows, autoplay on or off, the countdown (Wholphin's 0 to 60 s) and when to ask "Still watching?"
 
 What tvOS offers the system player for this, checked in the tvOS 27 SDK's headers (each available since tvOS 15 or earlier and none deprecated, so all are in tvOS 26):
 
@@ -250,7 +269,13 @@ What tvOS offers the system player for this, checked in the tvOS 27 SDK's header
 - `customOverlayViewController` (tvOS 13): shown only when the user asks for it (swiping up, or a button in the transport bar), so it can't pop up an Up Next card on its own. `PlayerAccessories.card` shows as a SwiftUI card over the player instead; in the simulator, focus moved to its first button when it appeared, and its buttons worked.
 - `AVContentProposal` and `AVContentProposalViewController` (tvOS 10): tvOS's own Up Next. Set `AVPlayerItem.nextContentProposal` with `contentTimeForTransition` and `automaticAcceptanceInterval`; at that time the player shows the app's `contentProposalViewController` subclass and shrinks the video into its `preferredPlayerViewFrame`, with `dateOfAutomaticAcceptance` for a countdown. The delegate's `playerViewController(_:didAcceptContentProposal:)` must load the next item (`playNext()`), and rejecting dismisses the player unless the delegate handles it. It's the native look, but only for the system player; Anemone's overlay (3e) and MPV need the card, so an Up Next built on the card works in both.
 
-For pass-out protection, the system player keeps remote presses to itself. Pausing, resuming and scrubbing reach features as events; noticing any press would take a press observer in `PlayerScreen`.
+For pass-out protection, the system player keeps remote presses to itself. Pausing, resuming and scrubbing reach features as events; noticing any press takes a press observer, which `PlayerScreen` puts on the window while the player shows.
+
+Tested live in the simulator against the Jellyfin 12.3 demo server and the local fixture server, mostly with a debug-only `-upNextCreditsAt <seconds>` launch argument that treats that point as the start of the credits in every entry. On the demo's Pioneer One: Play started S1E1 (with everything watched, so nothing was next up), Up Next offered S1:E2 with focus on Play Now, counted down and played it, and offered S1:E3 in turn; Cancel there took the card down and the episode played on until Menu closed the player. Shuffle played a random episode with another offered next. With "Still watching?" after 1 autoplay, the second episode asked instead of counting down, and unanswered, the player closed after 60 s; a press of Up on the remote during the second episode made it count down instead, so the system player's presses do reach the observer. Play on the playlist My New Playlist started The Boy in the Plastic Bubble with Caminandes: Gran Dillama next; no page linked to a playlist then (Search came later), so a temporary debug hook, not committed, opened it. On the fixture's Fixture Show: Play went S1E1, S1E2, S1E3, then S2E1, past the special; played to their real ends, S1E1 and S1E2 each showed Up Next over the last frame and autoplayed the next, and Cancel at the end closed the player; from unwatched, after S1E1 autoplayed into S1E2, the season page showed both watched and S1E3 not. With "During the credits", the episode's real Credits segment at 2:30 brought Up Next, Cancel kept the credits playing, and the card came back at the end. Settings › Playback › Autoplay showed each setting with its value, and its choices on a page of their own.
+
+Not verified live: collection Play and Shuffle, with the page's sort and filters (no page linked to a collection then, and the fixture's test user sees no collection or playlist), the note about skipped items (no mixed playlist), Season Play and Shuffle (no buttons yet), autoplay off and an immediate countdown, the Still watching buttons themselves, and a transcode retry after a stream fails partway (unit tests, and a test that AVPlayer keeps playing into the next item unless paused). Segment skipping's "Skip Outro" button shows for a moment under the Up Next card at the outro before it steps aside; Wholphin shows Up Next instead of the button.
+
+Not yet: the queue row and next and previous controls in Anemone's overlay (3e), playing a playlist from one of its entries, a movie's additional parts, cinema intros before the first entry (5c), and Wholphin's "Never" timing.
 
 #### 3c: media segments: skip intro, credits, recap and more
 
@@ -272,7 +297,22 @@ Not started. Ported from `StreamChoiceService`, remembered per item and per seri
 
 #### 3e: Anemone player overlay, seeking, chapters, trickplay
 
-Not started. Plex-style overlay: D-pad seek with acceleration, clickpad scrubbing, chapters, queue, trickplay, and the controls features add.
+- [x] Settings › Playback › Player Controls: the system player, still the default, or Anemone's overlay, with Wholphin's skip amounts (10 s back, 30 s forward), how long the controls stay up (5 s) and a debug panel. Engines that draw their own video, as MPV will, always get the overlay
+- [x] Wholphin's overlay over an `AVPlayerLayer`, driven only through the controller and its `PlayerEngine`: the title, episode, tracks playing and "Ends at"; the seek bar and its times; Previous, skip back, Play/Pause, skip forward and Next; a pause indicator. Previous restarts the entry unless it's within 3 s of the start, as in Wholphin
+- [x] D-pad seeking that speeds up while held. SwiftUI's move commands don't say how long a press lasts, so a view controller takes `pressesBegan` and `pressesEnded` before the focus engine, as Swiftfin's player does, and repeats a held press at Android's pace (every 50 ms after 500 ms) through Wholphin's `SeekAcceleration` tiers; with the controls hidden the first 8 repeats pass, as in Wholphin. The seek lands 750 ms after the last press, as Wholphin's seek bar waits; Select seeks at once and Menu drops it. Menu then hides the controls, then closes the player
+- [x] Swipe scrubbing on the clickpad, with the controls hidden or on the seek bar: a swipe across the surface covers a fifth of the video, between 2 and 10 minutes
+- [x] Trickplay thumbnails over the seek bar, from the item's trickplay for the version playing, at the widest width up to 480 px. Sheets come through the session, since they need the token, and only the three asked for last stay decoded: a sheet that finishes loading after seeking has moved on keeps just its JPEG
+- [x] The chapter row with the chapters' images, starting on the chapter playing, and the queue row with what plays after this entry, below the transport as in Wholphin
+- [x] What features add through `PlayerAccessories`: their actions over the video take focus when they appear, their menus open as lists over the controls, and the card shows above everything, as with the system player
+- [x] A debug panel behind a setting: the engine, play method and session, version, position, speed, trickplay, chapters and tracks
+
+Wholphin's `TODO()` crashes for the playlist and video-filter dialogs (`PlaybackPage.kt:292-296`) aren't ported: the overlay has neither action.
+
+Tested live in the simulator against the fixture server, with Anemone H264 Chapters (3 minutes, 6 chapters, trickplay): right twice with the controls hidden showed the compact seek bar with a thumbnail and landed a minute on; Select brought up the controls on Play/Pause; on the seek bar two presses moved 60 s with a thumbnail over the bar; down from the transport opened the chapter row on the chapter playing, and choosing an earlier one jumped there; Play/Pause paused and resumed, as the debug panel showed the controller heard; Menu hid the controls, then closed the player; and with 3c's `-fakeSegments`, Skip Intro showed over the video with focus and skipped the intro. And against the demo server, with Night of the Living Dead (96 minutes, trickplay): holding right for 2 s moved 11 minutes and then holding for 5 s moved 47, where the 2 s hold's pace would have reached 41 (a hold starts seeking after 0.9 s), and after closing the page offered Resume from where the seek had landed. With the setting left at System, the system player is unchanged. Jellyfin keeps no resume position for videos under 5 minutes, so the fixture movie's page offered Play again. After review: on the fixture movie, paused at 2:35 in the last chapter, whose card starts off screen, down from the transport opened the row on that card, and after choosing the second chapter the row opened on it; the times read 2:35 and -0:25 beside "Ends at"; and on the demo movie, a 5 s hold and then a 2 s one crossed three trickplay sheets and the compact bar still showed the thumbnail for where each landed.
+
+Not verified live: swiping on the clickpad, which the simulator's UI tests can't do (the scrubbing itself is unit-tested), the queue row, which needs more than one entry (3b), and features' menus and cards in the overlay, since no feature adds any yet.
+
+Not yet: Now Playing and remote commands while the overlay plays, which 3f adds for both players; skip-back on resume; a playback speed menu.
 
 #### 3f: Now Playing, display matching and playback settings
 

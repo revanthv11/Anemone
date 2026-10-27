@@ -1,4 +1,5 @@
 import AnemoneJellyfin
+import AnemonePlayback
 import AnemoneUI
 import SwiftUI
 
@@ -15,6 +16,7 @@ struct CollectionPage: View {
     @State private var items: [ItemDetails]?
     @State private var problem: String?
     @State private var alert: ItemAlert?
+    @State private var playback: PlaybackRequest?
     /// The card the header describes; `nil` for the collection itself.
     @State private var focusedEntry: ItemDetails?
     /// Follows `focusedEntry` after a pause, like the home page's backdrop.
@@ -54,6 +56,9 @@ struct CollectionPage: View {
         }
         .initialFocus($focus, .action(.play))
         .itemAlert($alert)
+        .player($playback) {
+            await loadItems()
+        }
         .onChange(of: focus) { _, focus in
             memory.note(focus)
             switch focus {
@@ -79,20 +84,34 @@ struct CollectionPage: View {
         .collectionDisplay($display, for: collection.id)
         // Runs again when the sort or filter changes.
         .pageTask(id: display?.query) {
-            guard let query = display?.query else { return }
-            do {
-                items = try await browse.session.collectionItems(
-                    id: collection.id,
-                    sort: query.sort,
-                    filter: query.filter,
-                )
-                problem = nil
-            } catch {
-                // A failed refresh keeps the rows already showing.
-                let message = browse.problem(with: error, doing: "load what's in \(collection.item.name)")
-                if items == nil {
-                    problem = message
-                }
+            await loadItems()
+        }
+    }
+
+    private func loadItems() async {
+        guard let query = display?.query else { return }
+        do {
+            items = try await browse.session.collectionItems(
+                id: collection.id,
+                sort: query.sort,
+                filter: query.filter,
+            )
+            problem = nil
+        } catch {
+            // A failed refresh keeps the rows already showing.
+            let message = browse.problem(with: error, doing: "load what's in \(collection.item.name)")
+            if items == nil {
+                problem = message
+            }
+        }
+    }
+
+    /// In the order and with the filters the page shows, as Wholphin's Play All takes them.
+    private func play(shuffled: Bool) {
+        let order = display.map { (sort: $0.sort, filter: $0.filter) }
+        Task {
+            await browse.playQueue(of: collection, shuffled: shuffled, order: order) { playback = $0 } failed: {
+                alert = $0
             }
         }
     }
@@ -125,21 +144,20 @@ struct CollectionPage: View {
     private var buttons: some View {
         HStack(spacing: 24) {
             ActionButton(title: "Play", systemImage: "play.fill") {
-                alert = .queueUnavailable
+                play(shuffled: false)
             }
             .focused($focus, equals: .action(.play))
             .accessibilityIdentifier("action.play")
             ActionButton(title: "Shuffle", systemImage: "shuffle") {
-                alert = .queueUnavailable
+                play(shuffled: true)
             }
             .focused($focus, equals: .action(.shuffle))
+            .accessibilityIdentifier("action.shuffle")
             FavoriteButton(isFavorite: collection.userState.isFavorite) {
                 Task { await setFavorite(!collection.userState.isFavorite) }
             }
             .focused($focus, equals: .action(.favorite))
             DeleteButton(item: collection, canDelete: canDelete).focused($focus, equals: .action(.delete))
-            PlaybackNotWiredNote()
-                .padding(.leading, 16)
             CollectionOptionsButtons(collection: collection, display: $display, focus: $focus)
         }
         .padding(.vertical, 20)

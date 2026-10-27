@@ -40,6 +40,8 @@ struct PlayerCardView: View {
         .onAppear {
             focusedAction = card.actions.first?.id
         }
+        // A container, so its buttons keep their own identifiers.
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("player.card")
     }
 }
