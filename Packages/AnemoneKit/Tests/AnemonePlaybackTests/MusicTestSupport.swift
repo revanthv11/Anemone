@@ -45,6 +45,7 @@ final class FakeLibrary: Sendable {
 
     private let stored = Mutex<[MusicItem]>([])
     private let others = Mutex<Set<Int>>([])
+    private let unread = Mutex<Set<Int>>([])
     private let requests = Mutex<[Request]>([])
     private let failing = Mutex<Int?>(nil)
     private let holding = Mutex<LoadGate?>(nil)
@@ -59,6 +60,13 @@ final class FakeLibrary: Sendable {
     var notSongs: Set<Int> {
         get { others.withLock(\.self) }
         set { others.withLock { $0 = newValue } }
+    }
+
+    /// Where the server's list holds songs the app can't read: left out of the page's songs, but
+    /// still songs.
+    var unreadable: Set<Int> {
+        get { unread.withLock(\.self) }
+        set { unread.withLock { $0 = newValue } }
     }
 
     /// Pages from this index on fail.
@@ -88,11 +96,13 @@ final class FakeLibrary: Sendable {
             }
             let all = songs
             let notSongs = notSongs
+            let unreadable = unreadable
             let indices = all.indices.dropFirst(startIndex).prefix(limit)
             return MusicPage(
-                items: indices.filter { !notSongs.contains($0) }.map { all[$0] },
+                items: indices.filter { !notSongs.contains($0) && !unreadable.contains($0) }.map { all[$0] },
                 totalCount: startIndex == 0 ? all.count : nil,
                 serverCount: indices.count,
+                isAllSongs: indices.allSatisfy { !notSongs.contains($0) },
             )
         }
     }
