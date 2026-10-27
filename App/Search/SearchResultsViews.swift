@@ -13,7 +13,7 @@ struct SearchRows: View {
         ForEach(kinds, id: \.self) { kind in
             switch results.rows[kind] {
             case .searching?:
-                SearchPlaceholder(title: kind.title, message: "Searching…")
+                SearchPlaceholder(title: kind.title, message: String(localized: "Searching…"))
             case let .failed(message)?:
                 SearchPlaceholder(title: kind.title, message: message)
             case let .found(items)? where !items.isEmpty:
@@ -23,8 +23,11 @@ struct SearchRows: View {
             }
         }
         if isEmpty {
-            SearchPlaceholder(title: "No results", message: "Nothing matches “\(results.term)”.")
-                .accessibilityIdentifier("search.noResults")
+            SearchPlaceholder(
+                title: String(localized: "No results"),
+                message: String(localized: "Nothing matches “\(results.term)”."),
+            )
+            .accessibilityIdentifier("search.noResults")
         }
     }
 
@@ -81,18 +84,22 @@ struct CombinedResults: View {
     var body: some View {
         switch results.combined?.state {
         case .searching?:
-            SearchPlaceholder(title: "Results", message: "Searching…")
+            SearchPlaceholder(title: String(localized: "Results"), message: String(localized: "Searching…"))
         case let .failed(message)?:
-            SearchPlaceholder(title: "Results", message: message)
+            SearchPlaceholder(title: String(localized: "Results"), message: message)
         case let .found(items)? where items.isEmpty:
-            SearchPlaceholder(title: "Results", message: "Nothing matches “\(results.term)”.")
-                .accessibilityIdentifier("search.noResults")
+            SearchPlaceholder(
+                title: String(localized: "Results"),
+                message: String(localized: "Nothing matches “\(results.term)”."),
+            )
+            .accessibilityIdentifier("search.noResults")
         case let .found(items)?:
             VStack(alignment: .leading, spacing: 8) {
                 Text("Results")
                     .font(.headline)
                     .foregroundStyle(theme.onBackground)
-                    .accessibilityAddTraits(.isHeader)
+                    // The row's label reads the title as focus moves in, so it's said once.
+                    .accessibilityHidden(true)
                 LazyVGrid(columns: Self.columns, alignment: .leading, spacing: 40) {
                     ForEach(items) { details in
                         NavigationLink(value: details.item) {
@@ -106,7 +113,7 @@ struct CombinedResults: View {
                 }
                 .padding(.vertical, ItemLayout.focusPadding)
             }
-            .accessibilityRow("Results")
+            .accessibilityRow(String(localized: "Results"))
             .focusSection()
         case nil:
             EmptyView()
@@ -140,7 +147,8 @@ struct RecentSearchesSection: View {
                 Text("Recent Searches")
                     .font(.headline)
                     .foregroundStyle(theme.onBackground)
-                    .accessibilityAddTraits(.isHeader)
+                    // The row's label reads the title as focus moves in, so it's said once.
+                    .accessibilityHidden(true)
                 ForEach(Array(terms.enumerated()), id: \.element) { index, term in
                     Button(term, systemImage: "clock.arrow.circlepath") {
                         pick(term)
@@ -153,7 +161,7 @@ struct RecentSearchesSection: View {
                     .padding(.top, 16)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityRow("Recent Searches")
+            .accessibilityRow(String(localized: "Recent Searches"))
             .focusSection()
         }
     }
@@ -164,8 +172,8 @@ struct RecentSearchesSection: View {
 struct NoSearchKinds: View {
     var body: some View {
         SearchPlaceholder(
-            title: "No search types selected",
-            message: "Choose the types to include in View Options.",
+            title: String(localized: "No search types selected"),
+            message: String(localized: "Choose the types to include in View Options."),
         )
         .accessibilityIdentifier("search.noKinds")
     }
@@ -195,19 +203,19 @@ extension SearchKind {
     /// The row's name in Wholphin (`formatTypeName`).
     var title: String {
         switch self {
-        case .movie: "Movies"
-        case .series: "TV Shows"
-        case .episode: "Episodes"
-        case .collection: "Collections"
-        case .person: "People"
-        case .musicAlbum: "Albums"
-        case .musicArtist: "Artists"
-        case .audio: "Songs"
-        case .musicVideo: "Music Videos"
-        case .playlist: "Playlists"
-        case .video: "Videos"
-        case .photo: "Photos"
-        case .photoAlbum: "Photo Albums"
+        case .movie: String(localized: "Movies")
+        case .series: String(localized: "TV Shows")
+        case .episode: String(localized: "Episodes")
+        case .collection: String(localized: "Collections")
+        case .person: String(localized: "People")
+        case .musicAlbum: String(localized: "Albums")
+        case .musicArtist: String(localized: "Artists")
+        case .audio: String(localized: "Songs")
+        case .musicVideo: String(localized: "Music Videos")
+        case .playlist: String(localized: "Playlists")
+        case .video: String(localized: "Videos")
+        case .photo: String(localized: "Photos")
+        case .photoAlbum: String(localized: "Photo Albums")
         }
     }
 

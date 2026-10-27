@@ -34,11 +34,11 @@ public extension MediaSegment.Kind {
     /// The skip button's title, as Wholphin words it.
     var skipTitle: String {
         switch self {
-        case .intro: "Skip Intro"
-        case .outro: "Skip Outro"
-        case .recap: "Skip Recap"
-        case .preview: "Skip Preview"
-        case .commercial: "Skip Ads"
+        case .intro: String(localized: "Skip Intro", bundle: .module)
+        case .outro: String(localized: "Skip Outro", bundle: .module)
+        case .recap: String(localized: "Skip Recap", bundle: .module)
+        case .preview: String(localized: "Skip Preview", bundle: .module)
+        case .commercial: String(localized: "Skip Ads", bundle: .module)
         }
     }
 }

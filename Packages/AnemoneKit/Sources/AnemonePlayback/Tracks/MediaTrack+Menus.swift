@@ -8,7 +8,8 @@ extension MediaTrack {
             return displayTitle
         }
         let language = language.flatMap { Locale.current.localizedString(forLanguageCode: $0) }
-        return [title ?? language ?? "Unknown", codec?.uppercased()].compactMap(\.self).joined(separator: " - ")
+        return [title ?? language ?? String(localized: "Unknown", bundle: .module), codec?.uppercased()]
+            .compactMap(\.self).joined(separator: " - ")
     }
 }
 

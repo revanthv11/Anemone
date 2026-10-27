@@ -111,11 +111,11 @@ struct ScreensaverView: View {
             do {
                 slides = try await session.screensaverSlides(maxAgeRating: maxAge >= 0 ? maxAge : nil)
             } catch {
-                await showMessage("Couldn't reach the server.")
+                await showMessage(String(localized: "Couldn't reach the server."))
                 continue
             }
             guard !slides.isEmpty else {
-                await showMessage("Nothing to show.")
+                await showMessage(String(localized: "Nothing to show."))
                 continue
             }
             for next in slides {

@@ -31,7 +31,7 @@ struct VersionPicker: View {
             Color.clear
                 .frame(width: 0, height: 0)
             if versions.count > 1 {
-                ActionButton(title: "Version", systemImage: "square.stack") {
+                ActionButton(title: String(localized: "Version"), systemImage: "square.stack") {
                     isChoosing = true
                 }
                 // "Version, 1080p": the one that plays.
@@ -132,7 +132,7 @@ private extension MediaVersion {
             return versions + (versions.count + 1 ... count).map { number in
                 MediaVersion(
                     id: "\(first.id)-fake\(number)",
-                    name: "\(first.name) (copy \(number))",
+                    name: String(localized: "\(first.name) (copy \(number))"),
                     bitrate: first.bitrate,
                     runtime: first.runtime,
                     video: first.video,

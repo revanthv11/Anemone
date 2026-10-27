@@ -216,9 +216,11 @@ struct SearchPage: View {
             return .found(items)
         case let .failure(error as SessionError) where error == .signedOut:
             browse.noteSignedOut()
-            return .failed("\(browse.server.name) signed you out. Go to Home to sign in again.")
+            return .failed(String(localized: "\(browse.server.name) signed you out. Go to Home to sign in again."))
         case .failure:
-            return .failed("Couldn't search \(browse.server.name). Check that it's running, then try again.")
+            return .failed(
+                String(localized: "Couldn't search \(browse.server.name). Check that it's running, then try again."),
+            )
         }
     }
 

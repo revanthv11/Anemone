@@ -41,7 +41,7 @@ struct ItemDetailView: View {
             details = try await browse.session.itemDetails(id: item.id)
             problem = nil
         } catch {
-            let message = browse.problem(with: error, doing: "load \(item.name) from \(browse.server.name)")
+            let message = browse.problem(with: error, failure: "Couldn't load \(item.name) from \(browse.server.name).")
             // A failed refresh keeps the page that's already showing.
             if details == nil {
                 problem = message

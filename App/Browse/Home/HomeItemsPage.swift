@@ -58,7 +58,8 @@ struct HomeItemsPage: View {
                 .font(.title2.bold())
                 .foregroundStyle(theme.onBackground)
                 .lineLimit(1)
-            Text([link.query.library.name, count == 1 ? "1 item" : "\(count.formatted()) items"]
+            // One key with plural forms in the String Catalog.
+            Text([link.query.library.name, String(localized: "\(count) items")]
                 .filter { !$0.isEmpty }
                 .joined(separator: " · "))
                 .font(.callout)

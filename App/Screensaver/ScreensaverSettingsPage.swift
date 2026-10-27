@@ -21,7 +21,7 @@ struct ScreensaverSettingsPage: View {
                 Toggle("Use in-app screensaver", isOn: $isEnabled)
                     .accessibilityIdentifier("screensaver.enabled")
                 ScreensaverChoiceRow(
-                    title: "Start after",
+                    title: String(localized: "Start after"),
                     selection: $startDelay,
                     choices: ScreensaverChoices.startDelays,
                     name: Self.durationText,
@@ -29,12 +29,14 @@ struct ScreensaverSettingsPage: View {
                 .disabled(!isEnabled)
                 .accessibilityIdentifier("screensaver.startDelay")
             } footer: {
-                Text("Shows the backdrops of random movies and shows once the remote has been left alone, "
-                    + "but never while a video plays.")
+                Text("""
+                Shows the backdrops of random movies and shows once the remote has been left alone, \
+                but never while a video plays.
+                """)
             }
             Section {
                 ScreensaverChoiceRow(
-                    title: "Each picture for",
+                    title: String(localized: "Each picture for"),
                     selection: $duration,
                     choices: ScreensaverChoices.durations,
                     name: Self.durationText,
@@ -45,7 +47,7 @@ struct ScreensaverSettingsPage: View {
                 Toggle("Animate", isOn: $animates)
                     .accessibilityIdentifier("screensaver.animate")
                 ScreensaverChoiceRow(
-                    title: "Max age rating",
+                    title: String(localized: "Max age rating"),
                     selection: $maxAge,
                     choices: ScreensaverChoices.maxAges,
                     name: Self.ageText,
@@ -69,9 +71,9 @@ struct ScreensaverSettingsPage: View {
     /// As Wholphin words them.
     private static func ageText(_ age: Int) -> String {
         switch age {
-        case -1: "No limit"
-        case 0: "For all ages"
-        default: "Up to age \(age)"
+        case -1: String(localized: "No limit")
+        case 0: String(localized: "For all ages")
+        default: String(localized: "Up to age \(age)")
         }
     }
 }

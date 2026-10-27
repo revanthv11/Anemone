@@ -96,7 +96,7 @@ struct CollectionOptionsButtons: View {
                 sortMenu(display)
                 let active = display.wrappedValue.filter.activeCount
                 ActionButton(
-                    title: active > 0 ? "Filter (\(active))" : "Filter",
+                    title: active > 0 ? String(localized: "Filter (\(active))") : String(localized: "Filter"),
                     systemImage: "line.3.horizontal.decrease.circle",
                     spokenTitle: active > 0 ? Text("Filter, \(active) active") : nil,
                 ) {

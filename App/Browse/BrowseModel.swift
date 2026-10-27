@@ -140,7 +140,7 @@ extension BrowseModel {
                 try await homeWriter.save(settings)
                 homeSaveProblem = nil
             } catch {
-                homeSaveProblem = problem(with: error, doing: "save your rows on \(server.name)")
+                homeSaveProblem = problem(with: error, failure: "Couldn't save your rows on \(server.name).")
             }
         }
     }

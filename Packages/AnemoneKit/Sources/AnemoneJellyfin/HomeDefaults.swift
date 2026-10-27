@@ -55,13 +55,13 @@ public enum HomeLibraryRowType: String, Hashable, Sendable, CaseIterable {
 
     public var title: String {
         switch self {
-        case .recentlyAdded: "Recently Added"
-        case .recentlyReleased: "Recently Released"
-        case .suggestions: "Suggestions"
-        case .genres: "Genres"
-        case .studios: "Studios"
-        case .tvChannels: "Channels"
-        case .tvPrograms: "Watch Live"
+        case .recentlyAdded: String(localized: "Recently Added", bundle: .module)
+        case .recentlyReleased: String(localized: "Recently Released", bundle: .module)
+        case .suggestions: String(localized: "Suggestions", bundle: .module)
+        case .genres: String(localized: "Genres", bundle: .module)
+        case .studios: String(localized: "Studios", bundle: .module)
+        case .tvChannels: String(localized: "Channels", bundle: .module)
+        case .tvPrograms: String(localized: "Watch Live", bundle: .module)
         }
     }
 
@@ -100,10 +100,20 @@ public enum HomeFavoriteKind {
     ]
 
     private static let names = [
-        "Movie": "Movies", "Series": "TV Shows", "Episode": "Episodes", "BoxSet": "Collections",
-        "Person": "People", "TvChannel": "Channels", "MusicAlbum": "Albums", "MusicArtist": "Artists",
-        "Audio": "Songs", "MusicVideo": "Music Videos", "Playlist": "Playlists", "Video": "Videos",
-        "Photo": "Photos", "PhotoAlbum": "Photo Albums",
+        "Movie": String(localized: "Movies", bundle: .module),
+        "Series": String(localized: "TV Shows", bundle: .module),
+        "Episode": String(localized: "Episodes", bundle: .module),
+        "BoxSet": String(localized: "Collections", bundle: .module),
+        "Person": String(localized: "People", bundle: .module),
+        "TvChannel": String(localized: "Channels", bundle: .module),
+        "MusicAlbum": String(localized: "Albums", bundle: .module),
+        "MusicArtist": String(localized: "Artists", bundle: .module),
+        "Audio": String(localized: "Songs", bundle: .module),
+        "MusicVideo": String(localized: "Music Videos", bundle: .module),
+        "Playlist": String(localized: "Playlists", bundle: .module),
+        "Video": String(localized: "Videos", bundle: .module),
+        "Photo": String(localized: "Photos", bundle: .module),
+        "PhotoAlbum": String(localized: "Photo Albums", bundle: .module),
     ]
 
     private static func kinds(in kind: Library.Kind) -> [String] {
@@ -127,31 +137,43 @@ public extension HomeRowConfig {
     /// The row's title, as Wholphin's `HomeSettingsService.resolve` words it. `names` holds the
     /// names of items that aren't libraries, such as a collection shown by a `byParent` row.
     func title(libraries: [Library], names: [String: String] = [:]) -> String {
-        let wording = titleWording
-        guard let joiner = wording.joiner, let id = parentID,
-              let name = libraries.first(where: { $0.id == id })?.name ?? names[id]
-        else { return wording.text }
-        return joiner.isEmpty ? name : wording.text + joiner + name
+        let parent = parentID.flatMap { id in libraries.first(where: { $0.id == id })?.name ?? names[id] }
+        return parent.flatMap(title(naming:)) ?? fixedTitle
     }
 
-    /// A fixed title, or the start of one that names the library: "Genres" + " in " + "Movies".
-    /// An empty joiner means the parent's name alone.
-    private var titleWording: (text: String, joiner: String?) {
+    /// The title of a row that names the library or item it's from, as a whole sentence rather
+    /// than "Genres" + " in " + "Movies", so a translation can put the name where its language
+    /// needs it. `nil` for rows whose title never names one.
+    private func title(naming parent: String) -> String? {
         switch kind {
-        case .continueWatching, .continueWatchingCombined: ("Continue Watching", nil)
-        case .nextUp: ("Next Up", nil)
-        case .recentlyAdded: ("Recently Added", " in ")
-        case .recentlyReleased: ("Recently Released", " in ")
-        case .genres: ("Genres", " in ")
-        case .studios: ("Studios", " in ")
-        case let .favorite(itemKind): ("Favorite \(HomeFavoriteKind.pluralName(itemKind))", nil)
-        case .recordings: ("Active Recordings", nil)
-        case .tvPrograms: ("Watch Live", nil)
-        case .tvChannels: ("Channels", nil)
-        case .suggestions: ("Suggestions", " for ")
-        case .byParent: ("Collection", "")
-        case let .getItems(name, _): (name, nil)
-        case let .customEndpoint(endpoint): (endpoint.title, nil)
+        case .recentlyAdded: String(localized: "Recently Added in \(parent)", bundle: .module)
+        case .recentlyReleased: String(localized: "Recently Released in \(parent)", bundle: .module)
+        case .genres: String(localized: "Genres in \(parent)", bundle: .module)
+        case .studios: String(localized: "Studios in \(parent)", bundle: .module)
+        case .suggestions: String(localized: "Suggestions for \(parent)", bundle: .module)
+        case .byParent: parent
+        default: nil
+        }
+    }
+
+    /// The title when the row names no library or item.
+    private var fixedTitle: String {
+        switch kind {
+        case .continueWatching, .continueWatchingCombined: String(localized: "Continue Watching", bundle: .module)
+        case .nextUp: String(localized: "Next Up", bundle: .module)
+        case .recentlyAdded: String(localized: "Recently Added", bundle: .module)
+        case .recentlyReleased: String(localized: "Recently Released", bundle: .module)
+        case .genres: String(localized: "Genres", bundle: .module)
+        case .studios: String(localized: "Studios", bundle: .module)
+        case let .favorite(itemKind):
+            String(localized: "Favorite \(HomeFavoriteKind.pluralName(itemKind))", bundle: .module)
+        case .recordings: String(localized: "Active Recordings", bundle: .module)
+        case .tvPrograms: String(localized: "Watch Live", bundle: .module)
+        case .tvChannels: String(localized: "Channels", bundle: .module)
+        case .suggestions: String(localized: "Suggestions", bundle: .module)
+        case .byParent: String(localized: "Collection", bundle: .module)
+        case let .getItems(name, _): name
+        case let .customEndpoint(endpoint): endpoint.title
         }
     }
 

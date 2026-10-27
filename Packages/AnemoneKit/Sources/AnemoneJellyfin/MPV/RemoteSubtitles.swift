@@ -184,7 +184,10 @@ extension SubtitleStream {
         guard let index = stream.index else { return nil }
         self.init(
             index: index,
-            title: stream.displayTitle ?? stream.title ?? stream.language ?? "Subtitles \(index)",
+            title: stream.displayTitle ?? stream.title ?? stream.language ?? String(
+                localized: "Subtitles \(index)",
+                bundle: .module,
+            ),
             language: stream.language,
             codec: stream.codec,
             isExternal: stream.isExternal ?? false,

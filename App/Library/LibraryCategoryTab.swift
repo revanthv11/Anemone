@@ -41,13 +41,13 @@ struct LibraryCategoryTab: View {
             case let .loaded(pager, sortNames):
                 grid(pager, sortNames: sortNames)
             case .failed:
-                message("Couldn't load the \(noun) in \(library.name) from \(browse.server.name).") {
+                message(failureMessage) {
                     Button("Try again") {
                         Task { await load() }
                     }
                 }
             case .signedOut:
-                message("\(browse.server.name) signed you out. Go to Home to sign in again.") {}
+                message(String(localized: "\(browse.server.name) signed you out. Go to Home to sign in again.")) {}
             }
         }
         .task {
@@ -64,7 +64,9 @@ struct LibraryCategoryTab: View {
             onSelect: open,
             onPastFirstRow: onPastFirstRow,
             onExitTop: onExitTop,
-            emptyMessage: "There are no \(noun) in \(library.name).",
+            emptyMessage: kind == .genres
+                ? String(localized: "There are no genres in \(library.name).")
+                : String(localized: "There are no studios in \(library.name)."),
             hearsPageButtons: true,
             card: { entry, width, pixelWidth in
                 CategoryCard(
@@ -76,7 +78,8 @@ struct LibraryCategoryTab: View {
                 )
             },
             header: {
-                Text(pager.count == 1 ? "1 \(singular)" : "\(pager.count.formatted()) \(noun)")
+                // One key per kind, with plural forms in the String Catalog.
+                Text(kind == .genres ? "\(pager.count) genres" : "\(pager.count) studios")
                     .font(.callout)
                     .foregroundStyle(theme.secondaryText)
             },
@@ -95,12 +98,12 @@ struct LibraryCategoryTab: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var noun: String {
-        kind == .genres ? "genres" : "studios"
-    }
-
-    private var singular: String {
-        kind == .genres ? "genre" : "studio"
+    /// Whole sentences for each kind, rather than its name dropped into one, so a translation
+    /// can word each as its language needs.
+    private var failureMessage: String {
+        kind == .genres
+            ? String(localized: "Couldn't load the genres in \(library.name) from \(browse.server.name).")
+            : String(localized: "Couldn't load the studios in \(library.name) from \(browse.server.name).")
     }
 
     private func imageURL(for entry: LibraryEntry, pixelWidth: Int) -> URL? {

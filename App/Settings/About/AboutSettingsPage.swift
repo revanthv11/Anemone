@@ -25,9 +25,11 @@ struct AboutSettingsPage: View {
                 Text("Anemone \(version.text)")
                     .accessibilityIdentifier("about.version")
             } footer: {
-                Text("Anemone is free software: you can redistribute it and modify it under the terms of the "
-                    + "GNU General Public License, version 3. The source code of every App Store and "
-                    + "TestFlight build is tagged in that repository; this one is \(version.sourceTag).")
+                Text("""
+                Anemone is free software: you can redistribute it and modify it under the terms of the \
+                GNU General Public License, version 3. The source code of every App Store and \
+                TestFlight build is tagged in that repository; this one is \(version.sourceTag).
+                """)
             }
 
             if let notice {

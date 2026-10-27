@@ -146,7 +146,7 @@ struct LibraryScreen: View {
             LibraryItemsPage(
                 library: library,
                 scope: .collections,
-                title: "Collections",
+                title: String(localized: "Collections"),
                 path: $path,
                 onPastFirstRow: onPastFirstRow,
                 onExitTop: onExitTop,

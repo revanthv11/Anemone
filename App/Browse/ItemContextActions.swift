@@ -80,7 +80,7 @@ final class ItemContextActions {
             do {
                 details = try await browse.session.itemDetails(id: target.id)
             } catch {
-                if let message = browse.problem(with: error, doing: "load \(target.item.name)") {
+                if let message = browse.problem(with: error, failure: "Couldn't load \(target.item.name).") {
                     alert = .failed(message)
                 }
                 return
@@ -254,16 +254,26 @@ private extension ItemMenuEntry {
     /// Wholphin's wording, as on the item pages' buttons.
     var title: String {
         switch self {
-        case .goTo: "Go to"
-        case .play: "Play"
-        case .resume: "Resume"
-        case .restart: "Restart"
-        case .addToPlaylist: "Add to playlist"
-        case .removeFromContinueWatching: "Remove from Continue Watching"
-        case .removeFromNextUp: "Remove from Next Up"
-        case let .setPlayed(isPlayed): isPlayed ? "Mark as watched" : "Mark as unwatched"
-        case let .setFavorite(isFavorite): isFavorite ? "Add to favorites" : "Remove from favorites"
-        case .goToSeries: "Go to series"
+        case .goTo: String(localized: "Go to")
+        case .play: String(localized: "Play")
+        case .resume: String(localized: "Resume")
+        case .restart: String(localized: "Restart")
+        case .addToPlaylist: String(localized: "Add to playlist")
+        case .removeFromContinueWatching: String(localized: "Remove from Continue Watching")
+        case .removeFromNextUp: String(localized: "Remove from Next Up")
+        case let .setPlayed(isPlayed):
+            if isPlayed {
+                String(localized: "Mark as watched")
+            } else {
+                String(localized: "Mark as unwatched")
+            }
+        case let .setFavorite(isFavorite):
+            if isFavorite {
+                String(localized: "Add to favorites")
+            } else {
+                String(localized: "Remove from favorites")
+            }
+        case .goToSeries: String(localized: "Go to series")
         }
     }
 

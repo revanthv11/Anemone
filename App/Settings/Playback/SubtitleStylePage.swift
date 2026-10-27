@@ -33,11 +33,13 @@ struct SubtitleStylePage: View {
                 SubtitlePreview(style: style.wrappedValue)
             }
             Section("Font") {
-                steps("Size", \.fontSize, Array(stride(from: 8, through: 70, by: 2))) { "\($0)" }
-                colors("Color", \.fontColor)
+                steps(String(localized: "Size"), \.fontSize, Array(stride(from: 8, through: 70, by: 2))) { "\($0)" }
+                colors(String(localized: "Color"), \.fontColor)
                 Toggle("Bold", isOn: style.isBold)
                 Toggle("Italic", isOn: style.isItalic)
-                steps("Opacity", \.fontOpacity, Array(stride(from: 10, through: 100, by: 10))) { "\($0)%" }
+                steps(String(localized: "Opacity"), \.fontOpacity, Array(stride(from: 10, through: 100, by: 10))) {
+                    "\($0)%"
+                }
             }
             Section("Edge") {
                 Picker("Style", selection: style.edge) {
@@ -45,8 +47,10 @@ struct SubtitleStylePage: View {
                     Text("Outline").tag(SubtitleEdge.solid)
                     Text("Drop shadow").tag(SubtitleEdge.shadow)
                 }
-                colors("Color", \.edgeColor)
-                steps("Size", \.edgeThickness, Array(1 ... 32)) { String(format: "%g", Double($0) / 2) }
+                colors(String(localized: "Color"), \.edgeColor)
+                steps(String(localized: "Size"), \.edgeThickness, Array(1 ... 32)) {
+                    String(format: "%g", Double($0) / 2)
+                }
             }
             Section("Background") {
                 Picker("Style", selection: style.background) {
@@ -54,11 +58,15 @@ struct SubtitleStylePage: View {
                     Text("Behind each line").tag(SubtitleBackground.wrap)
                     Text("One box").tag(SubtitleBackground.boxed)
                 }
-                colors("Color", \.backgroundColor)
-                steps("Opacity", \.backgroundOpacity, Array(stride(from: 10, through: 100, by: 10))) { "\($0)%" }
+                colors(String(localized: "Color"), \.backgroundColor)
+                steps(String(localized: "Opacity"), \.backgroundOpacity, Array(
+                    stride(from: 10, through: 100, by: 10),
+                )) {
+                    "\($0)%"
+                }
             }
             Section("More") {
-                steps("Margin", \.margin, Array(stride(from: 0, through: 100, by: 2))) { "\($0)%" }
+                steps(String(localized: "Margin"), \.margin, Array(stride(from: 0, through: 100, by: 2))) { "\($0)%" }
                 Button("Reset") {
                     stored = preference.defaultValue.json
                 }

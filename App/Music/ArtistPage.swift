@@ -45,13 +45,23 @@ struct ArtistPage: View {
                         popularSongs
                     }
                     if !albums.isEmpty {
-                        MusicRow(id: "albums", title: "Albums", items: albums, focus: $focus)
+                        MusicRow(id: "albums", title: String(localized: "Albums"), items: albums, focus: $focus)
                     }
                     if !appearsOn.isEmpty {
-                        MusicRow(id: "appearsOn", title: "Appears On", items: appearsOn, focus: $focus)
+                        MusicRow(
+                            id: "appearsOn",
+                            title: String(localized: "Appears On"),
+                            items: appearsOn,
+                            focus: $focus,
+                        )
                     }
                     if !similar.isEmpty {
-                        MusicRow(id: "similar", title: "More Like This", items: similar, focus: $focus)
+                        MusicRow(
+                            id: "similar",
+                            title: String(localized: "More Like This"),
+                            items: similar,
+                            focus: $focus,
+                        )
                     }
                 }
                 .padding(.horizontal, ItemLayout.horizontalInset)

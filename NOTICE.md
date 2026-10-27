@@ -14,6 +14,8 @@ Anemone is a Swift rewrite for tvOS. Behaviour, data models, and logic are porte
 
 Some of Wholphin's device profile code is adapted from the official [jellyfin-androidtv](https://github.com/jellyfin/jellyfin-androidtv) client (GPL-2.0). Any of it that is ported keeps that attribution.
 
+Anemone's translations are Wholphin's: `scripts/import-wholphin-strings.py` copies them from Wholphin's `strings.xml` into Anemone's String Catalogs, for the strings the two apps word the same. They are the work of Wholphin's translators, contributed through Weblate, and come under Wholphin's license, above.
+
 ## Swiftfin
 
 Anemone's AVPlayer device profile, the checks it makes on the server's media segments, the way its player overlay takes the Siri Remote's presses before the focus engine and passes on those it doesn't use, the link that opens a YouTube trailer in the YouTube app, its Now Playing info and remote commands, and closing a live TV stream that never got under way are adapted from [Swiftfin](https://github.com/jellyfin/Swiftfin), the official Jellyfin client for Apple platforms. So is the way the player matches the server's audio and subtitle streams to AVPlayer's tracks, decides when a track change needs a new stream, and burns in subtitles (`AnemonePlayback/Tracks/TrackSwitching.swift`).

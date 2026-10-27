@@ -12,14 +12,17 @@ struct SubtitleStyleSettingsPage: View {
         List {
             Section {
                 NavigationLink("Subtitle style") {
-                    SubtitleStylePage(preference: Preferences.subtitleStyle, title: "Subtitle Style")
+                    SubtitleStylePage(preference: Preferences.subtitleStyle, title: String(localized: "Subtitle Style"))
                 }
                 .accessibilityIdentifier("settings.subtitleStyle")
                 Toggle("Use a different style for HDR", isOn: $separateHDR)
                     .accessibilityIdentifier("settings.subtitleStyleSeparateHDR")
                 if separateHDR {
                     NavigationLink("HDR subtitle style") {
-                        SubtitleStylePage(preference: Preferences.hdrSubtitleStyle, title: "HDR Subtitle Style")
+                        SubtitleStylePage(
+                            preference: Preferences.hdrSubtitleStyle,
+                            title: String(localized: "HDR Subtitle Style"),
+                        )
                     }
                     .accessibilityIdentifier("settings.hdrSubtitleStyle")
                 }

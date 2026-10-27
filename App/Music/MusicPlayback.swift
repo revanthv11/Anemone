@@ -65,7 +65,10 @@ extension MusicPlayer {
             do {
                 try await play(source, shuffled: shuffled)
             } catch {
-                if let message = browse.problem(with: error, doing: "load the songs from \(browse.server.name)") {
+                if let message = browse.problem(
+                    with: error,
+                    failure: "Couldn't load the songs from \(browse.server.name).",
+                ) {
                     failed(message)
                 }
             }
@@ -101,7 +104,7 @@ extension MusicPlayer {
             do {
                 try await play { try await session.instantMix(from: itemID) }
             } catch {
-                if let message = browse.problem(with: error, doing: "make a mix on \(browse.server.name)") {
+                if let message = browse.problem(with: error, failure: "Couldn't make a mix on \(browse.server.name).") {
                     failed(message)
                 }
             }

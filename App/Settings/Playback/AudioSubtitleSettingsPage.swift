@@ -15,7 +15,7 @@ struct AudioSubtitleSettingsPage: View {
         List {
             Section {
                 LanguageSettingRow(
-                    title: "Audio language",
+                    title: String(localized: "Audio language"),
                     id: "audioLanguage",
                     setting: $audioLanguage,
                     profileLanguage: model.profile.audioLanguage,
@@ -23,8 +23,10 @@ struct AudioSubtitleSettingsPage: View {
                 )
                 SubtitleSettingRows(model: model)
             } footer: {
-                Text("Tracks you pick in the player win over these, for that item and, for an episode, the rest of "
-                    + "its season and series.")
+                Text("""
+                Tracks you pick in the player win over these, for that item and, for an episode, the rest of \
+                its season and series.
+                """)
             }
             Section {
                 Button("Forget picked tracks") {
@@ -85,8 +87,9 @@ struct LanguageSettingRow: View {
 
     private var summary: String {
         switch setting {
-        case .serverProfile: "Jellyfin profile (\(model.name(of: profileLanguage) ?? "any"))"
-        case .anyLanguage: "Any"
+        case .serverProfile:
+            String(localized: "Jellyfin profile (\(model.name(of: profileLanguage) ?? String(localized: "any")))")
+        case .anyLanguage: String(localized: "Any")
         case let .language(code): model.name(of: code) ?? code
         }
     }
@@ -95,10 +98,10 @@ struct LanguageSettingRow: View {
         var choices: [ChoicePage<LanguageSetting>.Choice] = [
             .init(
                 .serverProfile,
-                "From your Jellyfin profile",
-                detail: model.name(of: profileLanguage) ?? "Any language",
+                String(localized: "From your Jellyfin profile"),
+                detail: model.name(of: profileLanguage) ?? String(localized: "Any language"),
             ),
-            .init(.anyLanguage, "Any language"),
+            .init(.anyLanguage, String(localized: "Any language")),
         ]
         // Keeps a language the server's list doesn't have, so it still shows as picked.
         if case let .language(code) = setting, !model.languages.contains(where: { $0.code == code }) {

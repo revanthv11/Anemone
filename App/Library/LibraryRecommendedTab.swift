@@ -38,15 +38,17 @@ struct LibraryRecommendedTab: View {
             case let .loaded(recommended) where !recommended.rows.isEmpty:
                 rows(recommended)
             case let .loaded(recommended) where recommended.failedRows.isEmpty:
-                message("Nothing to recommend in \(library.name) yet.") {}
+                message(String(localized: "Nothing to recommend in \(library.name) yet.")) {}
             case .loaded, .failed:
-                message("Couldn't load recommendations for \(library.name) from \(browse.server.name).") {
+                message(
+                    String(localized: "Couldn't load recommendations for \(library.name) from \(browse.server.name)."),
+                ) {
                     Button("Try again") {
                         Task { await load() }
                     }
                 }
             case .signedOut:
-                message("\(browse.server.name) signed you out. Go to Home to sign in again.") {}
+                message(String(localized: "\(browse.server.name) signed you out. Go to Home to sign in again.")) {}
             }
         }
         .task {
@@ -69,7 +71,7 @@ struct LibraryRecommendedTab: View {
                             )
                     }
                     if !recommended.failedRows.isEmpty {
-                        NoticeText("Some rows couldn't be loaded.")
+                        NoticeText(String(localized: "Some rows couldn't be loaded."))
                     }
                 }
                 .padding(.horizontal, GridLayout.horizontalInset)
@@ -139,12 +141,12 @@ private extension RecommendedRow {
     /// Wholphin's row titles.
     var title: String {
         switch kind {
-        case .continueWatching: "Continue Watching"
-        case .nextUp: "Next Up"
-        case .recentlyReleased: "Recently Released"
-        case .recentlyAdded: "Recently Added"
-        case .topUnwatched: "Top Unwatched"
-        case .suggestions: "Suggestions"
+        case .continueWatching: String(localized: "Continue Watching")
+        case .nextUp: String(localized: "Next Up")
+        case .recentlyReleased: String(localized: "Recently Released")
+        case .recentlyAdded: String(localized: "Recently Added")
+        case .topUnwatched: String(localized: "Top Unwatched")
+        case .suggestions: String(localized: "Suggestions")
         }
     }
 }
@@ -165,7 +167,8 @@ private struct RecommendedRowView: View {
             Text(row.title)
                 .font(.headline)
                 .foregroundStyle(theme.onBackground)
-                .accessibilityAddTraits(.isHeader)
+                // The row's label reads the title as focus moves in, so it's said once.
+                .accessibilityHidden(true)
             ScrollView(.horizontal) {
                 LazyHStack(spacing: RecommendedLayout.cardSpacing) {
                     ForEach(row.items) { item in

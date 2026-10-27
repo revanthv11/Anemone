@@ -47,7 +47,8 @@ struct SlideshowDetails: View {
             }
             HStack(spacing: 24) {
                 ActionButton(
-                    title: slideshow.isRunning ? "Stop slideshow" : "Play slideshow",
+                    title: slideshow
+                        .isRunning ? String(localized: "Stop slideshow") : String(localized: "Play slideshow"),
                     systemImage: slideshow.isRunning ? "pause.fill" : "play.fill",
                     action: toggleSlideshow,
                 )
@@ -56,7 +57,7 @@ struct SlideshowDetails: View {
                 .accessibilityIdentifier("slideshow.toggle")
                 if item?.kind == .video, let clip {
                     ActionButton(
-                        title: clip.isPaused ? "Play" : "Pause",
+                        title: clip.isPaused ? String(localized: "Play") : String(localized: "Pause"),
                         systemImage: clip.isPaused ? "play" : "pause",
                     ) {
                         clip.togglePause()
@@ -89,23 +90,23 @@ struct SlideshowDetails: View {
 
     @ViewBuilder
     private var photoControls: some View {
-        ActionButton(title: "Rotate left", systemImage: "rotate.left") {
+        ActionButton(title: String(localized: "Rotate left"), systemImage: "rotate.left") {
             framing.rotate(by: -90)
         }
         .accessibilityIdentifier("slideshow.rotateLeft")
-        ActionButton(title: "Rotate right", systemImage: "rotate.right") {
+        ActionButton(title: String(localized: "Rotate right"), systemImage: "rotate.right") {
             framing.rotate(by: 90)
         }
         .accessibilityIdentifier("slideshow.rotateRight")
-        ActionButton(title: "Zoom in", systemImage: "plus.magnifyingglass") {
+        ActionButton(title: String(localized: "Zoom in"), systemImage: "plus.magnifyingglass") {
             framing.zoom(by: PhotoFraming.zoomStep)
         }
         .accessibilityIdentifier("slideshow.zoomIn")
-        ActionButton(title: "Zoom out", systemImage: "minus.magnifyingglass") {
+        ActionButton(title: String(localized: "Zoom out"), systemImage: "minus.magnifyingglass") {
             framing.zoom(by: -PhotoFraming.zoomStep)
         }
         .accessibilityIdentifier("slideshow.zoomOut")
-        ActionButton(title: "Reset", systemImage: "arrow.counterclockwise") {
+        ActionButton(title: String(localized: "Reset"), systemImage: "arrow.counterclockwise") {
             framing = PhotoFraming()
         }
         .accessibilityIdentifier("slideshow.reset")

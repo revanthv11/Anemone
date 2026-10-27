@@ -267,9 +267,9 @@ public enum MusicRecommendation: CaseIterable, Hashable, Sendable {
 
     public var title: String {
         switch self {
-        case .recentlyReleased: "Recently Released"
-        case .recentlyAdded: "Recently Added"
-        case .topRated: "Top Rated"
+        case .recentlyReleased: String(localized: "Recently Released", bundle: .module)
+        case .recentlyAdded: String(localized: "Recently Added", bundle: .module)
+        case .topRated: String(localized: "Top Rated", bundle: .module)
         }
     }
 }

@@ -106,12 +106,12 @@ struct PlaylistPage: View {
             }
             .foregroundStyle(theme.onBackground)
             HStack(spacing: 24) {
-                ActionButton(title: "Play", systemImage: "play.fill") {
+                ActionButton(title: String(localized: "Play"), systemImage: "play.fill") {
                     play(shuffled: false)
                 }
                 .focused($focus, equals: .action(.play))
                 .accessibilityIdentifier("action.play")
-                ActionButton(title: "Shuffle", systemImage: "shuffle") {
+                ActionButton(title: String(localized: "Shuffle"), systemImage: "shuffle") {
                     play(shuffled: true)
                 }
                 .focused($focus, equals: .action(.shuffle))
@@ -137,12 +137,12 @@ struct PlaylistPage: View {
     /// Wholphin's move buttons, shown when the user can edit the playlist.
     private func moveButtons(index: Int, count: Int) -> some View {
         HStack(spacing: 12) {
-            ActionButton(title: "Move up", systemImage: "chevron.up") {
+            ActionButton(title: String(localized: "Move up"), systemImage: "chevron.up") {
                 Task { await move(from: index, to: index - 1, button: Self.moveUpID) }
             }
             .disabled(index == 0)
             .focused($focus, equals: .card(row: Self.moveUpID, item: String(index)))
-            ActionButton(title: "Move down", systemImage: "chevron.down") {
+            ActionButton(title: String(localized: "Move down"), systemImage: "chevron.down") {
                 Task { await move(from: index, to: index + 1, button: Self.moveDownID) }
             }
             .disabled(index == count - 1)
@@ -171,7 +171,7 @@ struct PlaylistPage: View {
         do {
             try await browse.session.movePlaylistItem(entry.id, inPlaylist: playlist.id, to: newIndex)
         } catch {
-            alert = browse.problem(with: error, doing: "move \(entry.item.name)").map(ItemAlert.failed)
+            alert = browse.problem(with: error, failure: "Couldn't move \(entry.item.name).").map(ItemAlert.failed)
         }
         // Either way, show the order the server has now.
         await loadEntries()
@@ -189,7 +189,7 @@ struct PlaylistPage: View {
             problem = nil
         } catch {
             // A failed refresh keeps the entries already showing.
-            let message = browse.problem(with: error, doing: "load \(playlist.item.name)")
+            let message = browse.problem(with: error, failure: "Couldn't load \(playlist.item.name).")
             if load == entriesLoad, entries == nil {
                 problem = message
             }

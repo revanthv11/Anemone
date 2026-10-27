@@ -25,7 +25,7 @@ struct PersonPage: View {
                         if let items = filmography[row], !items.isEmpty {
                             ItemRow(
                                 id: "\(row)",
-                                title: "\(row.title) (\(items.count))",
+                                title: String(localized: "\(row.title) (\(items.count))"),
                                 items: items,
                                 shape: row == .episodes ? .thumb : .poster,
                                 focus: $focus,
@@ -153,9 +153,9 @@ struct PersonPage: View {
 private extension FilmographyRow {
     var title: String {
         switch self {
-        case .movies: "Movies"
-        case .series: "TV Shows"
-        case .episodes: "Episodes"
+        case .movies: String(localized: "Movies")
+        case .series: String(localized: "TV Shows")
+        case .episodes: String(localized: "Episodes")
         }
     }
 }

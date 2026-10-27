@@ -35,7 +35,7 @@ extension BrowseModel {
             cardMarks.record(CardMarks(state, replacing: before), for: details.id, replacing: before)
             return state
         } catch {
-            if let message = problem(with: error, doing: "update \(details.item.name)") {
+            if let message = problem(with: error, failure: "Couldn't update \(details.item.name).") {
                 failed(.failed(message))
             }
             return nil
@@ -46,15 +46,16 @@ extension BrowseModel {
         image.flatMap { session.imageURL(for: $0, maxWidth: Int(width)) }
     }
 
-    /// What an item page says when a request fails. `nil` when the page was left, which
-    /// cancels its requests.
-    func problem(with error: any Error, doing what: String) -> String? {
+    /// What an item page says when a request fails: `failure`, a whole sentence such as
+    /// "Couldn't load Sintel.", then what to check. `nil` when the page was left, which cancels
+    /// its requests.
+    func problem(with error: any Error, failure: LocalizedStringResource) -> String? {
         if error as? SessionError == .signedOut {
             noteSignedOut()
-            return "\(server.name) signed you out. Go back to sign in again."
+            return String(localized: "\(server.name) signed you out. Go back to sign in again.")
         }
         guard !Task.isCancelled else { return nil }
-        return "Couldn't \(what). Check that \(server.name) is running, then try again."
+        return String(localized: "\(String(localized: failure)) Check that \(server.name) is running, then try again.")
     }
 
     /// The result of a request for part of an item page that it can do without, such as a
@@ -167,11 +168,11 @@ extension ItemDetails {
         case .episode:
             [spoken ? spokenEpisodeLabel : item.episodeLabel, premiereDate?.dayText]
         case .season:
-            [childCount.map { $0 == 1 ? "1 episode" : "\($0) episodes" }, item.year.map(String.init)]
+            [childCount.map { String(localized: "\($0) episodes") }, item.year.map(String.init)]
         case .series:
             [seriesYears]
         case .collection:
-            [item.year.map(String.init), childCount.map { $0 == 1 ? "1 item" : "\($0) items" }]
+            [item.year.map(String.init), childCount.map { String(localized: "\($0) items") }]
         default:
             [item.year.map(String.init)]
         }

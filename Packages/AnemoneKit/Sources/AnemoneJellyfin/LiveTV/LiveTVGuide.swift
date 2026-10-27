@@ -127,7 +127,7 @@ public struct LiveTVGuide: Hashable, Sendable {
             placeholders.append(LiveTVProgram(
                 id: "placeholder-\(channelID)-\(Int(cursor.timeIntervalSince1970))",
                 channelID: channelID,
-                name: "No data",
+                name: String(localized: "No data", bundle: .module),
                 start: cursor,
                 end: next,
                 isPlaceholder: true,

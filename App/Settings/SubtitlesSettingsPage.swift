@@ -27,18 +27,19 @@ struct SubtitleSettingRows: View {
 
     var body: some View {
         LanguageSettingRow(
-            title: "Subtitle language",
+            title: String(localized: "Subtitle language"),
             id: "subtitleLanguage",
             setting: $language,
             profileLanguage: model.profile.subtitleLanguage,
             model: model,
         )
         NavigationLink {
-            ChoicePage(title: "Show Subtitles", selection: $mode, choices: modes)
+            ChoicePage(title: String(localized: "Show Subtitles"), selection: $mode, choices: modes)
         } label: {
             LabeledContent(
                 "Show subtitles",
-                value: mode == .serverProfile ? "Jellyfin profile (\(profileMode.title))" : mode.title,
+                value: mode == .serverProfile ? String(localized: "Jellyfin profile (\(profileMode.title))") : mode
+                    .title,
             )
         }
         .accessibilityIdentifier("settings.subtitleMode")
@@ -59,12 +60,12 @@ struct SubtitleSettingRows: View {
 private extension SubtitleModeSetting {
     var title: String {
         switch self {
-        case .serverProfile: "From your Jellyfin profile"
-        case .default: "Default"
-        case .smart: "Smart"
-        case .onlyForced: "Only forced"
-        case .always: "Always"
-        case .none: "Never"
+        case .serverProfile: String(localized: "From your Jellyfin profile")
+        case .default: String(localized: "Default")
+        case .smart: String(localized: "Smart")
+        case .onlyForced: String(localized: "Only forced")
+        case .always: String(localized: "Always")
+        case .none: String(localized: "Never")
         }
     }
 
@@ -72,11 +73,11 @@ private extension SubtitleModeSetting {
     var explanation: String? {
         switch self {
         case .serverProfile: nil
-        case .default: "Subtitles marked default or forced in the file"
-        case .smart: "Subtitles when the audio is in another language, otherwise forced ones"
-        case .onlyForced: "Only forced subtitles, such as for signs"
-        case .always: "Subtitles in your language whenever there are some"
-        case .none: "No subtitles unless you pick some"
+        case .default: String(localized: "Subtitles marked default or forced in the file")
+        case .smart: String(localized: "Subtitles when the audio is in another language, otherwise forced ones")
+        case .onlyForced: String(localized: "Only forced subtitles, such as for signs")
+        case .always: String(localized: "Subtitles in your language whenever there are some")
+        case .none: String(localized: "No subtitles unless you pick some")
         }
     }
 }

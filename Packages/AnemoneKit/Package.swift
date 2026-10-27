@@ -12,6 +12,7 @@ let withSeerr: TargetDependencyCondition? = seerrFromEnvironment ? nil : .when(t
 
 let package = Package(
     name: "AnemoneKit",
+    defaultLocalization: "en",
     platforms: [
         .tvOS(.v26),
         .iOS(.v26),
@@ -57,6 +58,7 @@ let package = Package(
                 .product(name: "JellyfinAPI", package: "jellyfin-sdk-swift"),
                 .product(name: "Get", package: "Get"),
             ],
+            resources: [.process("Localizable.xcstrings")],
         ),
         .target(
             name: "AnemonePlayback",
@@ -68,6 +70,7 @@ let package = Package(
                 // behind `#if os(tvOS) || os(iOS)`.
                 .product(name: "MPVKit", package: "MPVKit", condition: .when(platforms: [.tvOS, .iOS])),
             ],
+            resources: [.process("Localizable.xcstrings")],
         ),
         // Built empty, with none of the client's packages, unless ANEMONE_SEERR is on; see
         // docs/seerr.md.
@@ -79,6 +82,7 @@ let package = Package(
                 .product(name: "OpenAPIURLSession", package: "swift-openapi-urlsession", condition: withSeerr),
                 .product(name: "HTTPTypes", package: "swift-http-types", condition: withSeerr),
             ],
+            resources: [.process("Localizable.xcstrings")],
         ),
         .target(
             name: "AnemoneUI",
@@ -87,6 +91,7 @@ let package = Package(
                 .product(name: "Nuke", package: "Nuke"),
                 .product(name: "NukeUI", package: "Nuke"),
             ],
+            resources: [.process("Localizable.xcstrings")],
         ),
         .testTarget(name: "AnemoneCoreTests", dependencies: ["AnemoneCore"]),
         .testTarget(name: "AnemoneJellyfinTests", dependencies: ["AnemoneJellyfin"]),

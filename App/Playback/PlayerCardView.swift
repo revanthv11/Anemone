@@ -19,15 +19,17 @@ struct PlayerCardView: View {
                     .accessibilityHidden(true)
             }
             VStack(alignment: .leading, spacing: 12) {
-                // The card's own label and value read these, so they're said once.
+                // The card's own label reads the title, so it's said once.
                 Text(card.title)
                     .font(.title3.bold())
                     .foregroundStyle(theme.onSurface)
                     .accessibilityHidden(true)
                 if let message = card.message {
+                    // Its own element: tvOS doesn't always read a container's value, so the
+                    // message ("Next: …, starting in 10 s") is read as text in the card.
                     Text(message)
                         .foregroundStyle(theme.secondaryText)
-                        .accessibilityHidden(true)
+                        .accessibilityIdentifier("player.card.message")
                 }
                 HStack(spacing: 24) {
                     ForEach(card.actions) { action in
@@ -46,11 +48,10 @@ struct PlayerCardView: View {
         .onAppear {
             focusedAction = card.actions.first?.id
         }
-        // A container, so its buttons keep their own identifiers. Named by its title, which
-        // VoiceOver reads as focus moves into it, with the message, before the button focused.
+        // A container, so its buttons and message keep their own elements. Named by its title,
+        // which VoiceOver reads as focus moves into it, before the button focused.
         .accessibilityElement(children: .contain)
         .accessibilityLabel(card.title)
-        .accessibilityValue(card.message ?? "")
         .accessibilityIdentifier("player.card")
     }
 }

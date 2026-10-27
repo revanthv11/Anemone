@@ -127,12 +127,12 @@
         var label: String? {
             switch self {
             case .unknown: nil
-            case .pending: "Requested"
-            case .processing: "Processing"
-            case .partiallyAvailable: "Partly available"
-            case .available: "Available"
-            case .blocklisted: "Blocklisted"
-            case .deleted: "Deleted"
+            case .pending: String(localized: "Requested")
+            case .processing: String(localized: "Processing")
+            case .partiallyAvailable: String(localized: "Partly available")
+            case .available: String(localized: "Available")
+            case .blocklisted: String(localized: "Blocklisted")
+            case .deleted: String(localized: "Deleted")
             }
         }
     }
@@ -140,12 +140,12 @@
     extension SeerrRequestStatus {
         var label: String {
             switch self {
-            case .unknown: "Requested"
-            case .pending: "Waiting for approval"
-            case .approved: "Approved"
-            case .declined: "Declined"
-            case .failed: "Failed"
-            case .completed: "Completed"
+            case .unknown: String(localized: "Requested")
+            case .pending: String(localized: "Waiting for approval")
+            case .approved: String(localized: "Approved")
+            case .declined: String(localized: "Declined")
+            case .failed: String(localized: "Failed")
+            case .completed: String(localized: "Completed")
             }
         }
     }

@@ -203,17 +203,24 @@ private extension UpNext {
     func showUpNext(_ next: PlaybackQueue.Entry, index: Int, left: Duration?) {
         controller?.accessories.show(PlayerCard(
             id: Self.upNextCard,
-            title: "Up Next",
-            message: [next.metadata.fullTitle, left.map { "Plays in \($0.wholeSeconds) s" }]
-                .compactMap(\.self)
-                .joined(separator: "\n"),
+            title: String(localized: "Up Next", bundle: .module),
+            message: [
+                next.metadata.fullTitle,
+                left.map { String(localized: "Plays in \($0.wholeSeconds) s", bundle: .module) },
+            ]
+            .compactMap(\.self)
+            .joined(separator: "\n"),
             imageURL: next.metadata.artworkURL,
             actions: [
-                PlayerAction(id: "upNext.play", title: "Play Now", systemImage: "play.fill") { [weak self] in
+                PlayerAction(
+                    id: "upNext.play",
+                    title: String(localized: "Play Now", bundle: .module),
+                    systemImage: "play.fill",
+                ) { [weak self] in
                     self?.noteRemoteInput()
                     self?.play(index)
                 },
-                PlayerAction(id: "upNext.cancel", title: "Cancel") { [weak self] in
+                PlayerAction(id: "upNext.cancel", title: String(localized: "Cancel", bundle: .module)) { [weak self] in
                     self?.noteRemoteInput()
                     self?.cancel()
                 },
@@ -224,15 +231,24 @@ private extension UpNext {
     func showStillWatching(_ next: PlaybackQueue.Entry, index: Int, left: Duration) {
         controller?.accessories.show(PlayerCard(
             id: Self.stillWatchingCard,
-            title: "Still watching?",
-            message: "Next: \(next.metadata.fullTitle)\nStopping in \(left.wholeSeconds) s",
+            title: String(localized: "Still watching?", bundle: .module),
+            message: String(
+                localized: "Next: \(next.metadata.fullTitle)\nStopping in \(left.wholeSeconds) s",
+                bundle: .module,
+            ),
             imageURL: next.metadata.artworkURL,
             actions: [
-                PlayerAction(id: "stillWatching.continue", title: "Keep Watching") { [weak self] in
+                PlayerAction(id: "stillWatching.continue", title: String(
+                    localized: "Keep Watching",
+                    bundle: .module,
+                )) { [weak self] in
                     self?.noteRemoteInput()
                     self?.play(index)
                 },
-                PlayerAction(id: "stillWatching.stop", title: "Stop") { [weak self] in
+                PlayerAction(id: "stillWatching.stop", title: String(
+                    localized: "Stop",
+                    bundle: .module,
+                )) { [weak self] in
                     self?.noteRemoteInput()
                     self?.stop()
                 },

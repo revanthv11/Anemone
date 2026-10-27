@@ -101,12 +101,12 @@ struct SeriesPage: View {
     private var buttons: some View {
         HStack(spacing: 24) {
             // Wholphin plays the next episode up, or the first one.
-            ActionButton(title: "Play", systemImage: "play.fill") {
+            ActionButton(title: String(localized: "Play"), systemImage: "play.fill") {
                 play(shuffled: false)
             }
             .focused($focus, equals: .action(.play))
             .accessibilityIdentifier("action.play")
-            ActionButton(title: "Shuffle", systemImage: "shuffle") {
+            ActionButton(title: String(localized: "Shuffle"), systemImage: "shuffle") {
                 play(shuffled: true)
             }
             .focused($focus, equals: .action(.shuffle))
@@ -131,7 +131,7 @@ struct SeriesPage: View {
         if !seasons.isEmpty {
             ItemRow(
                 id: "seasons",
-                title: "Seasons (\(seasons.count))",
+                title: String(localized: "Seasons (\(seasons.count))"),
                 items: seasons,
                 shape: .poster,
                 focus: $focus,
@@ -145,7 +145,7 @@ struct SeriesPage: View {
         if !similar.isEmpty {
             ItemRow(
                 id: "similar",
-                title: "More Like This",
+                title: String(localized: "More Like This"),
                 items: similar,
                 shape: .poster,
                 focus: $focus,

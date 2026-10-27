@@ -20,7 +20,7 @@ struct MusicRecommendedView: View {
             case .recentlyReleased: MusicRecommendation.recentlyReleased.title
             case .recentlyAdded: MusicRecommendation.recentlyAdded.title
             case .topRated: MusicRecommendation.topRated.title
-            case .suggestions: "Suggestions"
+            case .suggestions: String(localized: "Suggestions")
             }
         }
 
@@ -143,7 +143,7 @@ struct MusicGenresView: View {
             case let .success(list):
                 genres = list
             case let .failure(error):
-                problem = browse.problem(with: error, doing: "load the genres from \(browse.server.name)")
+                problem = browse.problem(with: error, failure: "Couldn't load the genres from \(browse.server.name).")
             }
         }
     }

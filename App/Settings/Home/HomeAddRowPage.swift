@@ -14,9 +14,13 @@ struct HomeAddRowPage: View {
     var body: some View {
         List {
             Section("Continue watching") {
-                add("Continue Watching", id: "continueWatching", HomeRowConfig(.continueWatching))
-                add("Next Up", id: "nextUp", HomeRowConfig(.nextUp))
-                add("Combine Continue Watching & Next Up", id: "combined", HomeRowConfig(.continueWatchingCombined))
+                add(String(localized: "Continue Watching"), id: "continueWatching", HomeRowConfig(.continueWatching))
+                add(String(localized: "Next Up"), id: "nextUp", HomeRowConfig(.nextUp))
+                add(
+                    String(localized: "Combine Continue Watching & Next Up"),
+                    id: "combined",
+                    HomeRowConfig(.continueWatchingCombined),
+                )
             }
             ForEach(browse.libraries) { library in
                 Section(library.name) {
@@ -29,14 +33,14 @@ struct HomeAddRowPage: View {
             Section("Favorites") {
                 ForEach(HomeFavoriteKind.available(for: browse.libraries), id: \.self) { kind in
                     add(
-                        "Favorite \(HomeFavoriteKind.pluralName(kind))",
+                        String(localized: "Favorite \(HomeFavoriteKind.pluralName(kind))"),
                         id: "favorite.\(kind)",
                         HomeRowConfig(.favorite(itemKind: kind)),
                     )
                 }
             }
-            parentSection("Collections", collections)
-            parentSection("Playlists", playlists)
+            parentSection(String(localized: "Collections"), collections)
+            parentSection(String(localized: "Playlists"), playlists)
         }
         .navigationTitle("Add row")
         .task {
@@ -52,9 +56,9 @@ struct HomeAddRowPage: View {
     private var liveTVSection: some View {
         if offersLiveTV, !browse.libraries.contains(where: { $0.kind == .liveTV }) {
             Section("Live TV") {
-                add("Watch Live", id: "tvPrograms", HomeRowConfig(.tvPrograms))
-                add("Channels", id: "tvChannels", HomeRowConfig(.tvChannels))
-                add("Active Recordings", id: "recordings", HomeRowConfig(.recordings))
+                add(String(localized: "Watch Live"), id: "tvPrograms", HomeRowConfig(.tvPrograms))
+                add(String(localized: "Channels"), id: "tvChannels", HomeRowConfig(.tvChannels))
+                add(String(localized: "Active Recordings"), id: "recordings", HomeRowConfig(.recordings))
             }
         }
     }

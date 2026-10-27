@@ -140,7 +140,7 @@ struct MoviePage: View {
             // Wholphin shows posters only when the page is a movie's.
             ItemRow(
                 id: "similar",
-                title: "More Like This",
+                title: String(localized: "More Like This"),
                 items: similar,
                 shape: item.item.kind == .movie ? .poster : .thumb,
                 focus: $focus,

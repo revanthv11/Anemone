@@ -33,13 +33,15 @@
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .notConfigured:
-                PageMessage(
-                    message: "Set up a Seerr server in Settings › Seerr to discover and request movies and shows.",
-                )
+                PageMessage(message: String(localized: """
+                Set up a Seerr server in Settings › Seerr to discover and request movies and shows.
+                """))
                 .accessibilityIdentifier("discover.notConfigured")
             case let .failed(failure):
-                PageMessage(message: "Couldn't sign in to Seerr at \(failure.address). \(failure.reason)")
-                    .accessibilityIdentifier("discover.failed")
+                PageMessage(
+                    message: String(localized: "Couldn't sign in to Seerr at \(failure.address). \(failure.reason)"),
+                )
+                .accessibilityIdentifier("discover.failed")
             case let .connected(connection, _):
                 DiscoverSections(connection: connection)
             }
@@ -113,7 +115,11 @@
                         }
                     }
                     if hasLoaded, rows.values.allSatisfy(\.isEmpty) {
-                        PageMessage(message: "Seerr didn't suggest anything. Check that it's running, then try again.")
+                        PageMessage(
+                            message: String(
+                                localized: "Seerr didn't suggest anything. Check that it's running, then try again.",
+                            ),
+                        )
                     }
                 }
                 .padding(.horizontal, ItemLayout.horizontalInset)
@@ -195,7 +201,7 @@
         var body: some View {
             Group {
                 if let requests = list.items, requests.isEmpty {
-                    PageMessage(message: "No requests yet.")
+                    PageMessage(message: String(localized: "No requests yet."))
                 } else if let requests = list.items {
                     ScrollView(.vertical) {
                         DiscoverGrid(
@@ -219,7 +225,7 @@
                     try await list.reload(from: connection)
                 } catch {
                     if !Task.isCancelled, list.items == nil {
-                        problem = "Couldn't load your requests. \(error.seerrReason)"
+                        problem = String(localized: "Couldn't load your requests. \(error.seerrReason)")
                     }
                 }
             }
@@ -284,7 +290,7 @@
             } catch {
                 guard !Task.isCancelled else { return }
                 results = nil
-                problem = "Couldn't search Seerr. \(error.seerrReason)"
+                problem = String(localized: "Couldn't search Seerr. \(error.seerrReason)")
             }
         }
     }
@@ -300,17 +306,17 @@
         var seerrReason: String {
             switch self as? SeerrError {
             case .invalidCredentials:
-                "Seerr didn't accept the username and password or API key."
+                String(localized: "Seerr didn't accept the username and password or API key.")
             case .forbidden:
-                "Seerr says this account isn't allowed to do that."
+                String(localized: "Seerr says this account isn't allowed to do that.")
             case .invalidAddress:
-                "That isn't a server address."
+                String(localized: "That isn't a server address.")
             case .unexpectedResponse:
-                "No Seerr server answered at that address."
+                String(localized: "No Seerr server answered at that address.")
             case let .status(code):
-                "Seerr answered with error \(code)."
+                String(localized: "Seerr answered with error \(code).")
             case nil:
-                "Check that the Seerr server is running, then try again."
+                String(localized: "Check that the Seerr server is running, then try again.")
             }
         }
     }

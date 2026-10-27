@@ -58,7 +58,7 @@ struct PlaybackButtons: View {
     var body: some View {
         if let resumePosition {
             ActionButton(
-                title: "Resume from \(resumePosition.clockText)",
+                title: String(localized: "Resume from \(resumePosition.clockText)"),
                 systemImage: "play.fill",
                 spokenTitle: Text("Resume from \(resumePosition.spokenPosition)"),
             ) {
@@ -66,13 +66,13 @@ struct PlaybackButtons: View {
             }
             .focused(focus, equals: .action(.play))
             .accessibilityIdentifier("action.resume")
-            ActionButton(title: "Restart", systemImage: "arrow.counterclockwise") {
+            ActionButton(title: String(localized: "Restart"), systemImage: "arrow.counterclockwise") {
                 play(nil)
             }
             .focused(focus, equals: .action(.restart))
             .accessibilityIdentifier("action.restart")
         } else {
-            ActionButton(title: "Play", systemImage: "play.fill") {
+            ActionButton(title: String(localized: "Play"), systemImage: "play.fill") {
                 play(nil)
             }
             .focused(focus, equals: .action(.play))
@@ -89,7 +89,7 @@ struct PlayedButton: View {
 
     var body: some View {
         ActionButton(
-            title: isPlayed ? "Mark as unwatched" : "Mark as watched",
+            title: isPlayed ? String(localized: "Mark as unwatched") : String(localized: "Mark as watched"),
             systemImage: isPlayed ? "eye" : "eye.slash",
             spokenTitle: Text("Watched"),
             isOn: isPlayed,
@@ -109,7 +109,7 @@ struct FavoriteButton: View {
 
     var body: some View {
         ActionButton(
-            title: isFavorite ? "Remove from favorites" : "Add to favorites",
+            title: isFavorite ? String(localized: "Remove from favorites") : String(localized: "Add to favorites"),
             systemImage: isFavorite ? "heart.fill" : "heart",
             tint: isFavorite ? theme.favorite.color : nil,
             spokenTitle: Text("Favorite"),
@@ -128,8 +128,8 @@ enum ItemAlert: Hashable {
 
     var title: String {
         switch self {
-        case .nothingToPlay: "Nothing to play"
-        case .failed: "Something went wrong"
+        case .nothingToPlay: String(localized: "Nothing to play")
+        case .failed: String(localized: "Something went wrong")
         }
     }
 

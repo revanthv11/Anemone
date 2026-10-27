@@ -40,11 +40,11 @@ struct LiveTVScheduleView: View {
         ScrollView(.vertical) {
             VStack(alignment: .leading, spacing: 12) {
                 if schedule.isEmpty {
-                    PageMessage(message: "No scheduled recordings")
+                    PageMessage(message: String(localized: "No scheduled recordings"))
                         .accessibilityIdentifier("schedule.empty")
                 }
                 if !schedule.active.isEmpty {
-                    heading("Active Recordings")
+                    heading(String(localized: "Active Recordings"))
                     ForEach(schedule.active) { recording in
                         row(recording)
                     }
@@ -56,7 +56,7 @@ struct LiveTVScheduleView: View {
                     }
                 }
                 if !schedule.series.isEmpty {
-                    heading("Series Recordings")
+                    heading(String(localized: "Series Recordings"))
                     ForEach(schedule.series) { series in
                         seriesRow(series)
                     }
@@ -130,11 +130,11 @@ struct LiveTVScheduleView: View {
             ScheduleRow(
                 title: series.name,
                 detail: [
-                    series.recordsAnyChannel ? "Any channel" : series.channelName,
-                    series.recordsAnyTime ? "Any time" : nil,
-                    series.recordsNewOnly ? "New episodes only" : nil,
+                    series.recordsAnyChannel ? String(localized: "Any channel") : series.channelName,
+                    series.recordsAnyTime ? String(localized: "Any time") : nil,
+                    series.recordsNewOnly ? String(localized: "New episodes only") : nil,
                 ].compactMap(\.self).joined(separator: " · "),
-                trailing: "Cancel",
+                trailing: String(localized: "Cancel"),
                 isRecording: false,
             )
         }
@@ -148,7 +148,10 @@ struct LiveTVScheduleView: View {
             problem = nil
         } catch {
             if schedule == nil {
-                problem = browse.problem(with: error, doing: "load the recording schedule from \(browse.server.name)")
+                problem = browse.problem(
+                    with: error,
+                    failure: "Couldn't load the recording schedule from \(browse.server.name).",
+                )
             }
         }
     }

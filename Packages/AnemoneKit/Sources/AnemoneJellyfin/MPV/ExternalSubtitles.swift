@@ -42,7 +42,10 @@ public extension JellyfinSession {
             guard let url = client.url(with: request, queryAPIKey: true) else { return nil }
             return ExternalSubtitle(
                 url: url,
-                title: track.displayTitle ?? track.title ?? track.language ?? "Subtitles \(track.index)",
+                title: track.displayTitle ?? track.title ?? track.language ?? String(
+                    localized: "Subtitles \(track.index)",
+                    bundle: .module,
+                ),
                 language: track.language,
                 isDefault: track.index == stream.subtitleStreamIndex,
             )

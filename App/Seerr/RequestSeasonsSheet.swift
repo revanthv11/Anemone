@@ -27,7 +27,7 @@
                             .disabled(requestable.isEmpty)
                             .accessibilityIdentifier("request.allSeasons")
                         ForEach(seasons) { season in
-                            let name = season.name ?? "Season \(season.number)"
+                            let name = season.name ?? String(localized: "Season \(season.number)")
                             Toggle(isOn: binding(for: season)) {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(name)
@@ -43,7 +43,8 @@
                         }
                     }
                     Section {
-                        Button("Request \(chosen.count) Season\(chosen.count == 1 ? "" : "s")") {
+                        // One key with plural forms in the String Catalog.
+                        Button("Request \(chosen.count) Seasons") {
                             submit(chosen.sorted(), is4K)
                         }
                         .disabled(chosen.isEmpty)
@@ -106,7 +107,7 @@
         private func caption(_ season: SeerrSeason) -> [String] {
             var parts: [String] = []
             if let count = season.episodeCount {
-                parts.append("\(count) episode\(count == 1 ? "" : "s")")
+                parts.append(String(localized: "\(count) episodes"))
             }
             if let label = season.availability.label {
                 parts.append(label)

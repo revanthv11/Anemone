@@ -45,13 +45,13 @@ struct PhotoFolderPage: View {
             case let .loaded(pager):
                 grid(pager)
             case .failed:
-                message("Couldn't load \(folder.name) from \(browse.server.name).") {
+                message(String(localized: "Couldn't load \(folder.name) from \(browse.server.name).")) {
                     Button("Try again") {
                         Task { await load() }
                     }
                 }
             case .signedOut:
-                message("\(browse.server.name) signed you out. Go to Home to sign in again.") {}
+                message(String(localized: "\(browse.server.name) signed you out. Go to Home to sign in again.")) {}
             }
         }
         .task {
@@ -120,7 +120,7 @@ struct PhotoFolderPage: View {
                     .lineLimit(1)
                     .accessibilityAddTraits(.isHeader)
                 if let count {
-                    Text(count == 1 ? "1 item" : "\(count.formatted()) items")
+                    Text("\(count) items")
                         .font(.callout)
                         .foregroundStyle(theme.secondaryText)
                 }
@@ -259,7 +259,7 @@ private struct PhotoSortMenu: View {
     private static func title(_ field: LibrarySort.Field) -> String {
         switch field {
         // Jellyfin keeps when a photo was taken as its premiere date.
-        case .premiereDate: "Date Taken"
+        case .premiereDate: String(localized: "Date Taken")
         default: field.title
         }
     }

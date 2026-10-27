@@ -54,17 +54,22 @@ struct PlayerControlsSettingsPage: View {
         .navigationTitle("Player Controls")
     }
 
-    private var footer: String {
+    private var footer: LocalizedStringResource {
         switch controls {
         case .system:
             "Apple TV's own player, with its scrubbing and info panel."
         case .anemone:
-            "Wholphin's controls: hold left or right to seek faster, with trickplay thumbnails, chapters and "
-                + "the queue."
+            """
+            Wholphin's controls: hold left or right to seek faster, with trickplay thumbnails, chapters and \
+            the queue.
+            """
         }
     }
 
     private static func label(_ seconds: Int) -> String {
-        seconds < 60 ? "\(seconds) s" : seconds % 60 == 0 ? "\(seconds / 60) min" : "\(seconds) s"
+        if seconds >= 60, seconds % 60 == 0 {
+            return String(localized: "\(seconds / 60) min")
+        }
+        return String(localized: "\(seconds) s")
     }
 }

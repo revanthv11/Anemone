@@ -22,7 +22,7 @@ struct HomeRemovedNextUpPage: View {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             case let .loaded(entries) where entries.isEmpty:
-                message("No series have been removed from Next Up.")
+                message(String(localized: "No series have been removed from Next Up."))
             case let .loaded(entries):
                 List(entries, id: \.series.id) { entry in
                     Button {
@@ -60,8 +60,8 @@ struct HomeRemovedNextUpPage: View {
             let series = try await browse.session.mediaItems(ids: Array(removed.dates.keys))
             content = .loaded(series.compactMap { item in removed.dates[item.id].map { (item, $0) } })
         } catch {
-            content = .failed(browse.problem(with: error, doing: "load the series removed from Next Up")
-                ?? "Couldn't load the series removed from Next Up.")
+            content = .failed(browse.problem(with: error, failure: "Couldn't load the series removed from Next Up.")
+                ?? String(localized: "Couldn't load the series removed from Next Up."))
         }
     }
 
@@ -71,8 +71,8 @@ struct HomeRemovedNextUpPage: View {
                 try await browse.homeWriter.allowInNextUp(seriesID: series.id)
                 await load()
             } catch {
-                content = .failed(browse.problem(with: error, doing: "update Next Up")
-                    ?? "Couldn't update Next Up.")
+                content = .failed(browse.problem(with: error, failure: "Couldn't update Next Up.")
+                    ?? String(localized: "Couldn't update Next Up."))
             }
         }
     }

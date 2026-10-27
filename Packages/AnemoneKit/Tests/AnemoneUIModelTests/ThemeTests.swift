@@ -7,7 +7,7 @@ import Testing
 /// text in them readable against what it's drawn on.
 struct ThemeTests {
     @Test func `the themes are Wholphin's, in its order and with its names`() {
-        #expect(AppThemeColors.allCases.map(\.title) == [
+        #expect(AppThemeColors.allCases.map { String(localized: $0.title) } == [
             "Purple", "Blue", "Green", "Orange", "Bold Blue", "Black", "Red", "Brown",
         ])
     }

@@ -322,19 +322,19 @@ extension Credit {
     }
 
     private static let jobTitles: [PersonKind: String] = [
-        .director: "Director",
-        .composer: "Composer",
-        .writer: "Writer",
-        .producer: "Producer",
-        .conductor: "Conductor",
-        .lyricist: "Lyricist",
-        .arranger: "Arranger",
-        .engineer: "Engineer",
-        .mixer: "Mixer",
-        .remixer: "Mixer",
-        .creator: "Creator",
-        .artist: "Artist",
-        .albumArtist: "Artist",
+        .director: String(localized: "Director", bundle: .module),
+        .composer: String(localized: "Composer", bundle: .module),
+        .writer: String(localized: "Writer", bundle: .module),
+        .producer: String(localized: "Producer", bundle: .module),
+        .conductor: String(localized: "Conductor", bundle: .module),
+        .lyricist: String(localized: "Lyricist", bundle: .module),
+        .arranger: String(localized: "Arranger", bundle: .module),
+        .engineer: String(localized: "Engineer", bundle: .module),
+        .mixer: String(localized: "Mixer", bundle: .module),
+        .remixer: String(localized: "Mixer", bundle: .module),
+        .creator: String(localized: "Creator", bundle: .module),
+        .artist: String(localized: "Artist", bundle: .module),
+        .albumArtist: String(localized: "Artist", bundle: .module),
     ]
 }
 

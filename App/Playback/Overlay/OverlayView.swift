@@ -165,9 +165,9 @@ struct OverlayView: View {
                     focus: $focus,
                 )
                 if !chapters.isEmpty {
-                    rowTitle("Chapters", focus: .chaptersTitle, identifier: "player.chapters")
+                    rowTitle(String(localized: "Chapters"), focus: .chaptersTitle, identifier: "player.chapters")
                 } else if !upcoming.isEmpty {
-                    rowTitle("Queue", focus: .queueTitle, identifier: "player.queue")
+                    rowTitle(String(localized: "Queue"), focus: .queueTitle, identifier: "player.queue")
                 }
             }
             // Wholphin's controls open on Play/Pause.
@@ -184,7 +184,7 @@ struct OverlayView: View {
                     overlay.jump(to: chapter)
                 }
                 if !upcoming.isEmpty {
-                    rowTitle("Queue", focus: .queueTitle, identifier: "player.queue")
+                    rowTitle(String(localized: "Queue"), focus: .queueTitle, identifier: "player.queue")
                 }
             }
         case .queue:

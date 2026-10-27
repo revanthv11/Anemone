@@ -34,7 +34,7 @@ struct LiveTVChannelsView: View {
             } else if let problem {
                 PageMessage(message: problem)
             } else if channels != nil {
-                PageMessage(message: "Live TV is on, but \(browse.server.name) has no channels.")
+                PageMessage(message: String(localized: "Live TV is on, but \(browse.server.name) has no channels."))
             } else {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -97,7 +97,8 @@ struct LiveTVChannelsView: View {
 
     private func channelValue(_ channel: LiveTVChannel) -> Text {
         switch (channel.currentProgram?.name, channel.isFavorite) {
-        case let (program?, true): Text("\(program), favorite")
+        // "Favorite" is the word the guide and the cards read too, one key for all of them.
+        case let (program?, true): Text("\(Text(verbatim: program)), \(Text("Favorite"))")
         case let (program?, false): Text(program)
         case (nil, true): Text("Favorite")
         case (nil, false): Text(verbatim: "")
@@ -113,7 +114,7 @@ struct LiveTVChannelsView: View {
             problem = nil
         } catch {
             if channels == nil {
-                problem = browse.problem(with: error, doing: "load the channels from \(browse.server.name)")
+                problem = browse.problem(with: error, failure: "Couldn't load the channels from \(browse.server.name).")
             }
         }
     }

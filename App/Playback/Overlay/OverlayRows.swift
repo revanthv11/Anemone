@@ -22,9 +22,9 @@ struct ChapterRow: View {
         let playingChapter = chapters.chapter(at: playing)?.id
         // Not lazy, so a late chapter's card is there for focus to move to as the row opens.
         // Videos have few chapters.
-        OverlayRow(title: "Chapters", isLazy: false) {
+        OverlayRow(title: String(localized: "Chapters"), isLazy: false) {
             ForEach(chapters) { chapter in
-                let title = chapter.name ?? "Chapter \(chapter.index + 1)"
+                let title = chapter.name ?? String(localized: "Chapter \(chapter.index + 1)")
                 Button {
                     choose(chapter)
                 } label: {
@@ -56,7 +56,7 @@ struct QueueRow: View {
     let play: (Int) -> Void
 
     var body: some View {
-        OverlayRow(title: "Queue") {
+        OverlayRow(title: String(localized: "Queue")) {
             ForEach(entries, id: \.index) { index, entry in
                 Button {
                     play(index)

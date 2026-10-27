@@ -38,13 +38,13 @@ public enum CardSpokenMark: Hashable, Sendable {
     public var spoken: LocalizedStringResource {
         switch self {
         case .favorite:
-            "Favorite"
+            LocalizedStringResource("Favorite", bundle: .anemoneUI)
         case .watched:
-            "Watched"
+            LocalizedStringResource("Watched", bundle: .anemoneUI)
         case let .unwatched(count):
-            "\(count) unwatched"
+            LocalizedStringResource("\(count) unwatched", bundle: .anemoneUI)
         case let .progress(percent):
-            "\(Double(percent) / 100, format: .percent) watched"
+            LocalizedStringResource("\(Double(percent) / 100, format: .percent) watched", bundle: .anemoneUI)
         }
     }
 }

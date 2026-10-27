@@ -34,14 +34,20 @@ struct PlayerEngineSettingsPage: View {
                 }
                 Section {
                     NavigationLink("Subtitle style") {
-                        SubtitleStylePage(preference: Preferences.subtitleStyle, title: "Subtitle Style")
+                        SubtitleStylePage(
+                            preference: Preferences.subtitleStyle,
+                            title: String(localized: "Subtitle Style"),
+                        )
                     }
                     .accessibilityIdentifier("settings.subtitleStyle")
                     Toggle("Use a different style for HDR", isOn: $separateHDR)
                         .accessibilityIdentifier("settings.subtitleStyleSeparateHDR")
                     if separateHDR {
                         NavigationLink("HDR subtitle style") {
-                            SubtitleStylePage(preference: Preferences.hdrSubtitleStyle, title: "HDR Subtitle Style")
+                            SubtitleStylePage(
+                                preference: Preferences.hdrSubtitleStyle,
+                                title: String(localized: "HDR Subtitle Style"),
+                            )
                         }
                         .accessibilityIdentifier("settings.hdrSubtitleStyle")
                     }
@@ -62,20 +68,24 @@ extension PlayerBackend {
         switch self {
         case .avPlayer: "AVPlayer"
         case .mpv: "MPV"
-        case .preferMPV: "Prefer MPV"
+        case .preferMPV: String(localized: "Prefer MPV")
         }
     }
 
     var explanation: String {
         switch self {
         case .avPlayer:
-            "Apple's player: Dolby Vision, Dolby Atmos and frame-rate matching. The server converts what it can't "
-                + "play, such as DTS audio or styled subtitles."
+            String(localized: """
+            Apple's player: Dolby Vision, Dolby Atmos and frame-rate matching. The server converts what it can't \
+            play, such as DTS audio or styled subtitles.
+            """)
         case .mpv:
-            "MPV plays nearly anything as it is, including MKV, DTS, TrueHD and styled ASS and PGS subtitles, "
-                + "with Anemone's controls. No Dolby Vision."
+            String(localized: """
+            MPV plays nearly anything as it is, including MKV, DTS, TrueHD and styled ASS and PGS subtitles, \
+            with Anemone's controls. No Dolby Vision.
+            """)
         case .preferMPV:
-            "MPV, except HDR and Dolby Vision video, which plays in AVPlayer."
+            String(localized: "MPV, except HDR and Dolby Vision video, which plays in AVPlayer.")
         }
     }
 }

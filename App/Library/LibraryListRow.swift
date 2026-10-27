@@ -64,7 +64,7 @@ struct LibraryListRow: View {
     private var title: String {
         guard let item else { return " " }
         guard isDense, let subtitle else { return item.displayTitle }
-        return "\(item.displayTitle) (\(subtitle))"
+        return String(localized: "\(item.displayTitle) (\(subtitle))")
     }
 
     /// A series' years, an episode's number and name, or the year.

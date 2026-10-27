@@ -34,11 +34,11 @@ extension LibrarySection {
     /// Wholphin's names for its library tabs.
     var title: String {
         switch self {
-        case .recommended: "Recommended"
-        case .library: "Library"
-        case .collections: "Collections"
-        case .genres: "Genres"
-        case .studios: "Studios"
+        case .recommended: String(localized: "Recommended")
+        case .library: String(localized: "Library")
+        case .collections: String(localized: "Collections")
+        case .genres: String(localized: "Genres")
+        case .studios: String(localized: "Studios")
         }
     }
 }

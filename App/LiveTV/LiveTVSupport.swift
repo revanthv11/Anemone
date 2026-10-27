@@ -88,7 +88,7 @@ extension LiveTVProgram {
         guard !isPlaceholder else { return parts[0] }
         parts.append(Self.length(duration))
         if isAiring(at: now) {
-            parts.append("\(Self.length(.seconds(end.timeIntervalSince(now)))) left")
+            parts.append(String(localized: "\(Self.length(.seconds(end.timeIntervalSince(now)))) left"))
         }
         parts += [episodeLabel, officialRating].compactMap(\.self)
         return parts.joined(separator: " · ")
