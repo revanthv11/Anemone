@@ -2,6 +2,7 @@ import AnemoneCore
 import AnemoneJellyfin
 import Foundation
 import os
+import Synchronization
 
 /// Theme music on item pages, ported from Wholphin's `ThemeSongPlayer`: while a movie, series,
 /// season, episode or collection page shows, one of its theme songs plays once, at the volume
@@ -82,15 +83,20 @@ public final class ThemeMusic {
 
     /// A video player opened, as Wholphin stops `ThemeSongPlayer` when its player opens: theme
     /// music stops now, before anything loads, intros included, and stays stopped until the
-    /// player closes, however it closes, even when it shows an error first. Then the page
-    /// showing plays its theme again.
+    /// player closes, however it closes, even when it shows an error first, or goes away without
+    /// closing. Then the page showing plays its theme again.
     public func hold(while player: PlaybackController) {
         let id = UUID()
         holds = holds.filter { $0.value.player != nil }
         holds[id] = Hold(player: player)
         stop()
-        player.whenStopped { [weak self] in
+        // The player keeps its stop actions until it closes, so the release goes with it if it's
+        // dropped without closing, and the page's theme plays again then too.
+        let release = HoldRelease { [weak self] in
             self?.release(id)
+        }
+        player.whenStopped {
+            release()
         }
     }
 
@@ -124,4 +130,33 @@ public final class ThemeMusic {
     }
 
     private static let log = Logger(subsystem: "com.revanthv11.anemone", category: "ThemeMusic")
+}
+
+/// Releases a video player's hold on theme music once: when the player closes, or when it goes
+/// away without closing and lets go of this.
+private final class HoldRelease: Sendable {
+    private let action: Mutex<(@MainActor @Sendable () -> Void)?>
+
+    init(_ action: @escaping @MainActor @Sendable () -> Void) {
+        self.action = Mutex(action)
+    }
+
+    @MainActor
+    func callAsFunction() {
+        take()?()
+    }
+
+    deinit {
+        // The last reference can go on any thread.
+        if let action = take() {
+            Task { @MainActor in action() }
+        }
+    }
+
+    private func take() -> (@MainActor @Sendable () -> Void)? {
+        action.withLock { action in
+            defer { action = nil }
+            return action
+        }
+    }
 }
