@@ -3,6 +3,7 @@ import AnemoneJellyfin
 @testable import AnemonePlayback
 import Foundation
 import JellyfinAPI
+import Synchronization
 import Testing
 
 /// Choosing tracks before the stream is asked for, the Audio and Subtitles menus, switching,
@@ -291,5 +292,59 @@ struct TrackSelectionTests {
         await start(playback)
 
         #expect(playback.accessories.menus.isEmpty)
+    }
+}
+
+/// Fetching the tracks of one item while another's are on their way.
+@MainActor
+struct TrackSelectionFetchTests {
+    private let defaults: UserDefaults
+    private let store: TrackChoiceStore
+
+    init() throws {
+        let suite = "TrackSelectionFetchTests.\(UUID().uuidString)"
+        defaults = try #require(UserDefaults(suiteName: suite))
+        defaults.removePersistentDomain(forName: suite)
+        store = TrackChoiceStore(userID: "u1", defaults: defaults)
+    }
+
+    @Test func `a fetch that a newer one replaced doesn't leave its item as the entry`() async throws {
+        let (released, release) = AsyncStream.makeStream(of: Void.self)
+        let isHeld = Mutex(false)
+        let selection = TrackSelection(
+            server: TrackSelection.Server(
+                itemTracks: { id in
+                    // The first episode's tracks come after the second's.
+                    if id == "e1" {
+                        isHeld.withLock { $0 = true }
+                        for await _ in released {
+                            break
+                        }
+                    }
+                    return ItemTracks(
+                        itemID: id,
+                        seriesID: "show",
+                        seasonID: "s2",
+                        sources: [.init(id: id, tracks: .fixture(for: id))],
+                    )
+                },
+                profileSettings: { .english },
+            ),
+            store: store,
+            defaults: defaults,
+        )
+        let first = Task { await selection.request(for: "e1", mediaSourceID: nil) }
+        #expect(await eventually { isHeld.withLock(\.self) })
+
+        _ = await selection.request(for: "e2", mediaSourceID: nil)
+        release.yield()
+        _ = await first.value
+
+        // The second episode, with its season and series, so what's picked in it is remembered
+        // for them, rather than the server's picks for it.
+        let entry = try #require(selection.entry)
+        #expect(entry.itemID == "e2")
+        #expect(entry.seasonID == "s2")
+        #expect(entry.seriesID == "show")
     }
 }
