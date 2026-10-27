@@ -7,7 +7,9 @@ import AnemoneJellyfin
 /// How the music player plays each song: a `PlaybackController` of its own, started once the
 /// song before has stopped, whose events move the player on.
 extension MusicPlayer {
-    /// Stops what's playing and empties the queue while a new one loads.
+    /// Stops what's playing and empties the queue while a new one loads. Now Playing shows
+    /// Pause meanwhile, and a pause doesn't move `requests`: so a load that finds the player
+    /// paused was paused by the user, and its queue starts paused.
     func clearForNewQueue() -> Int {
         requests += 1
         plays += 1
@@ -61,7 +63,8 @@ extension MusicPlayer {
         }
     }
 
-    func start(_ newQueue: MusicQueue) {
+    /// Plays `newQueue` from its current entry; when `paused`, the first song loads and waits.
+    func start(_ newQueue: MusicQueue, paused: Bool = false) {
         guard !newQueue.isEmpty else {
             stop()
             return
@@ -73,7 +76,7 @@ extension MusicPlayer {
         activateAudioSession()
         queue = newQueue
         remote?.attach(to: self)
-        playCurrent()
+        playCurrent(paused: paused)
     }
 
     /// Plays the queue's current entry from the start, after the song before it has stopped.

@@ -137,7 +137,7 @@ public final class MusicPlayer {
     /// `setQueue` empties the player first.
     ///
     /// Throws when nothing could be queued. Once the queue has started, a later page that fails
-    /// ends it early instead: what loaded plays on.
+    /// ends it early instead: what loaded plays on. Paused while it loads, it starts paused.
     public func play(_ source: MusicSource, shuffled: Bool = false) async throws {
         let request = clearForNewQueue()
         let first: MusicPage
@@ -145,7 +145,7 @@ public final class MusicPlayer {
             if shuffled || source.isRandomOrder {
                 let songs = try await loadAll(source, shuffled: shuffled, request: request)
                 guard request == requests else { return }
-                start(MusicQueue(songs, shuffled: shuffled))
+                start(MusicQueue(songs, shuffled: shuffled), paused: status == .paused)
                 return
             }
             first = try await loadSongs(source, false, 0, Self.pageSize)
@@ -157,18 +157,18 @@ public final class MusicPlayer {
             throw error
         }
         guard request == requests else { return }
-        start(MusicQueue(first.items))
+        start(MusicQueue(first.items), paused: status == .paused)
         await addPages(of: source, after: first, request: request)
     }
 
     /// Replaces the queue with the songs `load` fetches, such as an instant mix. What was
-    /// playing stops at once.
+    /// playing stops at once. Paused while it loads, it starts paused.
     public func play(loading load: @Sendable () async throws -> [MusicItem]) async throws {
         let request = clearForNewQueue()
         do {
             let songs = try await load()
             guard request == requests else { return }
-            start(MusicQueue(songs))
+            start(MusicQueue(songs), paused: status == .paused)
         } catch {
             if request == requests {
                 stop()
