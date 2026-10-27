@@ -7,8 +7,8 @@ import SwiftUI
 /// a card per extra, or per kind when there are several of it. Selecting an extra plays it; a
 /// kind's card lists its extras to pick from. Hidden when there are none.
 struct ExtrasRow: View {
-    /// The page's extras, whose special features the row shows. Reloaded when an extra's player
-    /// closes, so its card shows the new progress, or the extra marked watched.
+    /// The page's extras, whose special features the row shows. Their user state is reloaded when
+    /// an extra's player closes, so its card shows the new progress, or the extra marked watched.
     @Binding var extras: ItemExtras
     let focus: FocusState<ItemFocus?>.Binding
     let memory: RowMemory
@@ -58,14 +58,15 @@ struct ExtrasRow: View {
         playback = browse.playback(of: extra, from: extra.userState.resumePosition)
     }
 
-    /// Like the pages after their own playback: a failed reload keeps what's showing. One for an
-    /// item the page has moved away from meanwhile is dropped.
+    /// Asks again only for the special features' user state, not the rest of the extras. Like the
+    /// pages after their own playback, a failed reload keeps what's showing. One for an item the
+    /// page has moved away from meanwhile is dropped.
     private func reload() async {
         guard let id = extras.itemID else { return }
         let session = browse.session
-        let loaded = await browse.optional(attempt { try await session.itemExtras(id: id) })
-        guard let loaded, extras.itemID == id else { return }
-        extras = loaded
+        let states = await browse.optional(attempt { try await session.specialFeatureStates(id: id) })
+        guard let states, extras.itemID == id else { return }
+        extras.updateFeatures(states)
     }
 }
 

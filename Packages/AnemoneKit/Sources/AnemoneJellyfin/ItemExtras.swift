@@ -29,6 +29,19 @@ public struct ItemExtras: Hashable, Sendable {
         self.features = features
         self.canDelete = canDelete
     }
+
+    /// Takes the user's newer state with the special features, by feature, as
+    /// `specialFeatureStates(id:)` reads it. Features it doesn't name keep theirs.
+    public mutating func updateFeatures(_ states: [MediaItem.ID: ItemDetails.UserState]) {
+        features = features.map { entry in
+            ExtrasEntry(kind: entry.kind, items: entry.items.map { extra in
+                guard let state = states[extra.id] else { return extra }
+                var updated = extra
+                updated.apply(state)
+                return updated
+            })
+        }
+    }
 }
 
 /// A chapter marker in a movie or episode, ported from Wholphin's `Chapter`.
@@ -237,6 +250,15 @@ public extension JellyfinSession {
             features: ExtrasEntry.entries(features),
             canDelete: dto.canDelete ?? false,
         )
+    }
+
+    /// The user's state with each of an item's special features, by feature: what the Extras row
+    /// asks for again once an extra's player closes, without the rest of `itemExtras(id:)`. Unlike
+    /// that, a failure throws, so the row can keep what it shows.
+    func specialFeatureStates(id: MediaItem.ID) async throws -> [MediaItem.ID: ItemDetails.UserState] {
+        let features = try await send(Paths.getSpecialFeatures(itemID: id, userID: userID))
+        let states = features.compactMap { dto in dto.id.map { ($0, ItemDetails.UserState(dto.userData)) } }
+        return Dictionary(states) { first, _ in first }
     }
 
     /// Whether the user may delete an item, for a page that needs nothing else from
