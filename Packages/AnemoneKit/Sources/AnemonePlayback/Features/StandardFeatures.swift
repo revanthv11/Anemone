@@ -12,7 +12,7 @@ public extension PlaybackController {
             NowPlaying(),
             SkipBackOnResume(),
             PlaybackLifecycle(),
-            DisplayCriteriaMatching(session: session),
+            DisplayCriteriaMatching(),
         ]
     }
 }

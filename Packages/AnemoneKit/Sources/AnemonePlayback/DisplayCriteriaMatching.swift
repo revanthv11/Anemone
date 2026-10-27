@@ -16,102 +16,97 @@ import os
 /// this is for Anemone's overlay and MPV (Phase 4), which have nothing doing it for them.
 @MainActor
 public final class DisplayCriteriaMatching: PlaybackFeature {
-    /// The video of a version of an item, from the server.
-    typealias VideoLoader = @Sendable (MediaItem.ID, String?) async throws -> MediaVersion.Video?
-    /// Asks the display for a mode; `nil` for its usual one.
-    typealias Apply = @MainActor (DisplayCriteria?) -> Void
-
     /// Whether AVKit's system player shows the video, and so matches the display itself; when
     /// `nil`, as `PlayerScreen` chooses (`showsInSystemPlayer`).
     public var usesSystemPlayer: Bool?
-    /// What the display was asked for; `nil` when it's left alone.
-    public private(set) var applied: DisplayCriteria?
 
-    private let loadVideo: VideoLoader
-    private let apply: Apply
+    private let display: Display
     private let decoders: VideoDecoders
     /// How long to wait after a play session ends before going back to the usual mode, so the
-    /// next entry in a queue doesn't make the display switch twice.
+    /// next entry in a queue, or a player opened straight after, doesn't make the display switch
+    /// twice.
     private let resetDelay: Duration
-    private var loading: Task<Void, Never>?
-    private var pendingReset: Task<Void, Never>?
 
-    private static let log = Logger(subsystem: "com.revanthv11.anemone", category: "Playback")
-
-    public convenience init(session: JellyfinSession) {
-        self.init(
-            loadVideo: { itemID, versionID in
-                let versions = try await session.mediaVersions(of: itemID)
-                return (versions.first { $0.id == versionID } ?? versions.first)?.video
-            },
-            apply: Self.applyToDisplay,
-        )
+    public convenience init() {
+        self.init(display: .shared)
     }
 
-    init(
-        loadVideo: @escaping VideoLoader,
-        apply: @escaping Apply,
-        decoders: VideoDecoders = .current,
-        resetDelay: Duration = .seconds(2),
-    ) {
-        self.loadVideo = loadVideo
-        self.apply = apply
+    init(display: Display, decoders: VideoDecoders = .current, resetDelay: Duration = .seconds(2)) {
+        self.display = display
         self.decoders = decoders
         self.resetDelay = resetDelay
     }
 
     public func handle(_ event: PlaybackEvent, in controller: PlaybackController) async {
         switch event {
-        case let .loaded(stream, entry):
-            pendingReset?.cancel()
-            pendingReset = nil
-            guard !(usesSystemPlayer ?? controller.engine.showsInSystemPlayer) else {
-                change(to: nil)
-                return
-            }
-            match(entry.itemID, stream)
+        case let .loaded(stream, _):
+            // PlaybackInfo described the video, so there's nothing more to ask the server.
+            let criteria = (usesSystemPlayer ?? controller.engine.showsInSystemPlayer)
+                ? nil
+                : DisplayCriteria(stream: stream, decoders: decoders)
+            display.request(criteria, by: self)
         case .stopped:
-            loading?.cancel()
-            loading = nil
-            scheduleReset()
+            display.reset(after: resetDelay, by: self)
         case .started, .position, .paused, .resumed, .ended, .failed:
             break
         }
     }
+}
 
-    private func match(_ itemID: MediaItem.ID, _ stream: PlaybackStream) {
-        loading?.cancel()
-        let load = loadVideo
-        let decoders = decoders
-        loading = Task { [weak self] in
-            // Without the video's details, the display goes back to its usual mode.
-            let video = try? await load(itemID, stream.mediaSourceID)
-            guard !Task.isCancelled, let self else { return }
-            change(to: video.flatMap { DisplayCriteria(video: $0, method: stream.method, decoders: decoders) })
+extension DisplayCriteriaMatching {
+    /// The display, which every player's feature asks through one shared instance. A player
+    /// leaves a reset behind as it closes, and the reset belongs to that player's feature: the
+    /// next entry or player to ask for a mode cancels it, and a feature that's no longer the last
+    /// to ask can't reset the display, so a reset never undoes what another player asked for.
+    @MainActor
+    final class Display {
+        static let shared = Display(apply: DisplayCriteriaMatching.applyToDisplay)
+
+        /// What the display was asked for; `nil` while it's in its usual mode.
+        private(set) var criteria: DisplayCriteria?
+        /// Asks the display for a mode; `nil` for its usual one.
+        private let apply: @MainActor (DisplayCriteria?) -> Void
+        /// The feature that asked last, the only one that may reset the display.
+        private weak var owner: DisplayCriteriaMatching?
+        private var pendingReset: Task<Void, Never>?
+
+        private static let log = Logger(subsystem: "com.revanthv11.anemone", category: "Playback")
+
+        init(apply: @escaping @MainActor (DisplayCriteria?) -> Void) {
+            self.apply = apply
         }
-    }
 
-    /// Only when it's a change, so the next entry of a series doesn't blank the screen again.
-    private func change(to criteria: DisplayCriteria?) {
-        guard criteria != applied else { return }
-        applied = criteria
-        if let criteria {
-            let range = String(describing: criteria.dynamicRange)
-            Self.log.notice("Display criteria: \(criteria.frameRate, privacy: .public) fps, \(range, privacy: .public)")
+        /// The mode for `feature`'s video; `nil` for the usual one.
+        func request(_ criteria: DisplayCriteria?, by feature: DisplayCriteriaMatching) {
+            pendingReset?.cancel()
+            pendingReset = nil
+            owner = feature
+            change(to: criteria)
         }
-        apply(criteria)
-    }
 
-    /// Holds what it needs rather than the feature, which goes when the player closes.
-    private func scheduleReset() {
-        guard applied != nil else { return }
-        let apply = apply
-        let delay = resetDelay
-        pendingReset = Task { [weak self] in
-            try? await Task.sleep(for: delay)
-            guard !Task.isCancelled else { return }
-            self?.applied = nil
-            apply(nil)
+        /// Back to the usual mode after `delay`, unless another entry or player asks for a mode
+        /// first.
+        func reset(after delay: Duration, by feature: DisplayCriteriaMatching) {
+            guard owner === feature, criteria != nil else { return }
+            pendingReset?.cancel()
+            pendingReset = Task { [weak self] in
+                try? await Task.sleep(for: delay)
+                guard !Task.isCancelled, let self else { return }
+                pendingReset = nil
+                owner = nil
+                change(to: nil)
+            }
+        }
+
+        /// Only when it's a change, so the next entry of a series doesn't blank the screen again.
+        private func change(to criteria: DisplayCriteria?) {
+            guard criteria != self.criteria else { return }
+            self.criteria = criteria
+            if let criteria {
+                let summary = "\(criteria.frameRate) fps, \(criteria.dynamicRange), \(criteria.codecName)"
+                Self.log.notice("Display criteria: \(summary, privacy: .public)")
+            }
+            apply(criteria)
         }
     }
 }
@@ -125,6 +120,13 @@ public extension DisplayCriteriaMatching {
         #else
             nil
         #endif
+    }
+}
+
+private extension DisplayCriteria {
+    /// The codec's four characters, such as `hvc1`, for the log.
+    var codecName: String {
+        String(bytes: withUnsafeBytes(of: codec.bigEndian, Array.init), encoding: .ascii) ?? "\(codec)"
     }
 }
 

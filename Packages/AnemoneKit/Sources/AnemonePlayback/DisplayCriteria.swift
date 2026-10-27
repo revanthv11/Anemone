@@ -1,5 +1,6 @@
 import AnemoneJellyfin
 import CoreMedia
+import Foundation
 import JellyfinAPI
 
 /// The display mode a video would like: its frame rate and dynamic range. tvOS switches to it
@@ -30,24 +31,32 @@ public struct DisplayCriteria: Hashable, Sendable {
         self.height = height
     }
 
-    /// From the server's description of the version playing. `nil` without a frame rate, when
-    /// Wholphin doesn't switch either.
+    /// For the stream PlaybackInfo offered, from the video it describes. `nil` without a frame
+    /// rate, when Wholphin doesn't switch either.
     ///
-    /// A transcode keeps the frame rate, but the server tone-maps HDR when it re-encodes to
-    /// H.264, its usual choice, so it counts as SDR. Dolby Vision counts as its base layer when
-    /// this Apple TV can't decode Dolby Vision, as AVPlayer then shows that layer.
-    public init?(video: MediaVersion.Video, method: PlaybackMethod, decoders: VideoDecoders = .current) {
+    /// A transcode keeps the frame rate, and its codec and range are what the server's
+    /// transcoding URL says it sends (`TranscodedVideo`); when the URL doesn't say, it counts as
+    /// H.264 in SDR, the server's usual choice. Dolby Vision counts as its base layer when this
+    /// Apple TV can't decode Dolby Vision, as AVPlayer then shows that layer.
+    public init?(stream: PlaybackStream, decoders: VideoDecoders = .current) {
+        guard let video = stream.video else { return nil }
+        guard stream.method == .transcode else {
+            self.init(video: video, codec: video.codec, range: video.range ?? .sdr, decoders: decoders)
+            return
+        }
+        let output = TranscodedVideo(url: stream.url, source: video)
+        self.init(video: video, codec: output?.codec ?? "h264", range: output?.range ?? .sdr, decoders: decoders)
+    }
+
+    init?(video: MediaVersion.Video, codec: String?, range: VideoRangeType, decoders: VideoDecoders) {
         guard let frameRate = video.frameRate, frameRate.isFinite, frameRate > 0 else { return nil }
-        let width = Int32(clamping: video.width ?? 1920)
-        let height = Int32(clamping: video.height ?? 1080)
-        let isTranscode = method == .transcode
-        let range = isTranscode ? .sdr : Self.dynamicRange(video.range ?? .sdr, dolbyVision: decoders.dolbyVision)
+        let dynamicRange = Self.dynamicRange(range, dolbyVision: decoders.dolbyVision)
         self.init(
             frameRate: frameRate,
-            dynamicRange: range,
-            codec: isTranscode ? kCMVideoCodecType_H264 : Self.codec(video.codec, range: range),
-            width: width,
-            height: height,
+            dynamicRange: dynamicRange,
+            codec: Self.codec(codec, range: dynamicRange),
+            width: Int32(clamping: video.width ?? 1920),
+            height: Int32(clamping: video.height ?? 1080),
         )
     }
 
@@ -110,5 +119,68 @@ public struct DisplayCriteria: Hashable, Sendable {
             formatDescriptionOut: &description,
         )
         return status == noErr ? description : nil
+    }
+}
+
+/// The video a transcode sends, read from the options Jellyfin puts in its transcoding URL
+/// (`StreamInfo`): `VideoCodec`, the codecs it may send in its order of preference;
+/// `TranscodeReasons`, why it isn't direct playing; `AllowVideoStreamCopy`, off for Wholphin's
+/// retry; and `<codec>-rangetype`, the ranges the device profile takes in each codec.
+///
+/// When only the container or the audio doesn't suit the player, the server copies the video,
+/// HDR and all. Otherwise it encodes to the first codec, keeping an HDR10 or HLG range (a Dolby
+/// Vision video's base layer) only when the profile takes it in that codec, as it does in HEVC
+/// on an Apple TV 4K, and tone-mapping the rest to SDR.
+struct TranscodedVideo: Equatable {
+    var codec: String
+    var range: VideoRangeType
+
+    /// The reasons that leave the video as it is.
+    private static let copyingReasons: Set = [
+        "containernotsupported", "audiocodecnotsupported", "audioprofilenotsupported",
+        "audiochannelsnotsupported", "audiosampleratenotsupported", "audiobitdepthnotsupported",
+        "audiobitratenotsupported", "audioisexternal", "secondaryaudionotsupported", "unknownaudiostreaminfo",
+    ]
+
+    init(codec: String, range: VideoRangeType) {
+        self.codec = codec
+        self.range = range
+    }
+
+    /// `nil` when the URL doesn't name the codecs.
+    init?(url: URL, source: MediaVersion.Video) {
+        let options = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        // Jellyfin reads its query without regard to case.
+        func list(_ name: String) -> [String] {
+            let value = options.first { $0.name.caseInsensitiveCompare(name) == .orderedSame }?.value ?? ""
+            return value.split { $0 == "," || $0 == "|" }.map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+        }
+        let codecs = list("VideoCodec")
+        guard let first = codecs.first else { return nil }
+        let sourceRange = source.range ?? .sdr
+        let reasons = list("TranscodeReasons")
+        if let sourceCodec = source.codec?.lowercased(), codecs.contains(sourceCodec),
+           list("AllowVideoStreamCopy") != ["false"],
+           !reasons.isEmpty, reasons.allSatisfy(Self.copyingReasons.contains)
+        {
+            self.init(codec: sourceCodec, range: sourceRange)
+            return
+        }
+        let baseLayer = Self.baseLayer(of: sourceRange)
+        let keepsRange = ["hevc", "av1"].contains(first)
+            && list("\(first)-rangetype").contains(baseLayer.rawValue.lowercased())
+        self.init(codec: first, range: keepsRange ? baseLayer : .sdr)
+    }
+
+    /// What an encode can keep: the server writes no Dolby Vision or HDR10+ metadata.
+    private static func baseLayer(of range: VideoRangeType) -> VideoRangeType {
+        switch range {
+        case .hdr10, .hdr10Plus, .doviWithHDR10, .doviWithHDR10Plus, .doviWithEL, .doviWithELHDR10Plus:
+            .hdr10
+        case .hlg, .doviWithHLG:
+            .hlg
+        case .sdr, .unknown, .dovi, .doviWithSDR, .doviInvalid:
+            .sdr
+        }
     }
 }
