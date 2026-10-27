@@ -33,11 +33,32 @@ extension MusicPlayer {
             songs += page.items
             total = min(page.totalCount ?? total, Self.queueLimit)
             // A random order changes from one request to the next, so it comes in one page.
-            if shuffled, source.isLarge {
+            if source.isRandomOrder || (shuffled && source.isLarge) {
                 break
             }
         }
         return songs
+    }
+
+    /// Adds the rest of `source` to the playing queue a page at a time, up to `queueLimit` songs.
+    /// A page that fails ends the queue where it is: the music has started, so it plays on.
+    func addPages(of source: MusicSource, after first: MusicPage, request: Int) async {
+        let total = min(first.totalCount ?? first.items.count, Self.queueLimit)
+        var loaded = first.items.count
+        while loaded < total {
+            let page: MusicPage
+            do {
+                page = try await loadSongs(source, false, loaded, Self.pageSize)
+            } catch {
+                guard request == requests else { return }
+                let reason = String(describing: error)
+                Self.log.error("A queue stopped at \(loaded) of \(total) songs, as a page failed: \(reason)")
+                return
+            }
+            guard request == requests, !page.items.isEmpty else { return }
+            queue.append(page.items)
+            loaded += page.items.count
+        }
     }
 
     func start(_ newQueue: MusicQueue) {
@@ -56,7 +77,9 @@ extension MusicPlayer {
     }
 
     /// Plays the queue's current entry from the start, after the song before it has stopped.
-    func playCurrent() {
+    /// When `paused`, the song loads and waits, paused, as ExoPlayer moves between songs while
+    /// paused.
+    func playCurrent(paused: Bool = false) {
         guard let entry = queue.current else { return }
         plays += 1
         let play = plays
@@ -65,7 +88,9 @@ extension MusicPlayer {
         failure = nil
         position = .zero
         duration = entry.song.item.runtime
-        setStatus(.loading)
+        // The remote hears about the new song even when the status stays the same.
+        status = paused ? .paused : .loading
+        remote?.update(from: self)
         Task {
             if let old {
                 await retire(old)
@@ -82,9 +107,12 @@ extension MusicPlayer {
         let metadata = PlaybackMetadata(title: song.item.name, subtitle: song.artistNames)
         let request = PlaybackRequest(PlaybackQueue.Entry(itemID: song.id, metadata: metadata))
         let loadStream = loadStream
+        let engine = SongEngine(makeEngine()) { [weak self] in
+            self?.status == .paused
+        }
         let controller = PlaybackController(
             request: request,
-            engine: makeEngine(),
+            engine: engine,
             features: makeFeatures() + [SongEvents(player: self, play: play)],
         ) { _, allowsDirect, _ in
             try await loadStream(song, allowsDirect)
@@ -109,6 +137,11 @@ extension MusicPlayer {
                 resumer.resume()
             }
         }
+    }
+
+    /// The song's engine, which knows whether its stream is ready.
+    var songEngine: SongEngine? {
+        controller?.engine as? SongEngine
     }
 
     func startTicking() {

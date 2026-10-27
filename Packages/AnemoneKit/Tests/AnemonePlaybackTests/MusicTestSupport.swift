@@ -44,10 +44,17 @@ final class FakeLibrary: Sendable {
 
     private let stored = Mutex<[MusicItem]>([])
     private let requests = Mutex<[Request]>([])
+    private let failing = Mutex<Int?>(nil)
 
     var songs: [MusicItem] {
         get { stored.withLock(\.self) }
         set { stored.withLock { $0 = newValue } }
+    }
+
+    /// Pages from this index on fail.
+    var failsFrom: Int? {
+        get { failing.withLock(\.self) }
+        set { failing.withLock { $0 = newValue } }
     }
 
     var received: [Request] {
@@ -58,6 +65,9 @@ final class FakeLibrary: Sendable {
         { [self] source, shuffled, startIndex, limit in
             requests.withLock {
                 $0.append(Request(source: source, shuffled: shuffled, startIndex: startIndex, limit: limit))
+            }
+            if let failsFrom, startIndex >= failsFrom {
+                throw PlaybackError.nothingToPlay
             }
             let all = songs
             let page = Array(all.dropFirst(startIndex).prefix(limit))

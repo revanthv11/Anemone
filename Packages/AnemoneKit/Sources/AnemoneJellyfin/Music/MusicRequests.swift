@@ -142,6 +142,11 @@ public extension JellyfinSession {
             parameters.parentID = id
             parameters.isRecursive = true
             parameters.sortBy = [.albumArtist, .album] + trackOrder
+        case let .songs(library, sort):
+            // The same order as the tab's `musicPage`.
+            parameters.parentID = library
+            parameters.isRecursive = true
+            (parameters.sortBy, parameters.sortOrder) = Self.sortParameters(sort)
         case let .genre(genreID, library):
             parameters.parentID = library
             parameters.genreIDs = [genreID]
@@ -150,6 +155,7 @@ public extension JellyfinSession {
         }
         if shuffled, source.isLarge {
             parameters.sortBy = [.random]
+            parameters.sortOrder = nil
         }
         let result = try await send(Paths.getItems(parameters: parameters))
         let items = result.items.musicItems

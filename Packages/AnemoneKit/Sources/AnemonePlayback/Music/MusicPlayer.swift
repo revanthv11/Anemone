@@ -1,6 +1,7 @@
 import AnemoneCore
 import AnemoneJellyfin
 import Observation
+import os
 
 /// Plays music in the background of the app, ported from Wholphin's `MusicService`: a queue of
 /// songs with shuffle and repeat, which keeps playing while the user browses, until it's stopped
@@ -35,6 +36,8 @@ public final class MusicPlayer {
     static let queueLimit = 1000
     /// Like ExoPlayer: Previous restarts the song once it has played this long.
     static let restartThreshold = Duration.seconds(3)
+    /// For what goes wrong with nobody to tell, such as a queue that ends early.
+    static let log = Logger(subsystem: "com.revanthv11.anemone", category: "Music")
 
     /// The player playing now, which a video stops when it starts.
     public internal(set) weak static var active: MusicPlayer?
@@ -128,37 +131,34 @@ public final class MusicPlayer {
     }
 
     /// Replaces the queue with the songs from `source`, starting once the first page is in and
-    /// adding the rest as they come, as Wholphin's `addAllToQueue` does. Shuffled, the whole
-    /// queue is fetched first; a library, artist or genre comes from the server in a random
-    /// order, up to `queueLimit` songs. What was playing stops at once, as Wholphin's `setQueue`
-    /// empties the player first.
+    /// adding the rest as they come, as Wholphin's `addAllToQueue` does. Shuffled, or in a random
+    /// order, the whole queue is fetched first; a library, artist or genre comes from the server
+    /// in a random order, in one request. What was playing stops at once, as Wholphin's
+    /// `setQueue` empties the player first.
+    ///
+    /// Throws when nothing could be queued. Once the queue has started, a later page that fails
+    /// ends it early instead: what loaded plays on.
     public func play(_ source: MusicSource, shuffled: Bool = false) async throws {
         let request = clearForNewQueue()
+        let first: MusicPage
         do {
-            if shuffled {
-                let songs = try await loadAll(source, shuffled: true, request: request)
+            if shuffled || source.isRandomOrder {
+                let songs = try await loadAll(source, shuffled: shuffled, request: request)
                 guard request == requests else { return }
-                start(MusicQueue(songs, shuffled: true))
+                start(MusicQueue(songs, shuffled: shuffled))
                 return
             }
-            let first = try await loadSongs(source, false, 0, Self.pageSize)
-            guard request == requests else { return }
-            start(MusicQueue(first.items))
-            let total = min(first.totalCount ?? first.items.count, Self.queueLimit)
-            var loaded = first.items.count
-            while loaded < total {
-                let page = try await loadSongs(source, false, loaded, Self.pageSize)
-                guard request == requests, !page.items.isEmpty else { return }
-                queue.append(page.items)
-                loaded += page.items.count
-            }
+            first = try await loadSongs(source, false, 0, Self.pageSize)
         } catch {
             // Nothing started: the player stops, so Now Playing closes and the page can say why.
-            if request == requests, !hasQueue {
+            if request == requests {
                 stop()
             }
             throw error
         }
+        guard request == requests else { return }
+        start(MusicQueue(first.items))
+        await addPages(of: source, after: first, request: request)
     }
 
     /// Replaces the queue with the songs `load` fetches, such as an instant mix. What was
@@ -208,7 +208,8 @@ public final class MusicPlayer {
         queue.moveEntry(from: source, to: destination)
     }
 
-    /// Removes an entry; removing the one playing plays the next.
+    /// Removes an entry; removing the one playing plays the next, or loads it paused when the
+    /// music was paused, as ExoPlayer's `removeMediaItem` keeps it.
     public func removeEntry(at index: Int) {
         guard queue.remove(at: index) else { return }
         if queue.isEmpty {
@@ -216,7 +217,7 @@ public final class MusicPlayer {
         } else if status == .ended {
             remote?.update(from: self)
         } else {
-            playCurrent()
+            playCurrent(paused: status == .paused)
         }
     }
 
@@ -235,8 +236,14 @@ public final class MusicPlayer {
     public func resume() {
         switch status {
         case .paused:
-            controller?.engine.play()
+            // A song paused before it was ready plays once it is.
+            guard let engine = songEngine, engine.isReady else {
+                setStatus(.loading)
+                return
+            }
+            // Not paused first, so the engine lets the song play.
             setStatus(.playing)
+            engine.play()
         case .ended:
             // Like starting the queue again.
             queue.move(to: 0)
@@ -248,9 +255,10 @@ public final class MusicPlayer {
         }
     }
 
+    /// Pauses the song; one still loading waits, paused, once it's ready (`SongEngine`).
     public func pause() {
-        guard status == .playing || status == .loading, let controller else { return }
-        controller.engine.pause()
+        guard status == .playing || status == .loading else { return }
+        controller?.engine.pause()
         setStatus(.paused)
     }
 
@@ -262,22 +270,23 @@ public final class MusicPlayer {
         }
     }
 
-    /// The next song; nothing at the end of the queue unless repeating it all.
+    /// The next song; nothing at the end of the queue unless repeating it all. While paused, the
+    /// next song waits paused, as with ExoPlayer's `seekToNext`.
     public func next() {
         guard let index = queue.nextIndex(automatic: false) else { return }
         queue.move(to: index)
-        playCurrent()
+        playCurrent(paused: status == .paused)
     }
 
     /// ExoPlayer's `seekToPrevious`: the song before, or the start of this one once it has played
-    /// a few seconds or when it's first.
+    /// a few seconds or when it's first. Either way, paused stays paused.
     public func previous() {
         guard position <= Self.restartThreshold, let index = queue.previousIndex else {
             seek(to: .zero)
             return
         }
         queue.move(to: index)
-        playCurrent()
+        playCurrent(paused: status == .paused)
     }
 
     public func seek(to target: Duration) {

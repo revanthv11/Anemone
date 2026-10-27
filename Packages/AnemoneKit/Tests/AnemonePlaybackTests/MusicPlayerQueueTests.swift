@@ -18,6 +18,49 @@ extension MusicPlayerTests {
         player.stop()
     }
 
+    @Test func `a page that fails once the queue has started ends the queue there, playing on`() async throws {
+        library.songs = (0 ..< 250).map { MusicItem.song("s\($0)") }
+        library.failsFrom = 100
+        let player = player()
+
+        try await player.play(.album("al1"))
+        await startSong(1, in: player)
+
+        #expect(library.received.map(\.startIndex) == [0, 100])
+        #expect(player.queue.entries.count == 100)
+        #expect(player.status == .playing)
+        #expect(player.current?.id == "s0")
+        player.stop()
+    }
+
+    @Test func `a first page that fails stops the player and says why`() async {
+        library.songs = (0 ..< 10).map { MusicItem.song("s\($0)") }
+        library.failsFrom = 0
+        let player = player()
+
+        await #expect(throws: PlaybackError.nothingToPlay) {
+            try await player.play(.album("al1"))
+        }
+
+        #expect(player.status == .idle)
+        #expect(!player.hasQueue)
+    }
+
+    @Test func `a source in a random order comes in one request, unshuffled`() async throws {
+        library.songs = (0 ..< 700).map { MusicItem.song("s\($0)") }
+        let player = player()
+
+        try await player.play(.songs(library: "lib", sort: MusicSort(.random)))
+        await startSong(1, in: player)
+
+        #expect(library.received.count == 1)
+        #expect(library.received.first?.shuffled == false)
+        #expect(library.received.first?.limit == 500)
+        #expect(!player.queue.isShuffled)
+        #expect(player.queue.entries.map(\.song.id) == library.songs.prefix(500).map(\.id))
+        player.stop()
+    }
+
     @Test func `shuffling a library asks the server for one random page`() async throws {
         library.songs = (0 ..< 50).map { MusicItem.song("s\($0)") }
         let player = player()

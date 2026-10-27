@@ -303,3 +303,32 @@ struct MusicTests {
         }
     }
 }
+
+/// Queues from the Songs tab, which follow the tab's sort.
+extension MusicTests {
+    @Test func `the songs tab's songs queue in the tab's sort`() async throws {
+        let sent = register(
+            host: "music-songs-queue.test",
+            path: "/jf/Items",
+            reply: .json(#"{"Items":[],"TotalRecordCount":0}"#),
+        )
+        let session = try session(host: "music-songs-queue.test")
+
+        let byAlbum = MusicSource.songs(library: "lib", sort: MusicSort(.album, .descending))
+        _ = try await session.songs(from: byAlbum, startIndex: 0, limit: 100)
+        var query = try #require(sent.request).query
+        #expect(query["parentId"] == "lib")
+        #expect(query["recursive"] == "true")
+        #expect(query["includeItemTypes"] == "Audio")
+        #expect(query["sortBy"] == "Album,SortName")
+        #expect(query["sortOrder"] == "Descending,Ascending")
+        #expect(!byAlbum.isRandomOrder)
+
+        _ = try await session.songs(from: byAlbum, shuffled: true, startIndex: 0, limit: 500)
+        query = try #require(sent.request).query
+        #expect(query["sortBy"] == "Random")
+        #expect(query["sortOrder"] == nil)
+
+        #expect(MusicSource.songs(library: "lib", sort: MusicSort(.random)).isRandomOrder)
+    }
+}

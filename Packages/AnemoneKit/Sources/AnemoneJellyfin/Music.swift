@@ -208,20 +208,31 @@ public struct MusicSort: Hashable, Codable, Sendable {
 }
 
 /// Where a queue of songs comes from: Wholphin's `getPagerForAlbum`, `getPagerForArtist` and
-/// `getPagerForPlaylist`, and Play All on a library's albums or songs.
+/// `getPagerForPlaylist`, and Play All on a library's albums, songs or genres.
 public enum MusicSource: Hashable, Sendable {
     case album(MediaItem.ID)
     case artist(MediaItem.ID)
     case playlist(MediaItem.ID)
     case library(Library.ID)
+    /// The Songs tab's songs, in the order the tab shows them.
+    case songs(library: Library.ID, sort: MusicSort)
     case genre(String, library: Library.ID)
 
     /// Whether it can hold more songs than a queue takes, so shuffling it asks the server for a
     /// random order instead of fetching it all.
     public var isLarge: Bool {
         switch self {
-        case .library, .artist, .genre: true
+        case .library, .songs, .artist, .genre: true
         case .album, .playlist: false
+        }
+    }
+
+    /// Whether the server picks a new random order for each request, so a queue from it comes
+    /// in one request: pages would repeat some songs and miss others.
+    public var isRandomOrder: Bool {
+        switch self {
+        case let .songs(_, sort): sort.field == .random
+        case .album, .artist, .playlist, .library, .genre: false
         }
     }
 }
