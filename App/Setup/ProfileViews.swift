@@ -1,4 +1,5 @@
 import AnemoneCore
+import AnemoneUI
 import SwiftUI
 
 /// What it takes to switch to this profile: nothing, a PIN, or signing in again.
@@ -7,6 +8,7 @@ struct ProfileLockView: View {
 
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.theme) private var theme
     @State private var isSettingPIN = false
     @State private var didSetPIN = false
 
@@ -14,8 +16,10 @@ struct ProfileLockView: View {
         VStack(alignment: .leading, spacing: 32) {
             Text("Profile lock")
                 .font(.largeTitle.bold())
+                .foregroundStyle(theme.onBackground)
+                .accessibilityAddTraits(.isHeader)
             Text("Controls what it takes to switch to \(user.name) on this Apple TV.")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.secondaryText)
             VStack(alignment: .leading, spacing: 20) {
                 option("No lock", isSelected: user.lock == .unlocked) {
                     model.setLock(.unlocked)
@@ -57,6 +61,8 @@ struct ProfileLockView: View {
         Button(action: action) {
             Label(title, systemImage: isSelected ? "checkmark.circle.fill" : "circle")
         }
+        // VoiceOver hears the filled circle as the option being chosen.
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
@@ -69,11 +75,14 @@ struct PINEntryView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var pin = ""
     @State private var isWrong = false
+    @Environment(\.theme) private var theme
 
     var body: some View {
         VStack(spacing: 32) {
             Text(title)
                 .font(.title2.bold())
+                .foregroundStyle(theme.onBackground)
+                .accessibilityAddTraits(.isHeader)
             SecureField("PIN", text: $pin)
                 .keyboardType(.numberPad)
                 .frame(maxWidth: 500)
@@ -109,11 +118,14 @@ private struct NewPINView: View {
     @State private var first: String?
     @State private var pin = ""
     @State private var problem: String?
+    @Environment(\.theme) private var theme
 
     var body: some View {
         VStack(spacing: 32) {
             Text(first == nil ? "Choose a \(PINHash.length)-digit PIN" : "Enter the PIN again")
                 .font(.title2.bold())
+                .foregroundStyle(theme.onBackground)
+                .accessibilityAddTraits(.isHeader)
             SecureField("PIN", text: $pin)
                 .keyboardType(.numberPad)
                 .frame(maxWidth: 500)

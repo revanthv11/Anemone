@@ -1,5 +1,6 @@
 import AnemoneCore
 import AnemoneJellyfin
+import AnemoneUI
 import SwiftUI
 
 /// "Who's watching?": profiles saved on this Apple TV, then the server's other public users.
@@ -10,6 +11,7 @@ struct UserListView: View {
     @State private var publicUsers: [PublicUser] = []
     @State private var path: [SignInRoute] = []
     @State private var userEnteringPIN: SavedUser?
+    @Environment(\.theme) private var theme
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -17,8 +19,10 @@ struct UserListView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Who's watching?")
                         .font(.largeTitle.bold())
+                        .foregroundStyle(theme.onBackground)
+                        .accessibilityAddTraits(.isHeader)
                     Text("\(server.name) · Jellyfin \(server.version)")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.secondaryText)
                 }
                 if let notice = model.notice {
                     NoticeText(notice)
@@ -34,6 +38,7 @@ struct UserListView: View {
                                         if user.lock != .unlocked {
                                             Image(systemName: "lock.fill")
                                                 .padding(12)
+                                                .accessibilityLabel("Locked")
                                         }
                                     }
                             }
@@ -135,6 +140,8 @@ private struct ProfileTile: View {
             }
             .frame(width: 200, height: 200)
             .clipShape(.rect(cornerRadius: 16))
+            // The profile's picture is decoration beside its name.
+            .accessibilityHidden(true)
             Text(name)
                 .lineLimit(1)
         }

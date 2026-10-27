@@ -18,6 +18,7 @@ struct LibraryDetailsHeader: View {
 
     @Environment(BrowseModel.self) private var browse
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.theme) private var theme
 
     var body: some View {
         let details = focus.details
@@ -40,7 +41,7 @@ struct LibraryDetailsHeader: View {
             }
             if let details {
                 QuickDetails(details: details)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryText)
             }
             // Two lines under an episode's name, as in Wholphin, so the header keeps its height.
             Text(details?.item.overview ?? " ")
@@ -48,6 +49,7 @@ struct LibraryDetailsHeader: View {
                 .lineLimit(details?.item.kind == .episode ? 2 : 3, reservesSpace: true)
                 .frame(maxWidth: LibraryDetailsLayout.overviewWidth, alignment: .leading)
         }
+        .foregroundStyle(theme.onBackground)
         .frame(maxWidth: .infinity, alignment: .bottomLeading)
         .frame(height: LibraryDetailsLayout.headerHeight, alignment: .bottomLeading)
         .animation(nil, value: details)
@@ -63,6 +65,7 @@ struct LibraryDetailsPanel: View {
 
     @Environment(BrowseModel.self) private var browse
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.theme) private var theme
 
     var body: some View {
         let details = focus.details
@@ -85,13 +88,14 @@ struct LibraryDetailsPanel: View {
             )
             if let details {
                 QuickDetails(details: details)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryText)
             }
             Text(details?.item.overview ?? " ")
                 .font(.callout)
                 .lineLimit(5)
             Spacer(minLength: 0)
         }
+        .foregroundStyle(theme.onBackground)
         .frame(width: width, alignment: .leading)
         .padding(.leading, GridLayout.horizontalInset)
         .padding(.vertical, GridLayout.focusPadding)

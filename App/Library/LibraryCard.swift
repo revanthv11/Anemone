@@ -19,6 +19,7 @@ struct LibraryCard: View {
             MediaCard(
                 title: item?.displayTitle ?? " ",
                 subtitle: item.flatMap { $0.subtitle ?? $0.year.map(String.init) },
+                spokenSubtitle: item?.spokenSubtitle,
                 imageURL: imageURL,
                 shape: options.shape,
                 width: width,

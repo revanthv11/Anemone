@@ -25,6 +25,7 @@ struct HomeCardView: View {
             MediaCard(
                 title: card.item.displayTitle,
                 subtitle: card.item.subtitle ?? card.item.year.map(String.init),
+                spokenSubtitle: card.item.spokenSubtitle,
                 imageURL: imageURL,
                 shape: style.shape,
                 width: style.width,
@@ -89,29 +90,37 @@ struct HomeCardStyle {
     }
 }
 
-/// Wholphin's `GenreCard` and `StudioCard`: art with the name over it.
+/// Wholphin's `GenreCard` and `StudioCard`: art with the name over it, in its colour for text on
+/// a card. VoiceOver reads the name.
 private struct HomeCategoryCard: View {
     let name: String
     let imageURL: URL?
     let shape: CardShape
     let width: CGFloat
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         ShapedArtwork(url: imageURL, shape: shape, width: width, placeholderSymbol: "square.stack")
             .overlay {
-                LinearGradient(colors: [.black.opacity(0.1), .black.opacity(0.6)], startPoint: .top, endPoint: .bottom)
-                    .clipShape(.rect(cornerRadius: 12))
+                LinearGradient(
+                    colors: [theme.scrim.withAlpha(0.1).color, theme.scrim.withAlpha(0.6).color],
+                    startPoint: .top,
+                    endPoint: .bottom,
+                )
+                .clipShape(.rect(cornerRadius: 12))
             }
             .overlay {
                 Text(name)
                     .font(.headline)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(theme.onSurfaceVariant)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .padding(16)
             }
             .hoverEffect(.highlight)
-            .accessibilityElement(children: .combine)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(verbatim: name))
     }
 }
 
@@ -144,6 +153,15 @@ extension MediaItem {
         default:
             nil
         }
+    }
+
+    /// The subtitle as VoiceOver reads it, where the written one is shorthand: an episode's
+    /// "Season 1, episode 3, Pilot" for "S1:E3 · Pilot". `nil` reads the written one.
+    var spokenSubtitle: Text? {
+        guard kind == .episode, let season = episode?.seasonNumber, let number = episode?.episodeNumber else {
+            return nil
+        }
+        return Text("Season \(season), episode \(number), \(name)")
     }
 
     /// Year, running time and age rating, such as "2024 · 1h 52m · PG-13".

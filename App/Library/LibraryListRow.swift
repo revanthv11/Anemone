@@ -1,21 +1,25 @@
 import AnemoneJellyfin
+import AnemoneUI
 import SwiftUI
 
 /// A title in a library's list layout, ported from Wholphin's `CollectionFolderList` rows: a
 /// heart for favourites, the title over its year or episode, then the running time and a check
 /// for watched titles, or a series' unwatched count. The dense list puts the year beside the
 /// title and drops the second line.
+///
+/// VoiceOver reads it as a card reads: the title, the year or episode, the running time, then
+/// the marks.
 struct LibraryListRow: View {
     let entry: LibraryEntry?
     let isDense: Bool
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         HStack(spacing: 20) {
             Image(systemName: "heart.fill")
-                .foregroundStyle(.red)
+                .foregroundStyle(theme.favorite)
                 .opacity(entry?.details?.userState.isFavorite == true ? 1 : 0)
-                .accessibilityLabel("Favorite")
-                .accessibilityHidden(entry?.details?.userState.isFavorite != true)
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .lineLimit(1)
@@ -35,6 +39,21 @@ struct LibraryListRow: View {
         .padding(.horizontal, 24)
         .padding(.vertical, isDense ? 10 : 16)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel { _ in
+            if let item {
+                Text(verbatim: item.displayTitle)
+                if let spoken = item.spokenSubtitle ?? subtitle.map(Text.init(verbatim:)) {
+                    spoken
+                }
+                if let runtime = shownRuntime {
+                    Text(runtime, format: .units(allowed: [.hours, .minutes], width: .wide))
+                }
+                ForEach(CardSpokenMark.marks(for: CardMarks(badges: shownBadges)), id: \.self) { mark in
+                    Text(mark.spoken)
+                }
+            }
+        }
     }
 
     private var item: MediaItem? {
@@ -60,36 +79,46 @@ struct LibraryListRow: View {
         }
     }
 
+    /// Series and collections show how many episodes are left instead of a running time.
+    private var isFolder: Bool {
+        item?.kind == .series || item?.kind == .collection
+    }
+
+    private var shownRuntime: Duration? {
+        guard !isFolder, let runtime = item?.runtime, runtime > .zero else { return nil }
+        return runtime.roundedToMinutes
+    }
+
+    /// The marks the row draws: the heart, and the check or the unwatched count.
+    private var shownBadges: CardBadges {
+        let state = entry?.details?.userState
+        let count = isFolder ? state?.unplayedCount ?? 0 : 0
+        return CardBadges(
+            isFavorite: state?.isFavorite == true,
+            isPlayed: count <= 0 && state?.isPlayed == true,
+            unplayedCount: count,
+        )
+    }
+
     @ViewBuilder
     private var trailing: some View {
-        let state = entry?.details?.userState
+        let badges = shownBadges
         HStack(spacing: 12) {
-            if item?.kind == .series || item?.kind == .collection {
-                if let count = state?.unplayedCount, count > 0 {
-                    Text(count, format: .number)
-                        .accessibilityLabel("\(count) unwatched")
-                } else if state?.isPlayed == true {
-                    watchedMark
-                }
-            } else {
-                if let runtime = item?.runtime, runtime > .zero {
-                    Text(runtime.roundedToMinutes.lengthText)
-                }
-                if state?.isPlayed == true {
-                    watchedMark
-                }
+            if let count = badges.unplayedCount, count > 0 {
+                Text(count, format: .number)
+            }
+            if let runtime = shownRuntime {
+                Text(runtime.lengthText)
+            }
+            if badges.isPlayed {
+                Image(systemName: "checkmark.circle.fill")
             }
         }
     }
-
-    private var watchedMark: some View {
-        Image(systemName: "checkmark.circle.fill")
-            .accessibilityLabel("Watched")
-    }
 }
 
-/// Focus on a list row: a soft highlight that fills the row, like Wholphin's focused list items,
-/// over a faint background that marks out each row.
+/// Focus on a list row, like Wholphin's focused list items: the theme's light platter with dark
+/// text, over a faint fill that marks out each row at rest.
 struct ListRowButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         RowBody(configuration: configuration)
@@ -98,10 +127,16 @@ struct ListRowButtonStyle: ButtonStyle {
     private struct RowBody: View {
         let configuration: ButtonStyleConfiguration
         @Environment(\.isFocused) private var isFocused
+        @Environment(\.theme) private var theme
 
         var body: some View {
             configuration.label
-                .background(.white.opacity(isFocused ? 0.25 : 0.06), in: .rect(cornerRadius: 12))
+                // The row's quieter text is `.secondary` of this, so it follows focus too.
+                .foregroundStyle(isFocused ? theme.onFocusedPlatter : theme.onBackground)
+                .background(
+                    isFocused ? theme.focusedPlatter : theme.surfaceVariant.withAlpha(0.3),
+                    in: .rect(cornerRadius: 12),
+                )
                 .scaleEffect(configuration.isPressed ? 0.98 : isFocused ? 1.02 : 1)
                 .animation(.easeOut(duration: 0.15), value: isFocused)
         }
