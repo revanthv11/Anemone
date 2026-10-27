@@ -25,6 +25,7 @@ struct CardRow<Element: Identifiable, Card: View>: View where Element.ID == Stri
                 LazyHStack(alignment: .top, spacing: ItemLayout.cardSpacing) {
                     ForEach(elements) { element in
                         card(element)
+                            .cardMenu()
                             .focused(focus, equals: .card(row: id, item: element.id))
                             .accessibilityIdentifier("card.\(id).\(element.id)")
                     }
@@ -90,6 +91,7 @@ struct ItemCard: View {
             width: shape.cardWidth,
             progress: details.item.progress,
             badges: details.badges,
+            menuItem: CardMenuItem(details),
         )
     }
 }

@@ -60,6 +60,7 @@ struct SignedInView: View {
             }
         }
         .tabViewStyle(.sidebarAdaptable)
+        .itemContextActions()
         .environment(browse)
         .task {
             await browse.load()
