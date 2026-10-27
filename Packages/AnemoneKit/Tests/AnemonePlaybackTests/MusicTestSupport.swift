@@ -127,22 +127,14 @@ final class LoadGate: Sendable {
     }
 }
 
-/// A remote that writes down what it hears.
+/// A feature whose `stopped` waits for the test, like a stop report to a slow server.
 @MainActor
-final class RecordingRemote: MusicRemote {
-    private(set) var attached = false
-    private(set) var detached = false
-    private(set) var statuses: [MusicPlayer.Status] = []
+final class SlowStop: PlaybackFeature {
+    let gate = LoadGate()
 
-    func attach(to _: MusicPlayer) {
-        attached = true
-    }
-
-    func update(from player: MusicPlayer) {
-        statuses.append(player.status)
-    }
-
-    func detach() {
-        detached = true
+    func handle(_ event: PlaybackEvent, in _: PlaybackController) async {
+        if case .stopped = event {
+            await gate.wait()
+        }
     }
 }

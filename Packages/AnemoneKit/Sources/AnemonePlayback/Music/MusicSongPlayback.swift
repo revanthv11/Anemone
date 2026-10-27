@@ -75,7 +75,6 @@ extension MusicPlayer {
         Self.active = self
         activateAudioSession()
         queue = newQueue
-        remote?.attach(to: self)
         playCurrent(paused: paused)
     }
 
@@ -91,9 +90,7 @@ extension MusicPlayer {
         failure = nil
         position = .zero
         duration = entry.song.item.runtime
-        // The remote hears about the new song even when the status stays the same.
-        status = paused ? .paused : .loading
-        remote?.update(from: self)
+        setStatus(paused ? .paused : .loading)
         Task {
             if let old {
                 await retire(old)
@@ -107,16 +104,23 @@ extension MusicPlayer {
     }
 
     func makeController(for song: MusicItem, play: Int) -> PlaybackController {
-        let metadata = PlaybackMetadata(title: song.item.name, subtitle: song.artistNames)
+        let metadata = PlaybackMetadata(
+            title: song.item.name,
+            subtitle: song.artistNames,
+            artworkURL: artworkURL(song),
+        )
         let request = PlaybackRequest(PlaybackQueue.Entry(itemID: song.id, metadata: metadata))
         let loadStream = loadStream
         let engine = SongEngine(makeEngine()) { [weak self] in
             self?.status == .paused
         }
+        // Now Playing before the song's events, so it shows the song before the player moves on
+        // at its end.
+        let shared: [any PlaybackFeature] = nowPlaying.map { [$0] } ?? []
         let controller = PlaybackController(
             request: request,
             engine: engine,
-            features: makeFeatures() + [SongEvents(player: self, play: play)],
+            features: makeFeatures() + shared + [SongEvents(player: self, play: play)],
         ) { _, allowsDirect, _ in
             try await loadStream(song, allowsDirect)
         }
@@ -171,7 +175,30 @@ extension MusicPlayer {
     func setStatus(_ status: Status) {
         guard status != self.status else { return }
         self.status = status
-        remote?.update(from: self)
+        updateOffer()
+    }
+
+    /// Like Wholphin's drawer: Now Playing is offered while the music plays, until two hours after
+    /// it's paused or finished, and not once it's stopped.
+    func updateOffer() {
+        switch status {
+        case .loading, .playing:
+            offerExpiry?.cancel()
+            offerExpiry = nil
+            offersNowPlaying = true
+        case .idle:
+            offerExpiry?.cancel()
+            offerExpiry = nil
+            offersNowPlaying = false
+        case .paused, .ended, .failed:
+            guard offerExpiry == nil, offersNowPlaying else { return }
+            offerExpiry = Task { [weak self, offerTimeout] in
+                try? await Task.sleep(for: offerTimeout)
+                guard !Task.isCancelled, let self else { return }
+                offerExpiry = nil
+                offersNowPlaying = false
+            }
+        }
     }
 
     func activateAudioSession() {

@@ -1,5 +1,6 @@
 import AnemoneCore
 import AnemoneJellyfin
+import Foundation
 import Observation
 import os
 
@@ -8,8 +9,9 @@ import os
 /// or a video starts.
 ///
 /// Each song plays through a `PlaybackController` of its own, with an AVPlayer engine and the
-/// features music needs (progress reports for now), so the server hears about each song as it
-/// does about videos.
+/// features music needs (`features(for:)`), so the server hears about each song as it does about
+/// videos. The songs share one `NowPlaying`, which shows them in the system's Now Playing and
+/// sends the remote's commands here, since each song's controller holds a queue of one.
 @MainActor
 @Observable
 public final class MusicPlayer {
@@ -29,6 +31,8 @@ public final class MusicPlayer {
     typealias SongLoader = @Sendable (MusicSource, Bool, Int, Int) async throws -> MusicPage
     /// How to fetch a song: the song, and whether the file itself may be sent.
     typealias StreamLoader = @Sendable (MusicItem, Bool) async throws -> PlaybackStream
+    /// Where a song's cover comes from, for Now Playing.
+    typealias ArtworkURL = @MainActor (MusicItem) -> URL?
 
     /// Wholphin pages a queue in as it plays; this asks for this many songs at a time.
     static let pageSize = 100
@@ -50,28 +54,39 @@ public final class MusicPlayer {
     public internal(set) var position = Duration.zero
     /// The song's length, once known.
     public internal(set) var duration: Duration?
+    /// Whether the sidebar offers Now Playing, as Wholphin's drawer does: from when a queue starts
+    /// until it's stopped, or until it has been paused or finished for `offerTimeout`.
+    public internal(set) var offersNowPlaying = false
 
     @ObservationIgnored let loadSongs: SongLoader
     @ObservationIgnored let loadStream: StreamLoader
     @ObservationIgnored let makeEngine: @MainActor () -> any PlayerEngine
     @ObservationIgnored let makeFeatures: @MainActor () -> [any PlaybackFeature]
-    @ObservationIgnored let remote: (any MusicRemote)?
+    @ObservationIgnored let artworkURL: ArtworkURL
     @ObservationIgnored let stopTimeout: Duration
     @ObservationIgnored let tickInterval: Duration
+    /// Wholphin's drawer stops offering Now Playing once the music has been paused for two hours.
+    @ObservationIgnored let offerTimeout: Duration
+    /// Every song's Now Playing; `nil` where nothing shows the music, as in most tests.
+    @ObservationIgnored private(set) var nowPlaying: NowPlaying?
     @ObservationIgnored var controller: PlaybackController?
     /// Counts songs started, so events from a song that was replaced are ignored.
     @ObservationIgnored var plays = 0
     /// Counts queues asked for, so a source still paging in stops when another queue starts.
     @ObservationIgnored var requests = 0
     @ObservationIgnored var ticker: Task<Void, Never>?
+    /// Stops offering Now Playing once the music has been still for `offerTimeout`.
+    @ObservationIgnored var offerExpiry: Task<Void, Never>?
 
-    /// A player for `session`'s server. `remote` shows it in Now Playing and takes the remote's
-    /// commands.
-    public convenience init(session: JellyfinSession, remote: (any MusicRemote)? = nil) {
+    /// A player for `session`'s server, shown in the system's Now Playing.
+    public convenience init(session: JellyfinSession) {
         self.init(
-            remote: remote,
+            nowPlaying: .shared,
             makeEngine: { AVPlayerEngine() },
-            makeFeatures: { [ProgressReporting(session: session)] },
+            makeFeatures: { MusicPlayer.features(for: session) },
+            artworkURL: { song in
+                song.coverImage.flatMap { session.imageURL(for: $0, maxWidth: 600) }
+            },
             loadSongs: { source, shuffled, startIndex, limit in
                 try await session.songs(from: source, shuffled: shuffled, startIndex: startIndex, limit: limit)
             },
@@ -88,22 +103,35 @@ public final class MusicPlayer {
         )
     }
 
+    /// - Parameter slot: where Now Playing shows the music; `nil` for nowhere.
     init(
-        remote: (any MusicRemote)? = nil,
+        nowPlaying slot: NowPlaying.Slot? = nil,
         stopTimeout: Duration = .seconds(2),
         tickInterval: Duration = .milliseconds(250),
+        offerTimeout: Duration = .seconds(2 * 60 * 60),
         makeEngine: @escaping @MainActor () -> any PlayerEngine,
         makeFeatures: @escaping @MainActor () -> [any PlaybackFeature],
+        artworkURL: @escaping ArtworkURL = { _ in nil },
         loadSongs: @escaping SongLoader,
         loadStream: @escaping StreamLoader,
     ) {
-        self.remote = remote
         self.stopTimeout = stopTimeout
         self.tickInterval = tickInterval
+        self.offerTimeout = offerTimeout
         self.makeEngine = makeEngine
         self.makeFeatures = makeFeatures
+        self.artworkURL = artworkURL
         self.loadSongs = loadSongs
         self.loadStream = loadStream
+        nowPlaying = slot.map { NowPlaying(music: self, slot: $0) }
+    }
+
+    /// The features every song plays with, besides Now Playing: progress reports, so the server
+    /// hears about each song. Not the video's `PlaybackLifecycle`, which pauses when the app goes
+    /// to the background, since music plays on there (the `audio` background mode); nor the rest
+    /// of the video's, such as `MusicStopping`.
+    public static func features(for session: JellyfinSession) -> [any PlaybackFeature] {
+        [ProgressReporting(session: session)]
     }
 
     /// The song playing, or about to.
@@ -214,16 +242,13 @@ public final class MusicPlayer {
         guard queue.remove(at: index) else { return }
         if queue.isEmpty {
             stop()
-        } else if status == .ended {
-            remote?.update(from: self)
-        } else {
+        } else if status != .ended {
             playCurrent(paused: status == .paused)
         }
     }
 
     public func toggleShuffle() {
         queue.setShuffled(!queue.isShuffled)
-        remote?.update(from: self)
     }
 
     /// Off, all, one, off, as Wholphin's repeat button cycles.
@@ -295,7 +320,6 @@ public final class MusicPlayer {
         position = clamped
         Task {
             _ = await controller.engine.seek(to: clamped)
-            remote?.update(from: self)
         }
     }
 
@@ -313,14 +337,15 @@ public final class MusicPlayer {
         ticker?.cancel()
         ticker = nil
         queue = MusicQueue()
-        status = .idle
+        setStatus(.idle)
         failure = nil
         position = .zero
         duration = nil
         if Self.active === self {
             Self.active = nil
         }
-        remote?.detach()
+        // At once, rather than once the song's play session has ended, which waits for the server.
+        nowPlaying?.stopPublishing()
         if let old {
             Task { await old.stop() }
         }

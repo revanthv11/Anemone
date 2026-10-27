@@ -19,19 +19,25 @@ struct MusicPlayerTests {
 
     let engines = Engines()
 
-    func player(remote: (any MusicRemote)? = nil) -> MusicPlayer {
+    func player(
+        nowPlaying slot: NowPlaying.Slot? = nil,
+        offerTimeout: Duration = .seconds(60),
+        features: @escaping @MainActor () -> [any PlaybackFeature] = { [] },
+    ) -> MusicPlayer {
         let engines = engines
         let log = log
         return MusicPlayer(
-            remote: remote,
+            nowPlaying: slot,
             stopTimeout: .milliseconds(200),
             tickInterval: .milliseconds(10),
+            offerTimeout: offerTimeout,
             makeEngine: {
                 let engine = FakeEngine()
                 engines.made.append(engine)
                 return engine
             },
-            makeFeatures: { [log] },
+            makeFeatures: { [log] + features() },
+            artworkURL: { URL(filePath: "/covers/\($0.albumName ?? $0.id).jpg") },
             loadSongs: library.load,
             loadStream: streams.load,
         )
@@ -258,22 +264,21 @@ struct MusicPlayerTests {
         #expect(stopping < nowPlaying)
     }
 
-    @Test func `the remote hears about each song and status`() async {
-        let remote = RecordingRemote()
-        let player = player(remote: remote)
+    @Test func `songs play without the video's background pause or music stopping`() throws {
+        let session = try JellyfinSession(
+            serverURL: #require(URL(string: "https://music.test/jf")),
+            userID: "u1",
+            accessToken: "tok",
+            identity: ClientIdentity(deviceName: "Test TV", deviceID: "device-1", appVersion: "0.1.0"),
+        )
+        let features = MusicPlayer.features(for: session)
 
-        player.play(songs("a"))
-        await startSong(1, in: player)
-        player.pause()
-        player.stop()
-
-        #expect(remote.attached)
-        #expect(remote.statuses.contains(.playing))
-        #expect(remote.statuses.last == .paused)
-        #expect(remote.detached)
+        #expect(features.contains { $0 is AnemonePlayback.ProgressReporting })
+        #expect(!features.contains { ($0 as? PlaybackLifecycle)?.pausesInBackground ?? false })
+        #expect(!features.contains { $0 is MusicStopping || $0 is NowPlaying })
     }
 
-    private func video() -> PlaybackController {
+    func video() -> PlaybackController {
         PlaybackController(
             request: PlaybackRequest(.item("m1")),
             engine: FakeEngine(),
