@@ -28,7 +28,7 @@ struct OverlayDebugPanel: View {
         .padding(24)
         .background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 16))
         .accessibilityIdentifier("player.debug")
-        .task(id: details?.stream) {
+        .task(id: details?.trackChanges) {
             tracks = await playback.engine.tracks(.audio) + playback.engine.tracks(.subtitle)
         }
     }
