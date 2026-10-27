@@ -70,6 +70,45 @@ struct QueuesTests {
         #expect(sent["/Shows/s1/Episodes"]?.query["startItemId"] == nil)
     }
 
+    @Test func `a special next up gives way to the regular episode after it`() async throws {
+        _ = register(host: "queue-placed.test", replies: [
+            "/Shows/NextUp": Self.items([Self.episode("sp1", season: 0, number: 1)]),
+            "/Shows/s1/Episodes": Self.items([
+                Self.episode("sp1", season: 0, number: 1),
+                Self.episode("e4", season: 2, number: 1),
+                Self.episode("e5", season: 2, number: 2),
+            ]),
+        ])
+
+        let queue = try await session(host: "queue-placed.test").seriesQueue(seriesID: "s1")
+
+        #expect(queue.map(\.id) == ["e4", "e5"])
+    }
+
+    @Test func `a special next up at the very end starts the series again`() async throws {
+        let all = Self.items([
+            Self.episode("e1", season: 1, number: 1),
+            Self.episode("e2", season: 1, number: 2),
+            Self.episode("sp1", season: 0, number: 1),
+        ])
+        MockServer.register(host: "queue-last.test") { request in
+            switch request.url?.path() {
+            case "/Shows/NextUp":
+                .json(Self.items([Self.episode("sp1", season: 0, number: 1)]))
+            case "/Shows/s1/Episodes":
+                request.url?.queryValues["startItemId"] == "sp1"
+                    ? .json(Self.items([Self.episode("sp1", season: 0, number: 1)]))
+                    : .json(all)
+            default:
+                nil
+            }
+        }
+
+        let queue = try await session(host: "queue-last.test").seriesQueue(seriesID: "s1")
+
+        #expect(queue.map(\.id) == ["e1", "e2"])
+    }
+
     @Test func `a series of specials alone still plays`() async throws {
         _ = register(host: "queue-specials.test", replies: [
             "/Shows/s1/Episodes": Self.items([Self.episode("sp1", season: 0, number: 1)]),

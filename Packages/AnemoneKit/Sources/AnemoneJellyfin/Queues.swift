@@ -31,7 +31,8 @@ public extension JellyfinSession {
 
     /// Series Play, like Wholphin's: the episode next up (the one to resume, or the one after the
     /// last watched), or the first episode when there's none, then the episodes after it in
-    /// order across seasons. Specials are left out; Jellyfin's next up never picks one either.
+    /// order across seasons, without the specials. Jellyfin's next up can be a special the server
+    /// places between seasons; Play starts at the regular episode after it instead.
     func seriesQueue(seriesID: MediaItem.ID) async throws -> [ItemDetails] {
         let parameters = Paths.GetNextUpParameters(
             userID: userID,
@@ -40,22 +41,20 @@ public extension JellyfinSession {
             seriesID: seriesID,
             enableUserData: true,
         )
-        let nextUp = try await send(Paths.getNextUp(parameters: parameters)).items?.first?.id
-        return try await episodes(ofSeries: seriesID, from: nextUp)
+        if let nextUp = try await send(Paths.getNextUp(parameters: parameters)).items?.first?.id {
+            let episodes = try await orderedEpisodes(ofSeries: seriesID, from: nextUp).filter { !$0.isSpecial }
+            if !episodes.isEmpty {
+                return episodes
+            }
+        }
+        return try await episodes(ofSeries: seriesID, from: nil)
     }
 
     /// A series' episodes from `episodeID` on, in order across seasons, for playing through: the
     /// specials after it when it's a special, otherwise the regular episodes. From the first
     /// regular episode when `episodeID` is `nil`, or the first special for a series of specials.
     func episodes(ofSeries seriesID: MediaItem.ID, from episodeID: MediaItem.ID?) async throws -> [ItemDetails] {
-        let parameters = Paths.GetEpisodesParameters(
-            userID: userID,
-            fields: Self.queueFields,
-            startItemID: episodeID,
-            limit: Self.queueLimit,
-            enableUserData: true,
-        )
-        let episodes = try await send(Paths.getEpisodes(seriesID: seriesID, parameters: parameters)).items.available
+        let episodes = try await orderedEpisodes(ofSeries: seriesID, from: episodeID)
         // The server starts the list at `episodeID`, wherever it puts the specials.
         let playsSpecials = episodeID != nil && episodes.first?.isSpecial == true
         let played = episodes.filter { $0.isSpecial == playsSpecials }
@@ -123,6 +122,20 @@ public extension JellyfinSession {
 
     /// The player shows the overview in its info panel.
     private static let queueFields: [ItemFields] = [.overview]
+
+    /// The series' episodes from `episodeID` on, specials included where the server puts them.
+    private func orderedEpisodes(ofSeries seriesID: MediaItem.ID, from episodeID: MediaItem.ID?) async throws
+        -> [ItemDetails]
+    {
+        let parameters = Paths.GetEpisodesParameters(
+            userID: userID,
+            fields: Self.queueFields,
+            startItemID: episodeID,
+            limit: Self.queueLimit,
+            enableUserData: true,
+        )
+        return try await send(Paths.getEpisodes(seriesID: seriesID, parameters: parameters)).items.available
+    }
 }
 
 private extension BaseItemDto {
