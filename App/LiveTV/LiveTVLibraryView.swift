@@ -1,5 +1,6 @@
 import AnemoneJellyfin
 import AnemonePlayback
+import AnemoneUI
 import SwiftUI
 
 /// A Live TV library, ported from Wholphin's `CollectionFolderLiveTv`: tabs for the guide, the
@@ -282,7 +283,8 @@ struct LiveTVLibraryView: View {
     }
 }
 
-/// A tab in the row at the top of the page: white when focused, underlined when showing.
+/// A tab in the row at the top of the page: on the theme's light platter when focused, and
+/// underlined in its accent when showing.
 private struct LiveTVTabStyle: ButtonStyle {
     let isSelected: Bool
 
@@ -295,17 +297,26 @@ private struct LiveTVTabStyle: ButtonStyle {
         let isSelected: Bool
 
         @Environment(\.isFocused) private var isFocused
+        @Environment(\.theme) private var theme
+
+        private var textColor: ThemeColor {
+            if isFocused {
+                theme.onFocusedPlatter
+            } else {
+                isSelected ? theme.onBackground : theme.secondaryText
+            }
+        }
 
         var body: some View {
             label
                 .font(.callout.weight(isSelected ? .semibold : .regular))
                 .padding(.horizontal, 24)
                 .padding(.vertical, 10)
-                .foregroundStyle(isFocused ? .black : isSelected ? .primary : .secondary)
-                .background(isFocused ? .white : .clear, in: .capsule)
+                .foregroundStyle(textColor)
+                .background(isFocused ? theme.focusedPlatter.color : .clear, in: .capsule)
                 .overlay(alignment: .bottom) {
                     if isSelected, !isFocused {
-                        Capsule().fill(.primary).frame(height: 3).padding(.horizontal, 24)
+                        Capsule().fill(theme.accent).frame(height: 3).padding(.horizontal, 24)
                     }
                 }
                 .animation(.easeOut(duration: 0.15), value: isFocused)

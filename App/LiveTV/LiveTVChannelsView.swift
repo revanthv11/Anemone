@@ -12,6 +12,7 @@ struct LiveTVChannelsView: View {
     let toggleFavorite: (LiveTVChannel) -> Void
 
     @Environment(BrowseModel.self) private var browse
+    @Environment(\.theme) private var theme
     @State private var channels: [LiveTVChannel]?
     @State private var problem: String?
 
@@ -56,11 +57,11 @@ struct LiveTVChannelsView: View {
                         .multilineTextAlignment(.center)
                 }
                 .frame(width: Self.tileWidth, height: Self.tileWidth * 9 / 16)
-                .background(.white.opacity(0.1))
+                .background(theme.surfaceVariant)
                 .overlay(alignment: .topTrailing) {
                     if channel.isFavorite {
                         Image(systemName: "heart.fill")
-                            .foregroundStyle(.red)
+                            .foregroundStyle(theme.favorite)
                             .padding(14)
                     }
                 }
@@ -75,17 +76,31 @@ struct LiveTVChannelsView: View {
                 }
             }
             .accessibilityIdentifier("channels.card.\(channel.id)")
+            // The channel, then what's on it now and whether it's a favourite: the caption under
+            // the tile isn't focusable, so the tile says it.
             .accessibilityLabel(channel.title)
+            .accessibilityValue(channelValue(channel))
             VStack(alignment: .leading, spacing: 2) {
                 Text(channel.title)
                     .font(.caption)
+                    .foregroundStyle(theme.onBackground)
                     .lineLimit(1)
                 Text(channel.currentProgram?.name ?? " ")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryText)
                     .lineLimit(1)
             }
             .frame(width: Self.tileWidth, alignment: .leading)
+            .accessibilityHidden(true)
+        }
+    }
+
+    private func channelValue(_ channel: LiveTVChannel) -> Text {
+        switch (channel.currentProgram?.name, channel.isFavorite) {
+        case let (program?, true): Text("\(program), favorite")
+        case let (program?, false): Text(program)
+        case (nil, true): Text("Favorite")
+        case (nil, false): Text(verbatim: "")
         }
     }
 

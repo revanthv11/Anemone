@@ -1,4 +1,5 @@
 import AnemoneJellyfin
+import AnemoneUI
 import SwiftUI
 
 /// Wholphin's DVR schedule (`DvrSchedule`): recordings under way, then those scheduled, by day.
@@ -15,6 +16,7 @@ struct LiveTVScheduleView: View {
     let cancelSeries: (LiveTVSeriesTimer) -> Void
 
     @Environment(BrowseModel.self) private var browse
+    @Environment(\.theme) private var theme
     @State private var schedule: LiveTVSchedule?
     @State private var problem: String?
 
@@ -69,8 +71,10 @@ struct LiveTVScheduleView: View {
     private func heading(_ title: String) -> some View {
         Text(title)
             .font(.headline)
+            .foregroundStyle(theme.onBackground)
             .padding(.top, 24)
             .padding(.horizontal, 20)
+            .accessibilityAddTraits(.isHeader)
     }
 
     private func row(_ timer: LiveTVTimer) -> some View {
@@ -85,7 +89,7 @@ struct LiveTVScheduleView: View {
                 isRecording: timer.isInProgress,
             )
         }
-        .buttonStyle(GuideCellStyle(fill: .white.opacity(0.08)))
+        .buttonStyle(GuideCellStyle(fill: .platter))
         .accessibilityIdentifier("schedule.timer.\(timer.id)")
     }
 
@@ -101,7 +105,7 @@ struct LiveTVScheduleView: View {
                 isRecording: true,
             )
         }
-        .buttonStyle(GuideCellStyle(fill: .white.opacity(0.08)))
+        .buttonStyle(GuideCellStyle(fill: .platter))
         .contextMenu {
             if program.timerID != nil {
                 Button("Cancel Recording", systemImage: "xmark.circle") {
@@ -134,7 +138,7 @@ struct LiveTVScheduleView: View {
                 isRecording: false,
             )
         }
-        .buttonStyle(GuideCellStyle(fill: .white.opacity(0.08)))
+        .buttonStyle(GuideCellStyle(fill: .platter))
         .accessibilityIdentifier("schedule.series.\(series.id)")
     }
 
@@ -159,6 +163,7 @@ private struct ScheduleRow: View {
     var body: some View {
         HStack(spacing: 24) {
             if isRecording {
+                // Wholphin's recording red, the same in every theme.
                 Circle()
                     .fill(.red)
                     .frame(width: 16, height: 16)

@@ -1,4 +1,5 @@
 import AnemoneJellyfin
+import AnemoneUI
 import SwiftUI
 
 /// Wholphin's programme dialog (`ProgramDialog`): the programme's details, with Watch Live while
@@ -13,6 +14,7 @@ struct LiveTVProgramSheet: View {
 
     @Environment(BrowseModel.self) private var browse
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.theme) private var theme
     @State private var loaded: LiveTVProgram?
     @State private var problem: String?
     @State private var isWorking = false
@@ -22,6 +24,7 @@ struct LiveTVProgramSheet: View {
         VStack(alignment: .leading, spacing: 20) {
             Text(program.name)
                 .font(.title2.bold())
+                .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("program.title")
             if let subtitle = program.subtitle {
                 Text(subtitle)
@@ -29,7 +32,7 @@ struct LiveTVProgramSheet: View {
             }
             Text([program.timeRange(), program.channelName].compactMap(\.self).joined(separator: " · "))
                 .font(.callout)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.secondaryText)
             if let overview = program.overview {
                 Text(overview)
                     .font(.callout)

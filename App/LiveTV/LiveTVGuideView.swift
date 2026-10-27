@@ -35,6 +35,7 @@ struct LiveTVGuideView: View {
 
     @AppStorage(Preferences.liveTVShowsDetails) private var showsDetails
     @AppStorage(Preferences.liveTVColorCodesPrograms) private var colorCodes
+    @Environment(\.theme) private var theme
     @FocusState private var focus: Focus?
     @State private var focusedProgram: LiveTVProgram?
 
@@ -102,7 +103,7 @@ struct LiveTVGuideView: View {
             HStack(spacing: 0) {
                 if model.rows[channel.id] != nil {
                     ForEach(model.cells(on: channel.id)) { cell in
-                        LiveTVProgramCell(cell: cell, colorCodes: colorCodes) {
+                        LiveTVProgramCell(cell: cell, channel: channel.title, colorCodes: colorCodes) {
                             selectProgram(cell.program)
                         }
                         .frame(width: CGFloat(cell.length / model.window.duration) * stripWidth)
@@ -117,19 +118,20 @@ struct LiveTVGuideView: View {
         }
     }
 
-    /// Wholphin's current-time marker, moved along once a minute.
+    /// Wholphin's current-time marker, in its tertiary colour, moved along once a minute.
     private func nowLine(stripWidth: CGFloat) -> some View {
         TimelineView(.everyMinute) { context in
             let window = model.window
             if window.contains(context.date) {
                 Rectangle()
-                    .fill(.tint)
+                    .fill(theme.highlight)
                     .frame(width: 3)
                     .offset(
                         x: LiveTVLayout.channelWidth + LiveTVLayout.columnSpacing
                             + CGFloat(context.date.timeIntervalSince(window.start) / window.duration) * stripWidth,
                     )
                     .allowsHitTesting(false)
+                    .accessibilityHidden(true)
             }
         }
     }

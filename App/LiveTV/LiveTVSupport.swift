@@ -111,21 +111,6 @@ extension LiveTVProgram {
         }
     }
 
-    /// What VoiceOver and UI tests read for a programme.
-    var accessibilityText: String {
-        var parts = [name]
-        if let subtitle {
-            parts.append(subtitle)
-        }
-        parts.append(timeRange())
-        if isSeriesRecording {
-            parts.append("Series recording")
-        } else if isRecording {
-            parts.append("Recording")
-        }
-        return parts.joined(separator: ", ")
-    }
-
     var isRecording: Bool {
         timerID != nil
     }
@@ -135,7 +120,8 @@ extension LiveTVProgram {
     }
 }
 
-/// Wholphin's recording marker: a red dot for a recording, two for a series.
+/// Wholphin's recording marker: a red dot for a recording, two for a series. The red is
+/// Wholphin's `Color.Red`, the same in every theme.
 struct RecordingMarker: View {
     let program: LiveTVProgram
 
@@ -148,7 +134,8 @@ struct RecordingMarker: View {
                 }
             }
             .padding(4)
-            .accessibilityHidden(true)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(program.isSeriesRecording ? "Series recording" : "Recording")
         }
     }
 }
