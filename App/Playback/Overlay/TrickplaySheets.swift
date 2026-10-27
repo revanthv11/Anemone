@@ -1,4 +1,5 @@
 import AnemoneJellyfin
+import AnemoneUI
 import CoreGraphics
 import Foundation
 import ImageIO
@@ -78,6 +79,8 @@ struct SeekPreview: View {
     let position: Duration
     let sheets: TrickplaySheets?
 
+    @Environment(\.theme) private var theme
+
     private static let width: CGFloat = 384
 
     var body: some View {
@@ -96,10 +99,11 @@ struct SeekPreview: View {
                 .frame(width: Self.width, height: Self.width * CGFloat(trickplay.height) / CGFloat(trickplay.width))
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .overlay {
+                    // Wholphin's border round the thumbnail, in the focus colour.
                     RoundedRectangle(cornerRadius: 10)
-                        .strokeBorder(.white.opacity(0.85), lineWidth: 2)
+                        .strokeBorder(theme.focusRing, lineWidth: 2)
                 }
-                .shadow(color: .black.opacity(0.5), radius: 12, y: 6)
+                .shadow(color: theme.scrim.withAlpha(0.5).color, radius: 12, y: 6)
                 .task(id: tile.sheet) {
                     sheets.load(tile.sheet)
                     // The next sheet too, since seeking mostly goes forward.
@@ -109,9 +113,10 @@ struct SeekPreview: View {
             }
             Text(position.clockText)
                 .font(.callout.monospacedDigit())
+                .foregroundStyle(theme.onSurface)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 4)
-                .background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 6))
+                .background(theme.scrim.withAlpha(0.6), in: RoundedRectangle(cornerRadius: 6))
         }
         .fixedSize()
     }

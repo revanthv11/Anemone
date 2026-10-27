@@ -7,6 +7,7 @@ import SwiftUI
 struct PlayerCardView: View {
     let card: PlayerCard
 
+    @Environment(\.theme) private var theme
     @FocusState private var focusedAction: PlayerAction.ID?
 
     var body: some View {
@@ -15,13 +16,16 @@ struct PlayerCardView: View {
                 ArtworkImage(url: imageURL)
                     .frame(width: 320, height: 180)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .accessibilityHidden(true)
             }
             VStack(alignment: .leading, spacing: 12) {
                 Text(card.title)
                     .font(.title3.bold())
+                    .foregroundStyle(theme.onSurface)
+                    .accessibilityAddTraits(.isHeader)
                 if let message = card.message {
                     Text(message)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.secondaryText)
                 }
                 HStack(spacing: 24) {
                     ForEach(card.actions) { action in
@@ -40,8 +44,11 @@ struct PlayerCardView: View {
         .onAppear {
             focusedAction = card.actions.first?.id
         }
-        // A container, so its buttons keep their own identifiers.
+        // A container, so its buttons keep their own identifiers. Named by its title, which
+        // VoiceOver reads as focus moves into it, with the message, before the button focused.
         .accessibilityElement(children: .contain)
+        .accessibilityLabel(card.title)
+        .accessibilityValue(card.message ?? "")
         .accessibilityIdentifier("player.card")
     }
 }

@@ -19,22 +19,28 @@ struct ChapterRow: View {
     }
 
     var body: some View {
+        let playingChapter = chapters.chapter(at: playing)?.id
         // Not lazy, so a late chapter's card is there for focus to move to as the row opens.
         // Videos have few chapters.
         OverlayRow(title: "Chapters", isLazy: false) {
             ForEach(chapters) { chapter in
+                let title = chapter.name ?? "Chapter \(chapter.index + 1)"
                 Button {
                     choose(chapter)
                 } label: {
                     OverlayCard(
                         imageURL: session.imageURL(for: chapter, maxWidth: 480),
                         placeholder: "film",
-                        title: chapter.name ?? "Chapter \(chapter.index + 1)",
+                        title: title,
                         detail: chapter.start.clockText,
                     )
                 }
                 .buttonStyle(.card)
                 .focused(focus, equals: .chapter(chapter.id))
+                // The chapter and where it starts; the one playing reads as selected.
+                .accessibilityLabel(title)
+                .accessibilityValue(Text("Starts at \(chapter.start.spokenTime)"))
+                .accessibilityAddTraits(chapter.id == playingChapter ? .isSelected : [])
                 .accessibilityIdentifier("player.chapter.\(chapter.id)")
             }
         }
@@ -64,6 +70,8 @@ struct QueueRow: View {
                 }
                 .buttonStyle(.card)
                 .focused(focus, equals: .queueEntry(index))
+                .accessibilityLabel(entry.metadata.title)
+                .accessibilityValue(entry.metadata.subtitle ?? "")
                 .accessibilityIdentifier("player.queue.\(index)")
             }
         }
@@ -78,10 +86,14 @@ private struct OverlayRow<Cards: View>: View {
     var isLazy = true
     @ViewBuilder let cards: () -> Cards
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
                 .font(.headline)
+                .foregroundStyle(theme.onBackground)
+                .accessibilityAddTraits(.isHeader)
             ScrollView(.horizontal) {
                 Group {
                     if isLazy {
@@ -107,29 +119,34 @@ private struct OverlayCard: View {
     let title: String
     let detail: String?
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            Color.white.opacity(0.1)
+            theme.surfaceVariant.color
             Image(systemName: placeholder)
                 .font(.title)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(theme.onSurfaceVariant)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .accessibilityHidden(true)
             ArtworkImage(url: imageURL)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.callout.weight(.semibold))
+                    .foregroundStyle(theme.onBackground)
                     .lineLimit(1)
                 if let detail {
                     Text(detail)
                         .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.secondaryText)
                         .lineLimit(1)
                 }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.black.opacity(0.55))
+            .background(theme.scrim.withAlpha(0.55))
         }
         .frame(width: 320, height: 180)
     }

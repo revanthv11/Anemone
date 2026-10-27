@@ -1,5 +1,6 @@
 import AnemoneJellyfin
 import AnemonePlayback
+import AnemoneUI
 import SwiftUI
 
 /// How the stream is being played, for Settings › Playback › Player Controls › Show debug info.
@@ -11,6 +12,7 @@ struct OverlayDebugPanel: View {
     let overlay: PlayerOverlay
     let details: PlaybackDetails?
 
+    @Environment(\.theme) private var theme
     @State private var tracks: [PlayerTrack] = []
 
     var body: some View {
@@ -18,15 +20,18 @@ struct OverlayDebugPanel: View {
             ForEach(rows, id: \.0) { name, value in
                 HStack(alignment: .firstTextBaseline, spacing: 16) {
                     Text(name)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.secondaryText)
                         .frame(width: 220, alignment: .leading)
                     Text(value)
+                        .foregroundStyle(theme.onSurface)
                 }
+                // Each line reads as its name and value.
+                .accessibilityElement(children: .combine)
             }
         }
         .font(.caption2.monospacedDigit())
         .padding(24)
-        .background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 16))
+        .background(theme.surface.withAlpha(0.6), in: RoundedRectangle(cornerRadius: 16))
         .accessibilityIdentifier("player.debug")
         .task(id: details?.trackChanges) {
             tracks = await playback.engine.tracks(.audio) + playback.engine.tracks(.subtitle)
