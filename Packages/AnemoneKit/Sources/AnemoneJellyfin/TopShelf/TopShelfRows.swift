@@ -62,29 +62,34 @@ public extension TopShelfOptions {
 
 public extension JellyfinSession {
     /// Continue Watching, then Next Up, as Wholphin's `TvProviderWorker.getPotentialItems` picks
-    /// them: Next Up leaves out the series already in Continue Watching, and the series taken
-    /// out of Next Up, like Home's row. Read-only: nothing on the server changes. Empty rows are
-    /// left out.
+    /// them: Next Up keeps only episodes of a series, leaving out the series already in Continue
+    /// Watching, and the series taken out of Next Up, like Home's row. Read-only: nothing on the
+    /// server changes. Empty rows are left out.
     ///
     /// - Throws: `SessionError.signedOut` when the token was revoked, or when either row fails.
     func topShelfRows(options: TopShelfOptions = TopShelfOptions(), now: Date = .now) async throws -> [TopShelfRow] {
-        // A failed read shows every series, as if none were removed, as on Home.
-        async let removedResult = attempt { try await removedFromNextUp() }
-        async let resumeResult = resumeEntries(limit: options.limit)
-        let removed = await (try? removedResult.get()) ?? RemovedFromNextUp()
         let homeOptions = HomeOptions(
             itemsPerRow: options.limit,
             enableRewatchingNextUp: options.enableRewatchingNextUp,
             maxDaysNextUp: options.maxDaysNextUp,
         )
-        let context = HomeRowContext(libraries: [], options: homeOptions, removed: removed)
-        async let nextUpResult = nextUpEntries(context: context, now: now)
+        // All three at once: the series taken out of Next Up are left out after it's fetched,
+        // rather than Next Up waiting for them.
+        let everySeries = HomeRowContext(libraries: [], options: homeOptions, removed: RemovedFromNextUp())
+        async let removedResult = attempt { try await removedFromNextUp() }
+        async let resumeResult = resumeEntries(limit: options.limit)
+        async let nextUpResult = nextUpEntries(context: everySeries, now: now)
 
         let resume = try await resumeResult.map(\.item)
+        let nextUpFound = try await nextUpResult
+        // A failed read shows every series, as if none were removed, as on Home.
+        let removed = await (try? removedResult.get()) ?? RemovedFromNextUp()
         let inProgress = Set(resume.compactMap(\.episode?.seriesID))
-        let nextUp = try await nextUpResult.map(\.item).filter { item in
-            item.episode?.seriesID.map { !inProgress.contains($0) } ?? true
+        let nextUp = nextUpFound.filter { entry in
+            guard let seriesID = entry.item.episode?.seriesID else { return false }
+            return !inProgress.contains(seriesID) && removed.allows(seriesID: seriesID, lastPlayed: entry.lastPlayed)
         }
+        .map(\.item)
         return [
             TopShelfRow(kind: .continueWatching, items: resume),
             TopShelfRow(kind: .nextUp, items: nextUp),
