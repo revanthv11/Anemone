@@ -25,6 +25,7 @@ struct HomeView: View {
                 // Home is the stack's root, which `itemPages(in:)` doesn't reach.
                 .environment(\.pageStack, stack)
                 .itemPages(in: stack)
+                .deepLinkPages(in: stack)
                 .navigationDestination(for: HomeItemsLink.self) { link in
                     HomeItemsPage(link: link)
                         .environment(\.pageStack, stack)

@@ -10,6 +10,10 @@ public extension PlaybackController {
             UpNext(),
             PlaybackDetails(session: session),
             LiveStreamClosing(session: session),
+            NowPlaying(),
+            SkipBackOnResume(),
+            PlaybackLifecycle(),
+            DisplayCriteriaMatching(),
         ]
     }
 }

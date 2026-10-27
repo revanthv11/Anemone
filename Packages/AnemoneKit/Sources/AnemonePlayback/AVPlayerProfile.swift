@@ -1,3 +1,4 @@
+import AnemoneCore
 import CoreMedia
 import JellyfinAPI
 import VideoToolbox
@@ -33,6 +34,11 @@ public struct VideoDecoders: Hashable, Sendable {
 public enum AVPlayerProfile {
     /// Wholphin's default limit, 100 Mbit/s.
     public static let defaultMaxBitrate = 100_000_000
+
+    /// The limit the user set (Settings › Playback › Streaming and Display), which PlaybackInfo asks for.
+    public static var maxBitrate: Int {
+        Preferences.maxBitrate.value()
+    }
 
     /// The profile for this device. Built once, since the decoders don't change while the app runs.
     public static let current = deviceProfile()
@@ -197,4 +203,16 @@ public enum AVPlayerProfile {
     private static func rangeList(_ ranges: [VideoRangeType]) -> String {
         ranges.map(\.rawValue).joined(separator: "|")
     }
+}
+
+/// Wholphin's `maxBitrate` setting: the server keeps a stream under it, transcoding what's above.
+public extension Preferences {
+    static let maxBitrate = Preference("maxBitrate", default: AVPlayerProfile.defaultMaxBitrate)
+}
+
+public extension AVPlayerProfile {
+    /// Wholphin's choices for the limit, from 500 kbit/s to 200 Mbit/s, counted in the decimal
+    /// megabits Jellyfin's own clients use, as `defaultMaxBitrate` is.
+    static let bitrateChoices: [Int] = [500_000, 750_000]
+        + [1, 2, 3, 5, 8, 10, 15, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200].map { $0 * 1_000_000 }
 }
