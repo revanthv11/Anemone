@@ -203,8 +203,13 @@ struct PhotosAndThemesTests {
         #expect(first["includeItemTypes"] == "Photo")
         #expect(first["enableImages"] == "false")
         let pages = requests.dropFirst()
-        #expect(pages.map { $0["ids"]?.split(separator: ",").count } == [100, 100, 50])
-        #expect(pages.flatMap { $0["ids"]?.split(separator: ",").map(String.init) ?? [] } == shown)
+        let pageIDs: [[String]] = pages.map { page in
+            let ids = page["ids"] ?? ""
+            return ids.split(separator: ",").map(String.init)
+        }
+        #expect(pageIDs.map(\.count) == [100, 100, 50])
+        let askedFor: [String] = pageIDs.flatMap(\.self)
+        #expect(askedFor == shown)
         #expect(pages.allSatisfy { $0["fields"] == "Overview,Width,Height,DateCreated" })
     }
 
