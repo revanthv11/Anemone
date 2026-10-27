@@ -107,7 +107,8 @@ Apart from Settings, now a list with a page for each part of the app, nothing vi
 ### Phase 1: foundation
 
 - [x] Add a server by URL: HTTPS first, then Jellyfin's default port; reverse-proxy paths kept; Jellyfin 12+ and finished-setup checks
-- [ ] Server discovery (waits on the multicast spike)
+- [x] Server discovery in AnemoneJellyfin: `ServerDiscovery` sends Jellyfin's "who is JellyfinServer?" to UDP port 7359 at each network's broadcast address and 255.255.255.255, then for 5 s lists each server that answers, once, from its JSON reply (id, name and address). BSD sockets, since a Network.framework connection only hears from the address it sends to; the port and addresses can be set, so tests answer on 127.0.0.1
+- [ ] Discovered servers on the add-server screen: waits on Apple's multicast entitlement and the multicast spike
 - [x] Sign in with a password or Quick Connect
 - [x] Multiple servers and profiles; switching protected by a hashed PIN or by requiring sign-in
 - [x] Everything stored in one Keychain item; last profile restored on launch unless it's locked
@@ -116,6 +117,10 @@ Apart from Settings, now a list with a page for each part of the app, nothing vi
 Tested live against the Jellyfin 12.3 demo server (adding the server, the profile list, getting a Quick Connect code) and against the maintainer's own Jellyfin 12.2 server: password sign-in, session restore, PIN lock and unlock, a locked profile not being restored on launch, and sign-out.
 
 tvOS ignores `.keyboardType(.numberPad)`, so PIN entry uses the full on-screen keyboard. A custom PIN pad is an idea for later.
+
+Server discovery is tested only by unit tests on macOS, against a stand-in server on 127.0.0.1 at a port the system picks: the probe's text, a reply becoming a server, a server answering twice listed once, stray datagrams ignored, a nameless server going by its host, the search ending on time, stopping early closing its socket, and which interfaces' broadcast addresses are used. Not verified: a real Jellyfin server answering a broadcast, and anything on Apple TV. Nothing in the app calls it yet.
+
+Not yet: the multicast entitlement (`com.apple.developer.networking.multicast`), which iOS needs to send a broadcast and tvOS may too (the multicast spike checks on hardware). It's a user and Apple step: the maintainer asks Apple for it (developer.apple.com/contact/request/networking-multicast), then it goes in the app's entitlements and provisioning profile. After that, a "found nearby" list on the add-server screen, each server added through `ServerConnector` like a typed address, as Wholphin's server list does.
 
 ### Phase 2: browsing
 
