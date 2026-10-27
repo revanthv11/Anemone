@@ -5,10 +5,10 @@ struct PlaybackSettingsPage: View {
     var body: some View {
         List {
             // One `NavigationLink` per page goes here, such as Autoplay or Skip Segments.
-            Text("Playback settings arrive later in Phase 3.")
-                .foregroundStyle(.secondary)
-                // Gives focus somewhere to rest, so Menu goes back to Settings.
-                .focusable()
+            NavigationLink("Skip Segments") {
+                SegmentSettingsPage()
+            }
+            .accessibilityIdentifier("settings.skipSegments")
         }
         .navigationTitle("Playback")
     }
