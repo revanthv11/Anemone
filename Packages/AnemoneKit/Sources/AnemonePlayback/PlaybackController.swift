@@ -29,6 +29,9 @@ public final class PlaybackController: Identifiable {
     /// down, then plays the next entry or calls `finish()`.
     public var closesAtEnd = true
     public let engine: any PlayerEngine
+    /// Whether the player closed. Nothing plays after that, so features can stop what they're
+    /// doing when they hear `stopped`.
+    @ObservationIgnored public private(set) var isStopped = false
 
     public var hasEnded: Bool {
         if case .ended = state {
@@ -40,6 +43,9 @@ public final class PlaybackController: Identifiable {
 
     @ObservationIgnored private let features: [any PlaybackFeature]
     @ObservationIgnored private let loadStream: StreamLoader
+    /// Finds the rest of the queue once the first entry is loading; see `PlaybackRequest`.
+    @ObservationIgnored private var following: PlaybackRequest.Following?
+    @ObservationIgnored private var followingLoad: Task<Void, Never>?
     /// How often features hear where playback is.
     @ObservationIgnored private let positionInterval: Duration
     /// What's loaded in the engine.
@@ -56,7 +62,6 @@ public final class PlaybackController: Identifiable {
     @ObservationIgnored private var isUnderWay = false
     @ObservationIgnored private var wasPaused = false
     @ObservationIgnored private var hasStarted = false
-    @ObservationIgnored private var isStopped = false
 
     /// A player for `request` on `session`'s server, with the features every player gets.
     public convenience init(session: JellyfinSession, request: PlaybackRequest) {
@@ -90,6 +95,7 @@ public final class PlaybackController: Identifiable {
             queue.shuffle()
         }
         self.queue = queue
+        following = request.following
         self.engine = engine
         self.features = features
         self.positionInterval = positionInterval
@@ -101,6 +107,7 @@ public final class PlaybackController: Identifiable {
     public func start() async {
         guard !hasStarted else { return }
         hasStarted = true
+        loadFollowing()
         await load(allowsDirect: true, from: queue.current.startPosition, as: beginLoad())
     }
 
@@ -110,6 +117,7 @@ public final class PlaybackController: Identifiable {
         guard !isStopped else { return }
         isStopped = true
         let position = currentPosition
+        followingLoad?.cancel()
         stopWatching()
         engine.stop()
         await endSession(at: position)
@@ -137,8 +145,11 @@ public final class PlaybackController: Identifiable {
     }
 
     /// Closes the player, as at the end of the queue; for features such as pass-out protection.
+    /// Features hear nothing more about where playback is, and the session ends as the player
+    /// closes.
     public func finish() {
         guard !isStopped else { return }
+        stopWatching()
         engine.pause()
         state = .ended
     }
@@ -147,6 +158,17 @@ public final class PlaybackController: Identifiable {
     /// the segments feature where the credits start.
     public func feature<Feature: PlaybackFeature>(_: Feature.Type) -> Feature? {
         features.lazy.compactMap { $0 as? Feature }.first
+    }
+
+    /// Adds what the request's `following` finds to the end of the queue. A failure leaves the
+    /// queue as it is, so the player closes after the entries it has.
+    private func loadFollowing() {
+        guard let following else { return }
+        self.following = nil
+        followingLoad = Task { [weak self] in
+            guard let entries = try? await following(), !entries.isEmpty, !Task.isCancelled else { return }
+            self?.queue.append(entries)
+        }
     }
 
     private func beginLoad() -> Int {
@@ -193,6 +215,8 @@ public final class PlaybackController: Identifiable {
             return
         }
         let position = currentPosition
+        // Nothing plays until the transcode is ready and at the position, as when an entry loads.
+        engine.pause()
         state = .loading
         let retry = beginLoad()
         // The failed session ends before the transcode's starts.
@@ -260,6 +284,10 @@ private extension PlaybackController {
                     switch event {
                     case .ready:
                         ready()
+                        // An engine already playing when the stream loaded doesn't report it again.
+                        if status == .playing {
+                            await changed(to: .playing)
+                        }
                     case let .status(status):
                         await changed(to: status)
                     case .ended:
@@ -282,11 +310,12 @@ private extension PlaybackController {
     }
 
     /// Like Wholphin: playback counts as started once it's under way, and after that, pausing
-    /// and resuming are worth telling features about.
+    /// and resuming are worth telling features about. Not before the stream is ready: until then
+    /// it may still be on its way to the start position.
     func changed(to status: PlayerStatus) async {
         self.status = status
         guard isUnderWay else {
-            guard status == .playing else { return }
+            guard status == .playing, case .playing = state else { return }
             isUnderWay = true
             await publish(.started(progress))
             // Unless the stream was replaced meanwhile.

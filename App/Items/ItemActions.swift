@@ -64,16 +64,6 @@ struct PlaybackButtons: View {
     }
 }
 
-/// Marks Play and Shuffle on series, collections and playlists as not wired up yet: they need a
-/// queue, which comes later in Phase 3.
-struct PlaybackNotWiredNote: View {
-    var body: some View {
-        Label("Play and Shuffle here aren't wired up yet (later in Phase 3)", systemImage: "info.circle")
-            .font(.caption)
-            .foregroundStyle(.secondary)
-    }
-}
-
 /// Mark watched or unwatched.
 struct PlayedButton: View {
     let isPlayed: Bool
@@ -107,27 +97,25 @@ struct FavoriteButton: View {
 
 /// What an item page's alert says.
 enum ItemAlert: Hashable {
-    /// Play or Shuffle for a series, collection or playlist, which needs a queue.
-    case queueUnavailable
     /// Music plays in Phase 5.
     case musicUnavailable
+    /// Play or Shuffle found nothing the player can play, and why.
+    case nothingToPlay(String)
     case failed(String)
 
     var title: String {
         switch self {
-        case .queueUnavailable, .musicUnavailable: "Playback isn't available yet"
+        case .musicUnavailable: "Playback isn't available yet"
+        case .nothingToPlay: "Nothing to play"
         case .failed: "Something went wrong"
         }
     }
 
     var message: String {
         switch self {
-        case .queueUnavailable:
-            "Playing a whole series, collection or playlist comes later in Phase 3. "
-                + "Play an item from its own page for now."
         case .musicUnavailable:
             "Music plays in Phase 5."
-        case let .failed(message):
+        case let .nothingToPlay(message), let .failed(message):
             message
         }
     }

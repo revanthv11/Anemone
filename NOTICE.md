@@ -10,13 +10,13 @@ Anemone is a modified version of [Wholphin](https://github.com/damontecres/Wholp
 
 Anemone is a Swift rewrite for tvOS. Behaviour, data models, and logic are ported from Wholphin; the Kotlin source is not included.
 
-**Parity baseline:** [`damontecres/Wholphin@52c26bc`](https://github.com/damontecres/Wholphin/commit/52c26bc0fcb46c11b2023d2e475bd7b17fc7939a) (2026-10-25). Upstream changes after this commit have not been reviewed for porting.
+**Parity baseline:** [`damontecres/Wholphin@52c26bc`](https://github.com/damontecres/Wholphin/commit/52c26bc0fcb46c11b2023d2e475bd7b17fc7939a) (2026-10-25). Upstream changes after this commit have not been reviewed for porting, except those listed in `docs/upstream/`. The companion plugin client (`ServerPlugin.swift`) follows Wholphin's `ServerPluginApi` at `cecfdae`.
 
 Some of Wholphin's device profile code is adapted from the official [jellyfin-androidtv](https://github.com/jellyfin/jellyfin-androidtv) client (GPL-2.0). Any of it that is ported keeps that attribution.
 
 ## Swiftfin
 
-Anemone's AVPlayer device profile, and the checks it makes on the server's media segments, are adapted from [Swiftfin](https://github.com/jellyfin/Swiftfin), the official Jellyfin client for Apple platforms.
+Anemone's AVPlayer device profile, the checks it makes on the server's media segments, and the link that opens a YouTube trailer in the YouTube app are adapted from [Swiftfin](https://github.com/jellyfin/Swiftfin), the official Jellyfin client for Apple platforms.
 
 - Copyright (c) Jellyfin & Jellyfin Contributors
 - Licensed under the Mozilla Public License, version 2.0, which allows combining it into this GPL-3.0 work

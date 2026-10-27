@@ -38,6 +38,9 @@ public final class AVPlayerEngine: PlayerEngine {
         #if os(tvOS) || os(iOS)
             item.externalMetadata = metadata.avMetadata
         #endif
+        // AVPlayer keeps its rate across items, so after a stream that failed while playing, the
+        // next would start from 0 before it's ready and at its position.
+        player.pause()
         player.replaceCurrentItem(with: item)
         let (stream, events) = AsyncStream.makeStream(of: PlayerEvent.self)
         self.events = events

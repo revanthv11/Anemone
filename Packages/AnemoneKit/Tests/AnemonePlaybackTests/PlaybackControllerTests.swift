@@ -135,6 +135,73 @@ struct PlaybackControllerTests {
         #expect(log.events.suffix(3) == ["failed", "stopped 45.0 seconds", "loaded m1 transcode"])
     }
 
+    @Test func `a transcode retry isn't under way until it's ready at its position`() async throws {
+        let playback = try controller()
+        await play(playback)
+        engine.currentTime = .seconds(45)
+        #expect(engine.isPlaying)
+
+        engine.send(.failed(PlayerError.streamFailed(underlying: nil)))
+        #expect(await eventually { engine.loads.count == 2 })
+        #expect(!engine.isPlaying)
+        // An engine that plays the new stream before it's ready, as AVPlayer did when it was
+        // still playing after the failure.
+        engine.send(.status(.playing))
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(log.events.last == "loaded m1 transcode")
+
+        engine.send(.ready)
+
+        #expect(await eventually { log.events.last == "started 45.0 seconds" })
+        #expect(log.events.count(where: { $0.hasPrefix("started") }) == 2)
+    }
+
+    @Test func `finishing stops telling features where playback is`() async throws {
+        let playback = try controller()
+        await play(playback)
+        #expect(await eventually { log.events.contains("position") })
+
+        playback.finish()
+        let positions = log.events.count(where: { $0 == "position" })
+        try await Task.sleep(for: .milliseconds(100))
+
+        #expect(playback.hasEnded)
+        #expect(!engine.isPlaying)
+        #expect(log.events.count(where: { $0 == "position" }) == positions)
+    }
+
+    @Test func `the rest of the queue is added once the first entry is loading`() async {
+        let playback = PlaybackController(
+            request: PlaybackRequest(.item("e1")) { [.item("e2"), .item("e3")] },
+            engine: engine,
+            features: [log],
+            positionInterval: .milliseconds(10),
+            loadStream: FakeStreams().load,
+        )
+
+        await playback.start()
+
+        #expect(await eventually { playback.queue.entries.count == 3 })
+        #expect(playback.queue.current.itemID == "e1")
+        #expect(playback.queue.next?.itemID == "e2")
+    }
+
+    @Test func `when the rest of the queue can't be found, the queue stays as it is`() async throws {
+        let playback = PlaybackController(
+            request: PlaybackRequest(.item("e1")) { throw PlaybackError.nothingToPlay },
+            engine: engine,
+            features: [log],
+            positionInterval: .milliseconds(10),
+            loadStream: FakeStreams().load,
+        )
+
+        await play(playback)
+        try await Task.sleep(for: .milliseconds(50))
+
+        #expect(playback.queue.entries.map(\.itemID) == ["e1"])
+        #expect(playback.state.isPlaying)
+    }
+
     @Test func `a transcode that fails shows the error`() async throws {
         let playback = try controller()
         await play(playback)

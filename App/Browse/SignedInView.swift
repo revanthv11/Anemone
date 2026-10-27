@@ -33,7 +33,7 @@ struct SignedInView: View {
                 HomeView(isSelected: selection == .home)
             }
             Tab("Search", systemImage: "magnifyingglass", value: Destination.search, role: .search) {
-                PlaceholderPage(title: "Search", message: "Search arrives later in Phase 2.")
+                SearchTab(server: server, user: user)
             }
             if FavoritesPage.isAvailable {
                 Tab("Favorites", systemImage: "heart", value: Destination.favorites) {

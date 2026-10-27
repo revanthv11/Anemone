@@ -1,4 +1,5 @@
 import AnemoneJellyfin
+import AnemonePlayback
 import AnemoneUI
 import SwiftUI
 
@@ -11,13 +12,18 @@ struct CollectionPage: View {
     @Environment(BrowseModel.self) private var browse
     @FocusState private var focus: ItemFocus?
     @State private var memory = RowMemory()
-    @State private var sections: [CollectionSection]?
+    /// In the order the sort asks for.
+    @State private var items: [ItemDetails]?
     @State private var problem: String?
     @State private var alert: ItemAlert?
+    @State private var playback: PlaybackRequest?
     /// The card the header describes; `nil` for the collection itself.
     @State private var focusedEntry: ItemDetails?
     /// Follows `focusedEntry` after a pause, like the home page's backdrop.
     @State private var backdropEntry: ItemDetails?
+    @State private var canDelete = false
+    /// `nil` until read from storage.
+    @State private var display: CollectionDisplay?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -50,11 +56,14 @@ struct CollectionPage: View {
         }
         .initialFocus($focus, .action(.play))
         .itemAlert($alert)
+        .player($playback) {
+            await loadItems()
+        }
         .onChange(of: focus) { _, focus in
             memory.note(focus)
             switch focus {
-            case let .card(row, item)?:
-                focusedEntry = entry(row: row, item: item)
+            case let .card(_, item)?:
+                focusedEntry = entry(item)
             case .some:
                 focusedEntry = nil
             case nil:
@@ -66,16 +75,43 @@ struct CollectionPage: View {
             guard !Task.isCancelled else { return }
             backdropEntry = focusedEntry
         }
-        .pageTask(id: collection.id) {
-            do {
-                sections = try await browse.session.collectionSections(id: collection.id)
-                problem = nil
-            } catch {
-                // A failed refresh keeps the rows already showing.
-                let message = browse.problem(with: error, doing: "load what's in \(collection.item.name)")
-                if sections == nil {
-                    problem = message
-                }
+        // Of the extras other pages load, this one shows only Delete.
+        .task(id: collection.id) {
+            let session = browse.session
+            let id = collection.id
+            canDelete = await browse.optional(attempt { try await session.canDelete(id: id) }) ?? false
+        }
+        .collectionDisplay($display, for: collection.id)
+        // Runs again when the sort or filter changes.
+        .pageTask(id: display?.query) {
+            await loadItems()
+        }
+    }
+
+    private func loadItems() async {
+        guard let query = display?.query else { return }
+        do {
+            items = try await browse.session.collectionItems(
+                id: collection.id,
+                sort: query.sort,
+                filter: query.filter,
+            )
+            problem = nil
+        } catch {
+            // A failed refresh keeps the rows already showing.
+            let message = browse.problem(with: error, doing: "load what's in \(collection.item.name)")
+            if items == nil {
+                problem = message
+            }
+        }
+    }
+
+    /// In the order and with the filters the page shows, as Wholphin's Play All takes them.
+    private func play(shuffled: Bool) {
+        let order = display.map { (sort: $0.sort, filter: $0.filter) }
+        Task {
+            await browse.playQueue(of: collection, shuffled: shuffled, order: order) { playback = $0 } failed: {
+                alert = $0
             }
         }
     }
@@ -104,24 +140,25 @@ struct CollectionPage: View {
         .frame(maxWidth: ItemLayout.textWidth, alignment: .leading)
     }
 
-    /// Wholphin's `CollectionButtons`, without sorting, filters and view options.
+    /// Wholphin's `CollectionButtons`.
     private var buttons: some View {
         HStack(spacing: 24) {
             ActionButton(title: "Play", systemImage: "play.fill") {
-                alert = .queueUnavailable
+                play(shuffled: false)
             }
             .focused($focus, equals: .action(.play))
             .accessibilityIdentifier("action.play")
             ActionButton(title: "Shuffle", systemImage: "shuffle") {
-                alert = .queueUnavailable
+                play(shuffled: true)
             }
             .focused($focus, equals: .action(.shuffle))
+            .accessibilityIdentifier("action.shuffle")
             FavoriteButton(isFavorite: collection.userState.isFavorite) {
                 Task { await setFavorite(!collection.userState.isFavorite) }
             }
             .focused($focus, equals: .action(.favorite))
-            PlaybackNotWiredNote()
-                .padding(.leading, 16)
+            DeleteButton(item: collection, canDelete: canDelete).focused($focus, equals: .action(.delete))
+            CollectionOptionsButtons(collection: collection, display: $display, focus: $focus)
         }
         .padding(.vertical, 20)
         .focusSection()
@@ -129,19 +166,27 @@ struct CollectionPage: View {
 
     @ViewBuilder
     private var rows: some View {
-        if let sections {
-            if sections.isEmpty {
-                Text("There's nothing in this collection yet.")
+        if let items, let display {
+            let typeRows = display.separateTypes ? CollectionSection.sections(items) : nil
+            // The rows leave out types without a row, so a collection of only those says this too.
+            if typeRows?.isEmpty ?? items.isEmpty {
+                Text(display.filter.isEmpty
+                    ? "There's nothing in this collection yet."
+                    : "Nothing in this collection matches the filters.")
                     .foregroundStyle(.secondary)
             }
-            ForEach(sections) { section in
-                ItemRow(
-                    id: section.rowID,
-                    title: section.title,
-                    items: section.items,
-                    focus: $focus,
-                    memory: memory,
-                )
+            if let typeRows {
+                ForEach(typeRows) { section in
+                    ItemRow(
+                        id: section.rowID,
+                        title: section.title,
+                        items: section.items,
+                        focus: $focus,
+                        memory: memory,
+                    )
+                }
+            } else {
+                CollectionGrid(items: items, options: display.gridOptions, focus: $focus)
             }
         } else if let problem {
             NoticeText(problem)
@@ -151,8 +196,9 @@ struct CollectionPage: View {
         }
     }
 
-    private func entry(row: String, item: String) -> ItemDetails? {
-        sections?.first { $0.rowID == row }?.items.first { $0.id == item }
+    /// Each item shows once, in its row or in the grid.
+    private func entry(_ item: String) -> ItemDetails? {
+        items?.first { $0.id == item }
     }
 
     private func setFavorite(_ isFavorite: Bool) async {
