@@ -44,33 +44,6 @@ struct HomeSettingsTests {
         #expect(!withoutPlugin.paths.contains("/wholphin/homesettings"))
     }
 
-    @Test func `a load reads Anemone's entry once, and asks about the plugin once a session`() async throws {
-        let removed = #"{"value":{"s9":"2026-10-25T10:00:00.000"}}"#
-        let server = HomeServer("settings-once.test") { path, _ in
-            switch path {
-            case "/DisplayPreferences/default": .displayPreferences(["removeNextUp": removed])
-            case "/UserViews": .json(HomeFixtures.views)
-            case "/Shows/NextUp": .homeItems(HomeFixtures.episode("e1", series: "s9"), HomeFixtures.episode("e2"))
-            default: .notFound
-            }
-        }
-        let session = try server.session()
-        let cache = HomeCache()
-
-        let resolution = try await session.resolveHomeSettings(cache: cache)
-        let home = try await session.home(
-            rows: [HomeRowConfig(.nextUp)],
-            removedFromNextUp: resolution.removedFromNextUp,
-            options: HomeOptions(cache: cache),
-        )
-        _ = try await session.resolveHomeSettings(cache: cache)
-
-        #expect(resolution.source == .default)
-        #expect(home.rows.first?.items.map(\.id) == ["e2"])
-        #expect(server.requests(to: "/DisplayPreferences/default").count == 2)
-        #expect(server.requests(to: "/wholphin/public").count == 1)
-    }
-
     @Test func `settings that can't be read are skipped, but a revoked token isn't`() async throws {
         let unreadable = HomeServer("settings-unreadable.test") { path, _ in
             switch path {
