@@ -30,6 +30,11 @@ final class LiveTVGuideModel {
 
     @ObservationIgnored private let browse: BrowseModel
     @ObservationIgnored private var requestedPages: Set<Int> = []
+    /// Counts the channel lists and guides `load()` has put up. Listings asked for under an
+    /// earlier one, whose pages held other channels, are dropped when they arrive.
+    @ObservationIgnored private var generation = 0
+    /// Counts calls to `load()`, so only the latest one puts up what it loaded.
+    @ObservationIgnored private var loads = 0
 
     init(browse: BrowseModel) {
         self.browse = browse
@@ -40,11 +45,14 @@ final class LiveTVGuideModel {
     func load() async {
         let session = browse.session
         let guide = LiveTVGuide()
+        loads += 1
+        let load = loads
         do {
             let channels = try await session.liveTVChannels(order: Preferences.liveTVChannelOrder)
             let first = Array(channels.prefix(Self.pageSize))
             let programs = try await listings(for: first, in: guide)
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, load == loads else { return }
+            generation += 1
             self.guide = guide
             self.channels = channels
             rows.merge(Self.rows(for: first, programs: programs, in: guide)) { $1 }
@@ -59,7 +67,8 @@ final class LiveTVGuideModel {
             }
             state = channels.isEmpty ? .noChannels : .loaded
         } catch {
-            guard let problem = browse.problem(with: error, doing: "load the guide from \(browse.server.name)")
+            guard load == loads,
+                  let problem = browse.problem(with: error, doing: "load the guide from \(browse.server.name)")
             else { return }
             if state != .loaded {
                 state = .failed(problem)
@@ -78,12 +87,16 @@ final class LiveTVGuideModel {
         }
     }
 
-    /// Loads one channel's listings again, after a recording was set or cancelled, so its
-    /// markers change.
-    func reloadListings(forChannel channelID: LiveTVChannel.ID) async {
-        guard let channel = channels.first(where: { $0.id == channelID }) else { return }
-        if let programs = try? await listings(for: [channel], in: guide) {
-            rows.merge(Self.rows(for: [channel], programs: programs, in: guide)) { $1 }
+    /// Loads the listings of every page asked for so far again, after a recording was set or
+    /// cancelled, so their markers change. A series recording marks its programmes on every
+    /// channel it airs on, not just the one chosen.
+    func reloadListings() async {
+        await withTaskGroup(of: Void.self) { group in
+            for page in requestedPages {
+                group.addTask {
+                    await self.loadListings(page: page, isReload: true)
+                }
+            }
         }
     }
 
@@ -138,13 +151,19 @@ final class LiveTVGuideModel {
         window = guide.window(from: guide.start, length: LiveTVLayout.windowLength)
     }
 
-    private func loadListings(page: Int) async {
+    /// - Parameter isReload: the page's rows already show listings, which a failure leaves up.
+    private func loadListings(page: Int, isReload: Bool = false) async {
         let channels = Array(channels.dropFirst(page * Self.pageSize).prefix(Self.pageSize))
         guard !channels.isEmpty else { return }
+        let generation = generation
+        let guide = guide
         do {
             let programs = try await listings(for: channels, in: guide)
+            // A reload put up other channels or another guide meanwhile, and asks for its own pages.
+            guard generation == self.generation else { return }
             rows.merge(Self.rows(for: channels, programs: programs, in: guide)) { $1 }
         } catch {
+            guard generation == self.generation, !isReload else { return }
             // Rows show no data; the page is asked for again when the guide next loads.
             requestedPages.remove(page)
         }

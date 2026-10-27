@@ -4,7 +4,8 @@ import JellyfinAPI
 /// What each kind of library's grid shows, following Wholphin's per-type library pages.
 public extension Library {
     var sortFields: [LibrarySort.Field] {
-        switch kind {
+        guard !isRecordingFolder else { return Self.videoSortFields }
+        return switch kind {
         case .shows:
             [
                 .name, .premiereDate, .dateCreated, .dateLastContentAdded, .seriesDatePlayed,
@@ -32,8 +33,8 @@ public extension Library {
         .runtime, .playCount, .random,
     ]
 
-    /// Movie, TV and music libraries list their titles from every folder; the rest show their top
-    /// level, folders included.
+    /// Movie, TV and music libraries list their titles from every folder (recording folders only
+    /// from their top level); the rest show their top level, folders included.
     internal var gridItemTypes: [BaseItemKind]? {
         switch kind {
         case .movies: [.movie]
@@ -44,7 +45,8 @@ public extension Library {
     }
 
     internal var isGridRecursive: Bool {
-        switch kind {
+        guard !isRecordingFolder else { return false }
+        return switch kind {
         case .movies, .shows, .music, .playlists: true
         default: false
         }

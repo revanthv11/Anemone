@@ -141,6 +141,20 @@ public struct LiveTVTimer: Hashable, Identifiable, Sendable {
     }
 }
 
+/// A recording under way. Wholphin's schedule lists these from the server's recordings rather
+/// than its timers, so each is an item that plays what has been recorded so far.
+public struct LiveTVRecording: Hashable, Identifiable, Sendable {
+    /// The recording's own item, which plays it.
+    public let id: String
+    /// What's being recorded: its name, channel and times, and the timers recording it.
+    public var program: LiveTVProgram
+
+    public init(id: String, program: LiveTVProgram) {
+        self.id = id
+        self.program = program
+    }
+}
+
 /// A series the server records whenever it airs.
 public struct LiveTVSeriesTimer: Hashable, Identifiable, Sendable {
     public let id: String
@@ -170,11 +184,11 @@ public struct LiveTVSeriesTimer: Hashable, Identifiable, Sendable {
 /// The DVR schedule: what's recording, what will record, and the series set to record. Wholphin's
 /// `DvrSchedule` shows the first two; the series are listed here so they can be cancelled too.
 public struct LiveTVSchedule: Hashable, Sendable {
-    public var active: [LiveTVTimer]
+    public var active: [LiveTVRecording]
     public var scheduled: [LiveTVTimer]
     public var series: [LiveTVSeriesTimer]
 
-    public init(active: [LiveTVTimer] = [], scheduled: [LiveTVTimer] = [], series: [LiveTVSeriesTimer] = []) {
+    public init(active: [LiveTVRecording] = [], scheduled: [LiveTVTimer] = [], series: [LiveTVSeriesTimer] = []) {
         self.active = active
         self.scheduled = scheduled
         self.series = series
@@ -286,6 +300,22 @@ extension LiveTVTimer {
         program.seriesTimerID = dto.seriesTimerID.nonBlank ?? program.seriesTimerID
         program.channelName = program.channelName ?? dto.channelName
         self.init(id: id, program: program, isInProgress: dto.status == .inProgress)
+    }
+}
+
+extension LiveTVRecording {
+    /// The server adds its timer's times, IDs and programme details to a recording under way,
+    /// which it reads as a programme would be. Only watching the channel would need the channel,
+    /// so a recording without one is still listed.
+    init?(_ dto: BaseItemDto) {
+        guard let id = dto.id else { return nil }
+        var programDto = dto
+        programDto.id = dto.programID ?? id
+        programDto.channelID = dto.channelID ?? ""
+        guard var program = LiveTVProgram(programDto) else { return nil }
+        // The artwork is the recording's.
+        program.image = ItemImage(itemID: id, kind: .primary, tag: dto.imageTags?[ImageType.primary.rawValue])
+        self.init(id: id, program: program)
     }
 }
 

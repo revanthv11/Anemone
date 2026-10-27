@@ -77,8 +77,8 @@ struct LiveTVLibraryView: View {
             LiveTVProgramSheet(program: program) { program in
                 pendingPlayback = browse.playback(onChannelOf: program, channel: guide?.channel(program.channelID))
                 shownProgram = nil
-            } changed: { program in
-                recordingsChanged(on: program.channelID)
+            } changed: { _ in
+                recordingsChanged()
             }
         }
         .sheet(isPresented: $showsViewOptions) {
@@ -158,12 +158,17 @@ struct LiveTVLibraryView: View {
         case .schedule:
             LiveTVScheduleView(version: version) { timer in
                 shownProgram = timer.program
+            } play: { recording in
+                playback = browse.playback(of: recording)
+            } cancel: { recording, series in
+                cancel(recording, series: series)
             } cancelSeries: { series in
                 seriesToCancel = series
             }
             .padding(.horizontal, LiveTVLayout.horizontalInset)
         case let .recordings(folder):
-            // The library page brings its own margins, sort, filters and view options.
+            // The library page brings its own margins, sort, filters and view options; the
+            // folder's library lists its top level with the video sort options, as Wholphin does.
             LibraryScreen(library: folder, path: $path)
         }
     }
@@ -226,10 +231,12 @@ struct LiveTVLibraryView: View {
         }
     }
 
-    private func recordingsChanged(on channelID: LiveTVChannel.ID) {
+    /// A series recording can mark programmes on any channel, so every row loaded so far loads
+    /// its listings again.
+    private func recordingsChanged() {
         version += 1
         Task {
-            await guide?.reloadListings(forChannel: channelID)
+            await guide?.reloadListings()
         }
     }
 
@@ -246,13 +253,22 @@ struct LiveTVLibraryView: View {
     }
 
     private func cancel(_ series: LiveTVSeriesTimer) {
+        cancelTimer(series.id, series: true, name: series.name)
+    }
+
+    private func cancel(_ recording: LiveTVRecording, series: Bool) {
+        let program = recording.program
+        guard let timerID = series ? program.seriesTimerID : program.timerID else { return }
+        cancelTimer(timerID, series: series, name: program.name)
+    }
+
+    private func cancelTimer(_ timerID: String, series: Bool, name: String) {
         Task {
             do {
-                try await browse.session.cancelRecording(timerID: series.id, series: true)
-                version += 1
-                await guide?.load()
+                try await browse.session.cancelRecording(timerID: timerID, series: series)
+                recordingsChanged()
             } catch {
-                notice = browse.problem(with: error, doing: "cancel \(series.name)")
+                notice = browse.problem(with: error, doing: "cancel \(name)")
             }
         }
     }

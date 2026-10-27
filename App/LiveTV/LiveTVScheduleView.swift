@@ -2,12 +2,16 @@ import AnemoneJellyfin
 import SwiftUI
 
 /// Wholphin's DVR schedule (`DvrSchedule`): recordings under way, then those scheduled, by day.
-/// Selecting one opens its programme, to watch the channel or cancel. The series set to record
+/// A recording under way plays what has been recorded so far, and a long press cancels it; a
+/// scheduled one opens its programme, to watch the channel or cancel. The series set to record
 /// are listed last, each with a way to cancel it.
 struct LiveTVScheduleView: View {
     /// Changes when the schedule should load again.
     let version: Int
     let select: (LiveTVTimer) -> Void
+    let play: (LiveTVRecording) -> Void
+    /// Cancels the recording's timer, or its series' timer.
+    let cancel: (LiveTVRecording, _ series: Bool) -> Void
     let cancelSeries: (LiveTVSeriesTimer) -> Void
 
     @Environment(BrowseModel.self) private var browse
@@ -39,8 +43,8 @@ struct LiveTVScheduleView: View {
                 }
                 if !schedule.active.isEmpty {
                     heading("Active Recordings")
-                    ForEach(schedule.active) { timer in
-                        row(timer)
+                    ForEach(schedule.active) { recording in
+                        row(recording)
                     }
                 }
                 ForEach(schedule.scheduledByDay(), id: \.day) { day in
@@ -83,6 +87,36 @@ struct LiveTVScheduleView: View {
         }
         .buttonStyle(GuideCellStyle(fill: .white.opacity(0.08)))
         .accessibilityIdentifier("schedule.timer.\(timer.id)")
+    }
+
+    private func row(_ recording: LiveTVRecording) -> some View {
+        let program = recording.program
+        return Button {
+            play(recording)
+        } label: {
+            ScheduleRow(
+                title: program.name,
+                detail: [program.subtitle, program.channelName].compactMap(\.self).joined(separator: " · "),
+                trailing: program.timeRange(),
+                isRecording: true,
+            )
+        }
+        .buttonStyle(GuideCellStyle(fill: .white.opacity(0.08)))
+        .contextMenu {
+            if program.timerID != nil {
+                Button("Cancel Recording", systemImage: "xmark.circle") {
+                    cancel(recording, false)
+                }
+                .accessibilityIdentifier("schedule.cancelRecording")
+            }
+            if program.seriesTimerID != nil {
+                Button("Cancel Series Recording", systemImage: "xmark.circle") {
+                    cancel(recording, true)
+                }
+                .accessibilityIdentifier("schedule.cancelSeries")
+            }
+        }
+        .accessibilityIdentifier("schedule.recording.\(recording.id)")
     }
 
     private func seriesRow(_ series: LiveTVSeriesTimer) -> some View {

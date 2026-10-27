@@ -46,6 +46,18 @@ extension BrowseModel {
         )
     }
 
+    /// Playing a recording under way from its start, as far as it has got.
+    func playback(of recording: LiveTVRecording) -> PlaybackRequest {
+        let program = recording.program
+        let details = [program.subtitle, program.channelName].compactMap(\.self)
+        let metadata = PlaybackMetadata(
+            title: program.name,
+            subtitle: details.isEmpty ? nil : details.joined(separator: " · "),
+            overview: program.overview,
+        )
+        return PlaybackRequest(PlaybackQueue.Entry(itemID: recording.id, metadata: metadata))
+    }
+
     private func live(channelID: String, title: String, program: LiveTVProgram?) -> PlaybackRequest {
         let metadata = PlaybackMetadata(
             title: title,

@@ -88,13 +88,21 @@ public extension JellyfinSession {
         try await send(series ? Paths.cancelSeriesTimer(timerID: timerID) : Paths.cancelTimer(timerID: timerID))
     }
 
-    /// What's recording, what's scheduled, and the series set to record.
+    /// What's recording, what's scheduled, and the series set to record. As in Wholphin's
+    /// `DvrScheduleViewModel`, what's recording comes from the recordings under way (the first
+    /// 100), which play, and what's scheduled from the timers.
     func liveTVSchedule() async throws -> LiveTVSchedule {
-        async let active = send(Paths.getTimers(parameters: .init(isActive: true)))
+        let recordings = Paths.GetRecordingsParameters(
+            userID: userID,
+            limit: 100,
+            isInProgress: true,
+            fields: [.overview, .sortName, .mediaSourceCount, .canDelete],
+        )
+        async let active = send(Paths.getRecordings(parameters: recordings))
         async let scheduled = send(Paths.getTimers(parameters: .init(isActive: false, isScheduled: true)))
         async let series = send(Paths.getSeriesTimers())
         return try await LiveTVSchedule(
-            active: (active.items ?? []).compactMap(LiveTVTimer.init).sorted { $0.program.start < $1.program.start },
+            active: (active.items ?? []).compactMap(LiveTVRecording.init),
             scheduled: (scheduled.items ?? []).compactMap(LiveTVTimer.init),
             series: (series.items ?? []).compactMap(LiveTVSeriesTimer.init),
         )
@@ -102,7 +110,11 @@ public extension JellyfinSession {
 
     /// The folders recordings are kept in, each a tab of the Live TV page as in Wholphin.
     func liveTVRecordingFolders() async throws -> [Library] {
-        try await (send(Paths.getRecordingFolders(userID: userID)).items ?? []).compactMap(Library.init)
+        try await (send(Paths.getRecordingFolders(userID: userID)).items ?? []).compactMap { dto in
+            var folder = Library(dto)
+            folder?.isRecordingFolder = true
+            return folder
+        }
     }
 
     /// Releases a live stream the server opened for playback (`isAutoOpenLiveStream`), so the

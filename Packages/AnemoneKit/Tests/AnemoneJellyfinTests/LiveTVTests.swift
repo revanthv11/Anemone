@@ -3,30 +3,9 @@ import Foundation
 import Synchronization
 import Testing
 
-/// Live TV requests against the fake server: channels, the guide, recording and the DVR schedule.
-struct LiveTVTests {
-    private func session(host: String) throws -> JellyfinSession {
-        try JellyfinSession(
-            serverURL: #require(URL(string: "https://\(host)")),
-            userID: "u1",
-            accessToken: "tok",
-            identity: ClientIdentity(deviceName: "Test TV", deviceID: "device-1", appVersion: "0.1.0"),
-            sessionConfiguration: { MockServer.sessionConfiguration() },
-        )
-    }
-
-    /// Answers "METHOD /path" with its reply, recording every request in order.
-    private func register(host: String, replies: [String: MockServer.Reply]) -> LiveTVRecorder {
-        let recorder = LiveTVRecorder()
-        MockServer.register(host: host) { request in
-            let key = "\(request.httpMethod ?? "GET") \(request.url?.path() ?? "")"
-            guard let reply = replies[key] else { return nil }
-            recorder.sent.withLock { $0.append((key, SentRequest(request))) }
-            return reply
-        }
-        return recorder
-    }
-
+/// Live TV requests against the fake server: channels, the guide, recording and Home's rows. The
+/// DVR schedule and recording folders are in `LiveTVScheduleTests`.
+struct LiveTVTests: LiveTVServerTesting {
     private static let empty = MockServer.Reply.json(#"{"Items":[]}"#)
     private static let noContent = MockServer.Reply(status: 204, body: "")
 
@@ -171,71 +150,6 @@ struct LiveTVTests {
         #expect(sent.keys == ["DELETE /LiveTv/Timers/t1", "DELETE /LiveTv/SeriesTimers/s1"])
     }
 
-    @Test func `the schedule has recordings under way, scheduled and series`() async throws {
-        let sent = LiveTVRecorder()
-        MockServer.register(host: "schedule.test") { request in
-            let path = request.url?.path() ?? ""
-            sent.sent.withLock { $0.append((path, SentRequest(request))) }
-            switch path {
-            case "/LiveTv/Timers" where request.url?.queryValues["isActive"] == "true":
-                return .json(#"""
-                {"Items":[{"Id":"t1","Status":"InProgress","ChannelId":"c1","ProgramInfo":{"Id":"p1","ChannelId":"c1",
-                  "Name":"Now","StartDate":"2026-10-26T10:00:00.0000000Z","EndDate":"2026-10-26T11:00:00.0000000Z"}}]}
-                """#)
-            case "/LiveTv/Timers":
-                return .json(#"""
-                {"Items":[{"Id":"t2","SeriesTimerId":"s1","ChannelId":"c2","ChannelName":"Anemone News",
-                  "ProgramInfo":{"Id":"p2","ChannelId":"c2","Name":"Later",
-                    "StartDate":"2026-10-26T12:00:00.0000000Z","EndDate":"2026-10-26T13:00:00.0000000Z"}},
-                 {"Id":"t3","ChannelId":"c3","Name":"By time","StartDate":"2026-10-27T08:00:00.0000000Z",
-                  "EndDate":"2026-10-27T09:00:00.0000000Z"},
-                 {"Id":"t4","Name":"Nothing to show"}]}
-                """#)
-            case "/LiveTv/SeriesTimers":
-                return .json(#"""
-                {"Items":[{"Id":"s1","Name":"Pattern Patrol","ChannelName":"Anemone One","RecordAnyChannel":false,
-                  "RecordAnyTime":true,"RecordNewOnly":true}]}
-                """#)
-            default:
-                return nil
-            }
-        }
-
-        let schedule = try await session(host: "schedule.test").liveTVSchedule()
-
-        #expect(schedule.active.map(\.id) == ["t1"])
-        #expect(schedule.active[0].isInProgress)
-        #expect(schedule.active[0].program.timerID == "t1")
-        #expect(schedule.scheduled.map(\.id) == ["t2", "t3"])
-        #expect(schedule.scheduled[0].program.seriesTimerID == "s1")
-        #expect(schedule.scheduled[0].program.channelName == "Anemone News")
-        #expect(schedule.scheduled[1].program.name == "By time")
-        #expect(schedule.scheduled[1].program.channelID == "c3")
-        #expect(schedule.series == [LiveTVSeriesTimer(
-            id: "s1",
-            name: "Pattern Patrol",
-            channelName: "Anemone One",
-            recordsAnyTime: true,
-            recordsNewOnly: true,
-        )])
-        let queries = sent.all.filter { $0.key == "/LiveTv/Timers" }.map(\.request.query)
-        #expect(queries.contains { $0["isActive"] == "false" && $0["isScheduled"] == "true" })
-    }
-
-    @Test func `recording folders become libraries`() async throws {
-        let sent = register(host: "folders.test", replies: ["GET /LiveTv/Recordings/Folders": .json(#"""
-        {"Items":[{"Id":"f1","Name":"Recordings"},{"Id":"f2","Name":"Shows","CollectionType":"tvshows"}]}
-        """#)])
-
-        let folders = try await session(host: "folders.test").liveTVRecordingFolders()
-
-        #expect(folders == [
-            Library(id: "f1", name: "Recordings", kind: .mixed),
-            Library(id: "f2", name: "Shows", kind: .shows),
-        ])
-        #expect(sent.request("GET /LiveTv/Recordings/Folders")?.query["userId"] == "u1")
-    }
-
     @Test func `closing a live stream names it`() async throws {
         let sent = register(host: "close.test", replies: ["POST /LiveStreams/Close": Self.noContent])
 
@@ -281,8 +195,35 @@ struct LiveTVTests {
     }
 }
 
+/// A session on the fake server, and a way to answer its requests, for the Live TV tests.
+protocol LiveTVServerTesting {}
+
+extension LiveTVServerTesting {
+    func session(host: String) throws -> JellyfinSession {
+        try JellyfinSession(
+            serverURL: #require(URL(string: "https://\(host)")),
+            userID: "u1",
+            accessToken: "tok",
+            identity: ClientIdentity(deviceName: "Test TV", deviceID: "device-1", appVersion: "0.1.0"),
+            sessionConfiguration: { MockServer.sessionConfiguration() },
+        )
+    }
+
+    /// Answers "METHOD /path" with its reply, recording every request in order.
+    func register(host: String, replies: [String: MockServer.Reply]) -> LiveTVRecorder {
+        let recorder = LiveTVRecorder()
+        MockServer.register(host: host) { request in
+            let key = "\(request.httpMethod ?? "GET") \(request.url?.path() ?? "")"
+            guard let reply = replies[key] else { return nil }
+            recorder.sent.withLock { $0.append((key, SentRequest(request))) }
+            return reply
+        }
+        return recorder
+    }
+}
+
 /// Every request a test's fake server answered, in order, by "METHOD /path".
-private final class LiveTVRecorder: Sendable {
+final class LiveTVRecorder: Sendable {
     let sent = Mutex<[(key: String, request: SentRequest)]>([])
 
     var all: [(key: String, request: SentRequest)] {
