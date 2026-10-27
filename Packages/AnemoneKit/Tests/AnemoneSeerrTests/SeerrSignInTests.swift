@@ -172,6 +172,8 @@
             #expect(account.username == "alice")
             #expect(account.secret == "pw")
             #expect(!account.description.contains("pw"))
+            #expect(!"\(account.credentials)".contains("pw"))
+            #expect(!String(reflecting: account.credentials).contains("pw"))
 
             try signIn(store).remove()
             #expect(try SeerrAccountStore(store: store).account(for: profile) == nil)

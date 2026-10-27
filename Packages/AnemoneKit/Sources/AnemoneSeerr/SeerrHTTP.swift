@@ -35,6 +35,21 @@
         }
     }
 
+    extension SeerrCredentials: CustomStringConvertible, CustomDebugStringConvertible {
+        /// Names the kind of sign-in but never the password or key, should it reach a log.
+        public var description: String {
+            switch self {
+            case .apiKey: "apiKey(<hidden>)"
+            case .local: "local(<hidden>)"
+            case .jellyfin: "jellyfin(<hidden>)"
+            }
+        }
+
+        public var debugDescription: String {
+            description
+        }
+    }
+
     /// Adds what each request to Seerr needs to be signed in: the API key, or the session cookie
     /// Seerr set when signing in with a password. Like Wholphin's `SeerrApiClient` with its
     /// cookie jar, it keeps only Seerr's `connect.sid` cookie, in memory, never on disk.
