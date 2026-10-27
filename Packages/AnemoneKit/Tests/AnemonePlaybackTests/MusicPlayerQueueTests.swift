@@ -18,6 +18,36 @@ extension MusicPlayerTests {
         player.stop()
     }
 
+    @Test func `a playlist with entries that aren't songs pages by the server's count`() async throws {
+        library.songs = (0 ..< 150).map { MusicItem.song("s\($0)") }
+        // Videos among the first page's entries, left out of its songs.
+        library.notSongs = Set(10 ..< 20)
+        let player = player()
+
+        try await player.play(.playlist("pl1"))
+        await startSong(1, in: player)
+
+        #expect(library.received.map(\.startIndex) == [0, 100])
+        let expected = (0 ..< 150).filter { !(10 ..< 20).contains($0) }.map { "s\($0)" }
+        #expect(player.queue.entries.map(\.song.id) == expected)
+        player.stop()
+    }
+
+    @Test func `a shuffled playlist with entries that aren't songs is fetched by the server's count`() async throws {
+        library.songs = (0 ..< 600).map { MusicItem.song("s\($0)") }
+        library.notSongs = Set(0 ..< 50)
+        let player = player()
+
+        try await player.play(.playlist("pl1"), shuffled: true)
+        await startSong(1, in: player)
+
+        #expect(library.received.map(\.startIndex) == [0, 500])
+        #expect(library.received.map(\.limit) == [500, 100])
+        #expect(Set(player.queue.entries.map(\.song.id)).count == 550)
+        #expect(player.queue.entries.count == 550)
+        player.stop()
+    }
+
     @Test func `a page that fails once the queue has started ends the queue there, playing on`() async throws {
         library.songs = (0 ..< 250).map { MusicItem.song("s\($0)") }
         library.failsFrom = 100

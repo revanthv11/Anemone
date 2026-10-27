@@ -350,5 +350,54 @@ extension MusicTests {
         #expect(request.query["sortBy"] == nil)
         #expect(page.items.map(\.id) == ["s1"])
         #expect(page.totalCount == 2)
+        // The clip is counted, so the next page starts after it.
+        #expect(page.serverCount == 2)
+    }
+
+    @Test func `a later page of a playlist counts what the server sent`() async throws {
+        let sent = register(
+            host: "music-playlist-later.test",
+            path: "/jf/Playlists/pl1/Items",
+            reply: .json(#"{"Items":[{"Id":"v1","Name":"Clip","Type":"Video"},\#(Self.song)]}"#),
+        )
+
+        let page = try await session(host: "music-playlist-later.test")
+            .songs(from: .playlist("pl1"), startIndex: 100, limit: 100)
+
+        #expect(try #require(sent.request).query["startIndex"] == "100")
+        #expect(page.items.map(\.id) == ["s1"])
+        #expect(page.totalCount == nil)
+        #expect(page.serverCount == 2)
+    }
+
+    @Test func `a playlist of songs comes in one request, for Play before its page has loaded`() async throws {
+        let sent = register(
+            host: "music-playlist-songs.test",
+            path: "/jf/Playlists/pl1/Items",
+            reply: .json(#"{"Items":[\#(Self.song)],"TotalRecordCount":1}"#),
+        )
+
+        let songs = try await session(host: "music-playlist-songs.test").playlistSongs("pl1")
+
+        #expect(songs?.map(\.id) == ["s1"])
+        let query = try #require(sent.request).query
+        #expect(query["limit"] == nil)
+        #expect(query["fields"]?.contains("MediaStreams") == true)
+    }
+
+    @Test func `a playlist with anything but songs isn't played as music`() async throws {
+        _ = register(
+            host: "music-playlist-mixed.test",
+            path: "/jf/Playlists/pl1/Items",
+            reply: .json(#"{"Items":[\#(Self.song),{"Id":"v1","Name":"Clip","Type":"Video"}],"TotalRecordCount":2}"#),
+        )
+        _ = register(
+            host: "music-playlist-empty.test",
+            path: "/jf/Playlists/pl1/Items",
+            reply: .json(#"{"Items":[],"TotalRecordCount":0}"#),
+        )
+
+        #expect(try await session(host: "music-playlist-mixed.test").playlistSongs("pl1") == nil)
+        #expect(try await session(host: "music-playlist-empty.test").playlistSongs("pl1") == nil)
     }
 }
