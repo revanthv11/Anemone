@@ -3,6 +3,8 @@
 @MainActor
 public final class ThemeMusicStopping: PlaybackFeature {
     private let music: ThemeMusic
+    /// The player it lets theme music go for when it closes.
+    private weak var controller: PlaybackController?
 
     public init(music: ThemeMusic = .shared) {
         self.music = music
@@ -12,18 +14,26 @@ public final class ThemeMusicStopping: PlaybackFeature {
         switch event {
         case .loaded:
             music.videoStarted()
-        case .stopped:
-            // The last session: the player closed, or the queue ended and it's closing.
-            if controller.isStopped || controller.hasEnded {
-                music.videoClosed()
-            }
+            releaseWhenClosed(controller)
         case .failed:
             // Nothing more will play: the player shows the error over the page.
             if case .failed = controller.state {
                 music.videoClosed()
             }
-        case .started, .position, .paused, .resumed, .ended:
+        case .started, .position, .paused, .resumed, .ended, .stopped:
             break
+        }
+    }
+
+    /// Once for each player, when it closes rather than at a `stopped`: it can close after the
+    /// last entry's session ended, as when Up Next or "Still watching?" is cancelled over the
+    /// last frame, and no `stopped` comes then.
+    private func releaseWhenClosed(_ controller: PlaybackController) {
+        guard self.controller !== controller else { return }
+        self.controller = controller
+        let music = music
+        controller.whenStopped {
+            music.videoClosed()
         }
     }
 }

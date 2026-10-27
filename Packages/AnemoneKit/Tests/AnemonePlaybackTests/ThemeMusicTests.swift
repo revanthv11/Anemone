@@ -162,23 +162,71 @@ struct ThemeMusicTests {
         #expect(await eventually { output.played.count == 2 })
     }
 
-    @Test func `the end of the queue lets the theme play again as the player closes`() async throws {
+    @Test func `the end of the queue lets the theme play again once the player has closed`() async throws {
         let music = music()
         music.show("m1", for: page, find: finder.find)
+        #expect(await eventually { output.played.count == 1 })
         let engine = FakeEngine()
-        let playback = try PlaybackController(
-            request: PlaybackRequest(queue: #require(PlaybackQueue(entries: [.item("m1")]))),
-            engine: engine,
-            features: [ThemeMusicStopping(music: music)],
-            loadStream: FakeStreams().load,
-        )
+        let log = EventLog()
+        let playback = try player(["m1"], engine: engine, music: music, log: log)
         await playback.start()
         engine.send(.ready)
-        #expect(music.isHeldForVideo)
 
         engine.send(.ended)
+        #expect(await eventually { playback.hasEnded && log.events.last?.hasPrefix("stopped") == true })
+        // The last frame is still on screen.
+        #expect(music.isHeldForVideo)
+        // The player screen dismisses at the end, and stops the controller as it goes.
+        await playback.stop()
 
-        #expect(await eventually { playback.hasEnded && !music.isHeldForVideo })
+        #expect(!music.isHeldForVideo)
+        #expect(await eventually { output.played.count == 2 })
+    }
+
+    @Test func `cancelling Up Next at the end lets the theme play again once the player has closed`() async throws {
+        let music = music()
+        music.show("e1", for: page, find: finder.find)
+        #expect(await eventually { output.played.count == 1 })
+        let engine = FakeEngine()
+        let log = EventLog()
+        let playback = try player(["e1", "e2"], engine: engine, music: music, log: log, upNext: true)
+        await playback.start()
+        engine.send(.ready)
+        engine.send(.ended)
+        // The first entry's session ended while the card counts down over its last frame.
+        #expect(await eventually { log.events.last?.hasPrefix("stopped") == true })
+        let card = try #require(playback.accessories.card)
+        #expect(card.id == UpNext.upNextCard)
+
+        try #require(card.actions.first { $0.id == "upNext.cancel" }).perform()
+        #expect(playback.hasEnded)
+        #expect(music.isHeldForVideo)
+        // The player screen dismisses at the end, and stops the controller as it goes.
+        await playback.stop()
+
+        #expect(!music.isHeldForVideo)
+        #expect(await eventually { output.played.count == 2 })
+        #expect(engine.loads.count == 1)
+    }
+
+    @Test func `closing the player during Up Next's countdown lets the theme play again`() async throws {
+        let music = music()
+        music.show("e1", for: page, find: finder.find)
+        #expect(await eventually { output.played.count == 1 })
+        let engine = FakeEngine()
+        let log = EventLog()
+        let playback = try player(["e1", "e2"], engine: engine, music: music, log: log, upNext: true)
+        await playback.start()
+        engine.send(.ready)
+        engine.send(.ended)
+        #expect(await eventually { log.events.last?.hasPrefix("stopped") == true })
+        #expect(playback.accessories.card?.id == UpNext.upNextCard)
+
+        // Back on the remote.
+        await playback.stop()
+
+        #expect(!music.isHeldForVideo)
+        #expect(await eventually { output.played.count == 2 })
     }
 
     @Test func `a stream the server won't offer leaves the theme playing`() async throws {
@@ -196,6 +244,28 @@ struct ThemeMusicTests {
 
         #expect(!music.isHeldForVideo)
         #expect(output.stops == 0)
+    }
+
+    /// A player for `ids` that holds `music` back, with Up Next if asked (counting down for long
+    /// enough that it never plays the next entry on its own), and `log` hearing events last.
+    private func player(
+        _ ids: [String],
+        engine: FakeEngine,
+        music: ThemeMusic,
+        log: EventLog,
+        upNext: Bool = false,
+    ) throws -> PlaybackController {
+        var features: [any PlaybackFeature] = [ThemeMusicStopping(music: music), log]
+        if upNext {
+            let settings = UpNext.Settings(countdown: .seconds(100), passOutCount: 0)
+            features.insert(UpNext(settings: settings, second: .milliseconds(10)), at: 0)
+        }
+        return try PlaybackController(
+            request: PlaybackRequest(queue: #require(PlaybackQueue(entries: ids.map { .item($0) }))),
+            engine: engine,
+            features: features,
+            loadStream: FakeStreams().load,
+        )
     }
 }
 
