@@ -242,10 +242,14 @@ public struct MusicPage: Sendable {
     public let items: [MusicItem]
     /// Only asked for with the first page.
     public let totalCount: Int?
+    /// How many entries the server sent, before those that aren't songs were left out (from a
+    /// playlist), so the next page starts after them.
+    public let serverCount: Int
 
-    public init(items: [MusicItem], totalCount: Int?) {
+    public init(items: [MusicItem], totalCount: Int?, serverCount: Int? = nil) {
         self.items = items
         self.totalCount = totalCount
+        self.serverCount = serverCount ?? items.count
     }
 }
 
