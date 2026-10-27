@@ -1,6 +1,6 @@
 # Seerr
 
-Anemone can discover and request movies and shows through a [Seerr](https://github.com/seerr-team/seerr) server (Overseerr or Jellyseerr, as Seerr is now), as Wholphin does. It's built only with `ANEMONE_SEERR`, so App Store builds can leave it out. Without it, nothing of Seerr is compiled, built or linked: no Discover tab, no Settings › Seerr, no Discover rows on item pages, an empty `AnemoneSeerr` module, none of the packages the Seerr client runs on, and no Seerr credits in Settings › About.
+Anemone can discover and request movies and shows through a [Seerr](https://github.com/seerr-team/seerr) server (Overseerr or Jellyseerr, as Seerr is now), as Wholphin does. It's built only with `ANEMONE_SEERR`, so App Store builds can leave it out. Without it, nothing of Seerr is compiled, built or linked: no Discover tab, no Settings › Seerr, no Discover rows on item pages, an empty `AnemoneSeerr` module, none of the packages the Seerr client runs on, and no Seerr credits in Settings › About. Only their license texts are still bundled: the app copies `App/Settings/About/Licenses` whole, so the texts for Seerr and its three packages are in every build, as text files Settings › About doesn't show without Seerr. Leaving them out would take a build setting in the project, which turning Seerr on doesn't change.
 
 ## Turning it on
 
@@ -60,8 +60,8 @@ A password sign-in keeps Seerr's session cookie in memory. When Seerr turns a re
 
 ## Trying it without a Seerr server
 
-DEBUG builds launched with `-seerrMock YES` sign in to a made-up server inside the app (`App/Seerr/SeerrDebugServer.swift`), as if the plugin had set it up. `-seerrMock url` has the plugin give only its address, for the add page, `-seerrMock failing` has its sign-in turned down, for Retry, and `-seerrMock lapsing` signs in with a password whose first session lapses as soon as it's used, so Anemone has to sign in again.
+DEBUG builds launched with `-seerrMock YES` sign in to a made-up server inside the app (`App/Seerr/SeerrDebugServer.swift`), as if the plugin had set it up. `-seerrMock url` has the plugin give only its address, for the add page, `-seerrMock failing` has its sign-in turned down, for Retry, `-seerrMock lapsing` signs in with a password whose first session lapses as soon as it's used, so Anemone has to sign in again, and `-seerrMock many` adds 45 requests, so the Requests page reads three pages of them.
 
 ## CI
 
-CI's `seerr` job builds and tests with Seerr on, so it doesn't rot while the default build leaves it out. It runs the Seerr tests with `--traits ANEMONE_SEERR --filter Seerr` (the other tests don't depend on the flag, and the `test` job runs them) and the tvOS build with `ANEMONE_SEERR=1` and the build setting, as above. The `test` and `build` jobs keep Seerr off. Run the whole suite with the trait locally before a Seerr change.
+CI's `seerr` job builds and tests with Seerr on, so it doesn't rot while the default build leaves it out. It runs the whole package suite with `--traits ANEMONE_SEERR`, and the tvOS build with `ANEMONE_SEERR=1` and the build setting, as above. The `test` and `build` jobs keep Seerr off.
