@@ -1,0 +1,105 @@
+import AnemoneCore
+import AnemoneJellyfin
+import AnemoneUI
+import SwiftUI
+
+/// Every channel as a tile with what's on now, in the guide's order. Selecting one watches it;
+/// a long press adds it to or removes it from favourites, as the guide's channel dialog does.
+struct LiveTVChannelsView: View {
+    /// Changes when the channels should load again.
+    let version: Int
+    let watch: (LiveTVChannel) -> Void
+    let toggleFavorite: (LiveTVChannel) -> Void
+
+    @Environment(BrowseModel.self) private var browse
+    @State private var channels: [LiveTVChannel]?
+    @State private var problem: String?
+
+    private static let tileWidth: CGFloat = 370
+    private static let columns = Array(repeating: GridItem(.fixed(tileWidth), spacing: 48, alignment: .top), count: 4)
+
+    var body: some View {
+        Group {
+            if let channels, !channels.isEmpty {
+                ScrollView(.vertical) {
+                    LazyVGrid(columns: Self.columns, alignment: .leading, spacing: 48) {
+                        ForEach(channels) { channel in
+                            tile(channel)
+                        }
+                    }
+                    .padding(.vertical, 30)
+                }
+                .scrollClipDisabled()
+            } else if let problem {
+                PageMessage(message: problem)
+            } else if channels != nil {
+                PageMessage(message: "Live TV is on, but \(browse.server.name) has no channels.")
+            } else {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .task(id: version) {
+            await load()
+        }
+    }
+
+    private func tile(_ channel: LiveTVChannel) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Button {
+                watch(channel)
+            } label: {
+                LogoImage(url: browse.imageURL(channel.image, width: 400), maxWidth: 280, height: 120) {
+                    Text(channel.name)
+                        .font(.headline)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(width: Self.tileWidth, height: Self.tileWidth * 9 / 16)
+                .background(.white.opacity(0.1))
+                .overlay(alignment: .topTrailing) {
+                    if channel.isFavorite {
+                        Image(systemName: "heart.fill")
+                            .foregroundStyle(.red)
+                            .padding(14)
+                    }
+                }
+            }
+            .buttonStyle(.card)
+            .contextMenu {
+                Button(
+                    channel.isFavorite ? "Remove from Favorites" : "Add to Favorites",
+                    systemImage: channel.isFavorite ? "heart.slash" : "heart",
+                ) {
+                    toggleFavorite(channel)
+                }
+            }
+            .accessibilityIdentifier("channels.card.\(channel.id)")
+            .accessibilityLabel(channel.title)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(channel.title)
+                    .font(.caption)
+                    .lineLimit(1)
+                Text(channel.currentProgram?.name ?? " ")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .frame(width: Self.tileWidth, alignment: .leading)
+        }
+    }
+
+    private func load() async {
+        do {
+            channels = try await browse.session.liveTVChannels(
+                order: Preferences.liveTVChannelOrder,
+                includesCurrentProgram: true,
+            )
+            problem = nil
+        } catch {
+            if channels == nil {
+                problem = browse.problem(with: error, doing: "load the channels from \(browse.server.name)")
+            }
+        }
+    }
+}

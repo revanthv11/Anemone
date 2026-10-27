@@ -51,8 +51,7 @@ public final class PlaybackController: Identifiable {
     @ObservationIgnored private var stream: PlaybackStream?
     /// Whether the last load allowed direct play, which `reload()` keeps.
     @ObservationIgnored private var allowsDirect = true
-    /// Where the loaded stream starts, until the engine is ready there: the engine's time says
-    /// 0 until then.
+    /// Where the loaded stream starts, until the engine is ready there: the engine's time says 0 until then.
     @ObservationIgnored private var pendingStart: Duration?
     /// Whether the loaded stream stays paused once it's ready, as after a reload while paused.
     @ObservationIgnored private var staysPaused = false
@@ -215,19 +214,20 @@ public final class PlaybackController: Identifiable {
         guard !isStopped else { return }
         let entry = queue.current
         self.allowsDirect = allowsDirect
-        var request = StreamRequest(
-            itemID: entry.itemID,
-            allowsDirect: allowsDirect,
-            mediaSourceID: stream?.mediaSourceID,
-            profile: engine.deviceProfile,
-        )
+        var request = StreamRequest(itemID: entry.itemID, allowsDirect: allowsDirect, profile: engine.deviceProfile)
+        // The version a retry or a reload keeps.
+        request.mediaSourceID = stream?.mediaSourceID
         for feature in features {
             await feature.prepare(&request)
         }
         guard !isStopped, attempt == loads else { return }
         do {
             let stream = try await loadStream(request)
-            guard !isStopped, attempt == loads else { return }
+            guard !isStopped, attempt == loads else {
+                // Features never hear of a stream nothing plays, so a live stream it opened is closed here.
+                await feature(LiveStreamClosing.self)?.discard(stream)
+                return
+            }
             await play(stream, entry, from: position, isReload: isReload)
         } catch {
             guard !isStopped, attempt == loads else { return }

@@ -16,7 +16,7 @@ Some of Wholphin's device profile code is adapted from the official [jellyfin-an
 
 ## Swiftfin
 
-Anemone's AVPlayer device profile, the checks it makes on the server's media segments, the way its player overlay takes the Siri Remote's presses before the focus engine and passes on those it doesn't use, the link that opens a YouTube trailer in the YouTube app, and its Now Playing info and remote commands are adapted from [Swiftfin](https://github.com/jellyfin/Swiftfin), the official Jellyfin client for Apple platforms. So is the way the player matches the server's audio and subtitle streams to AVPlayer's tracks, decides when a track change needs a new stream, and burns in subtitles (`AnemonePlayback/Tracks/TrackSwitching.swift`).
+Anemone's AVPlayer device profile, the checks it makes on the server's media segments, the way its player overlay takes the Siri Remote's presses before the focus engine and passes on those it doesn't use, the link that opens a YouTube trailer in the YouTube app, its Now Playing info and remote commands, and closing a live TV stream that never got under way are adapted from [Swiftfin](https://github.com/jellyfin/Swiftfin), the official Jellyfin client for Apple platforms. So is the way the player matches the server's audio and subtitle streams to AVPlayer's tracks, decides when a track change needs a new stream, and burns in subtitles (`AnemonePlayback/Tracks/TrackSwitching.swift`).
 
 - Copyright (c) Jellyfin & Jellyfin Contributors
 - Licensed under the Mozilla Public License, version 2.0, which allows combining it into this GPL-3.0 work
