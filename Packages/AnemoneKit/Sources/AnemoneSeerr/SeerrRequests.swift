@@ -72,7 +72,10 @@
         /// requests, so a user with more never sees the older ones. `SeerrRequestList` reads on.
         ///
         /// - Parameter known: titles found before, by `DiscoverItem.id`, which aren't looked up
-        ///   again. What the server has of one, and where, are taken from its request instead.
+        ///   again. What the server has of one, and where, are taken from its request instead;
+        ///   except for a series Seerr has no status for, whose availability comes from all of
+        ///   the user's requests for it, as `series(_:)` works it out. Only its lookup lists those,
+        ///   so it's looked up again, and a reload shows what the first read did.
         func requests(
             skip: Int = 0,
             take: Int = requestsPageSize,
@@ -95,11 +98,8 @@
                       let kind = SeerrMediaKind(mediaType: request._type), kind != .person
                 else { return nil }
                 let wanted = Wanted(request: SeerrRequest(request), tmdbID: tmdbID, kind: kind)
-                if let title = known[DiscoverItem.id(kind: kind, tmdbID: tmdbID)] {
-                    found[wanted.request.id] = SeerrRequestedItem(
-                        request: wanted.request,
-                        item: title.updated(from: request.media, request: wanted.request, user: user.id),
-                    )
+                if let title = known[DiscoverItem.id(kind: kind, tmdbID: tmdbID)]?.updated(from: request.media) {
+                    found[wanted.request.id] = SeerrRequestedItem(request: wanted.request, item: title)
                 }
                 return wanted
             }
@@ -240,14 +240,18 @@
 
     extension DiscoverItem {
         /// A title found before, with what the server has of it, and where, as its request's
-        /// `media` now says. A series counts that request as `series(_:)` counts the user's own.
-        func updated(from media: Components.Schemas.MediaInfo?, request: SeerrRequest, user: Int) -> DiscoverItem {
+        /// `media` now says; `nil` for a series Seerr has no status for. Such a series shows the
+        /// user's own requests for it (`SeerrRequest.availability`), all of them, which only its
+        /// lookup lists: working it out from the one request at hand would show an approved
+        /// request as processing while another of the user's is still pending.
+        func updated(from media: Components.Schemas.MediaInfo?) -> DiscoverItem? {
             guard let media else { return self }
-            var item = self
-            item.availability = SeerrAvailability(status: media.status)
-            if kind == .series {
-                item.availability = SeerrRequest.availability(item.availability, requests: [request], user: user)
+            let availability = SeerrAvailability(status: media.status)
+            if kind == .series, availability == .unknown {
+                return nil
             }
+            var item = self
+            item.availability = availability
             item.jellyfinItemID = media.jellyfinItemID
             return item
         }
