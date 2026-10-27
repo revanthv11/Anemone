@@ -348,13 +348,19 @@ Not started.
 
 #### 6a: release config: privacy, ATS, export compliance, licenses screen, EULA draft
 
-Not started.
+The release work and its reasons are in `docs/release/`, starting with `checklist.md`.
 
-- Privacy manifest and privacy labels (no data collected; logs go only to the user's own server)
-- Export compliance (standard encryption only)
-- ATS justification for user-entered plain-HTTP servers; local network usage string
-- Demo Jellyfin server and reviewer login, with legally free media
-- Custom GPL EULA, source tag per build
+- [x] Privacy manifests for the app and the Top Shelf extension: no tracking and no data collected, since everything goes only to the user's own server. The app declares UserDefaults (`CA92.1`) and file timestamps (`C617.1`, Nuke's artwork disk cache). The App Privacy answers and a privacy policy draft are in `docs/release/privacy.md` and `privacy-policy.md`
+- [x] Export compliance: `ITSAppUsesNonExemptEncryption` is `NO`, since the app only uses the system's HTTPS, the Keychain and SHA-256 for PINs. To look at again if MPVKit brings its own TLS library
+- [x] ATS: `NSAllowsArbitraryLoads` in the app, and now in the extension, for the plain-HTTP servers people type in, with the case for App Review in `docs/release/ats.md`. The local network usage string names the servers the user adds
+- [x] Settings › About: the version, the GPL, and where the source of each build is tagged; then a page per project Anemone is based on (Wholphin, Swiftfin) and per package, each with its full license text, as Wholphin's `LicenseInfo` lists its libraries. The list is read from `NOTICE.md`, which the app bundles at build time (a link in `App/Settings/About`), so a credit added there shows up without touching the screen; a test checks that the file keeps parsing. `scripts/update-licenses.sh` copies the packages' license texts from Xcode's checkouts and warns about a package NOTICE.md doesn't credit
+- [x] A custom GPL EULA draft, following Apple's minimum terms, and an App Review notes template (`docs/release/eula.md`, `app-review-notes.md`)
+- [x] `scripts/tag-build.sh` tags the commit each TestFlight build is archived from as `build/<version>-<build>`, the tag Settings › About names, after checking the commit is on GitHub and the build number isn't tagged yet
+- [ ] Demo Jellyfin server and reviewer login, with legally free media (the developer's to set up)
+
+Tested live in the simulator: Settings › About showed the version, the GPL, Wholphin, Swiftfin and all eight packages, and focus scrolled it to the last package and back; the GPL's page scrolled a paragraph at a time; Wholphin's page reached its license, and Nuke's showed its MIT text. In the add-server flow, `http://localhost:8196` (the local fixture server, plain HTTP) connected and showed that server's profiles, and the demo server's saved profile then went back to Home. The built app's `Info.plist` has the export compliance and ATS keys, and both bundles carry their privacy manifest. Not verified: a plain-HTTP server on another host (the simulator only reached localhost), an archive's privacy report, and anything in App Store Connect.
+
+Not yet: the app icon, Top Shelf image and screenshots; the EULA's final wording; the App Store Connect record. The release checklist lists them.
 
 #### 6b: colour themes, VoiceOver pass, localization import
 
