@@ -16,20 +16,22 @@ struct LibraryTab: View {
     }
 }
 
-/// A library's grid, or a placeholder for Live TV, which gets a guide in Phase 5.
+/// A library's first page, from the sidebar or More. Live TV, music and photo libraries get pages
+/// of their own, each in its own folder; the rest share the grid.
 struct LibraryRoot: View {
     let library: Library
     @Binding var path: NavigationPath
 
     var body: some View {
-        if library.hasGrid {
+        switch library.kind {
+        case .liveTV:
+            LiveTVLibraryView(library: library, path: $path)
+        case .music:
+            MusicLibraryView(library: library, path: $path)
+        case .photos:
+            PhotoLibraryView(library: library, path: $path)
+        default:
             LibraryScreen(library: library, path: $path)
-        } else {
-            Text("The Live TV guide arrives in Phase 5.")
-                .foregroundStyle(.secondary)
-                // Gives focus somewhere to rest, so pressing left opens the sidebar again.
-                .focusable()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 }
