@@ -320,11 +320,10 @@ public extension PlayerOverlay {
     }
 
     /// Wholphin's Previous: the previous entry near the start of this one, otherwise back to the
-    /// start.
+    /// start. Intros are passed over.
     func previous() {
-        let index = controller.queue.currentIndex
-        if index > 0, controller.engine.currentTime < Self.restartThreshold {
-            play(entryAt: index - 1)
+        if let index = controller.queue.previousIndex, controller.engine.currentTime < Self.restartThreshold {
+            play(entryAt: index)
         } else {
             seeker.jump(to: .zero)
             pulse()
@@ -335,9 +334,10 @@ public extension PlayerOverlay {
         controller.queue.next != nil
     }
 
+    /// The next entry, passing over intros.
     func next() {
-        guard hasNext else { return }
-        play(entryAt: controller.queue.currentIndex + 1)
+        guard let index = controller.queue.nextIndex else { return }
+        play(entryAt: index)
     }
 
     /// Plays another queue entry, as the queue row does.

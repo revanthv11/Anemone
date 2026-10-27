@@ -44,6 +44,9 @@ struct SettingsView: View {
                     page("Subtitles", systemImage: "captions.bubble", id: "subtitles") {
                         SubtitlesSettingsPage()
                     }
+                    page("Interface", systemImage: "music.note.tv", id: "interface") {
+                        InterfaceSettingsPage()
+                    }
                     page("Appearance", systemImage: "paintpalette", id: "appearance") {
                         AppearanceSettingsPage()
                     }

@@ -19,6 +19,8 @@ struct PlaybackSettingsPage: View {
                 StreamingSettingsPage()
             }
             .accessibilityIdentifier("settings.playback.streamingAndDisplay")
+            NavigationLink("Cinema Mode", destination: CinemaModeSettingsPage.init)
+                .accessibilityIdentifier("settings.playback.cinemaMode")
         }
         .navigationTitle("Playback")
     }
