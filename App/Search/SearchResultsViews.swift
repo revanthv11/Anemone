@@ -146,6 +146,18 @@ struct RecentSearchesSection: View {
     }
 }
 
+/// In place of results when View Options leaves out every kind: there's nothing to search, so
+/// nothing is asked for.
+struct NoSearchKinds: View {
+    var body: some View {
+        SearchPlaceholder(
+            title: "No search types selected",
+            message: "Choose the types to include in View Options.",
+        )
+        .accessibilityIdentifier("search.noKinds")
+    }
+}
+
 /// Wholphin's `SearchResultPlaceholder`: a row's title over what's happening.
 private struct SearchPlaceholder: View {
     let title: String
