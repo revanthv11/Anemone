@@ -1,5 +1,6 @@
 import Foundation
 import JellyfinAPI
+import Synchronization
 
 /// One of an item's versions, which Jellyfin calls media sources: a film kept in 4K and in
 /// 1080p, say, or a director's cut beside the theatrical one. Most items have just one.
@@ -69,7 +70,7 @@ public extension JellyfinSession {
         profile: DeviceProfile,
         maxBitrate: Int,
         allowsDirect: Bool = true,
-        choices: MediaVersionChoices = .standard,
+        choices: MediaVersionChoices = .current,
     ) async throws -> PlaybackStream {
         guard let picked = choices.choice(for: itemID, userID: userID) else {
             return try await playbackStream(
@@ -139,6 +140,9 @@ extension MediaVersion.Video {
 public struct MediaVersionChoices: Sendable {
     /// The app's own choices.
     public static let standard = Self(suiteName: nil)
+    /// The choices playback goes by: `standard`, unless a test sets a store of its own with
+    /// `$current.withValue(_:operation:)`, so tests running side by side don't share one.
+    @TaskLocal public static var current = standard
 
     static let key = "mediaVersionChoices"
     static let limit = 200
@@ -158,16 +162,30 @@ public struct MediaVersionChoices: Sendable {
 
     public func choose(_ versionID: String, for itemID: MediaItem.ID, userID: String) {
         let prefix = Self.prefix(itemID, userID)
-        var entries = entries.filter { !$0.hasPrefix(prefix) }
-        entries.append(prefix + versionID)
-        defaults.set(Array(entries.suffix(Self.limit)), forKey: Self.key)
+        update { entries in
+            entries.removeAll { $0.hasPrefix(prefix) }
+            entries.append(prefix + versionID)
+        }
     }
 
     /// Back to the server's first version, as when the picked one is gone from the server.
     public func forget(_ itemID: MediaItem.ID, userID: String) {
         let prefix = Self.prefix(itemID, userID)
-        defaults.set(entries.filter { !$0.hasPrefix(prefix) }, forKey: Self.key)
+        update { $0.removeAll { $0.hasPrefix(prefix) } }
     }
+
+    /// Changes the list in one step: a choice made on an item's page and one forgotten while a
+    /// stream loads in the background could otherwise each write back what they read before
+    /// the other's change, undoing it.
+    private func update(_ change: (inout [String]) -> Void) {
+        Self.updating.withLock { _ in
+            var entries = entries
+            change(&entries)
+            defaults.set(Array(entries.suffix(Self.limit)), forKey: Self.key)
+        }
+    }
+
+    private static let updating = Mutex(())
 
     private var defaults: UserDefaults {
         suiteName.flatMap(UserDefaults.init(suiteName:)) ?? .standard

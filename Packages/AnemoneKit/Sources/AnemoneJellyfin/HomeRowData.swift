@@ -245,7 +245,13 @@ extension HomeGetItemsFilter {
         parameters.maxPremiereDate = maxPremiereDate.flatMap(Self.date)
     }
 
-    private static func date(_ text: String) -> Date? {
-        (try? Date(text, strategy: .iso8601)) ?? RemovedFromNextUp.date(from: text)
+    /// Wholphin writes these as kotlinx's `LocalDateTime`, which leaves out the seconds when they
+    /// and the fraction are zero ("2024-05-01T00:00"). A date with a zone is read too.
+    static func date(_ text: String) -> Date? {
+        if let date = try? Date(text, strategy: .iso8601) {
+            return date
+        }
+        let withSeconds = text.wholeMatch(of: /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/) == nil ? text : text + ":00"
+        return RemovedFromNextUp.date(from: withSeconds)
     }
 }

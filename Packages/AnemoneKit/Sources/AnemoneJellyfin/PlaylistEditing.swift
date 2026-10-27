@@ -1,3 +1,4 @@
+import AnemoneCore
 import Foundation
 import JellyfinAPI
 
@@ -6,15 +7,15 @@ public struct EditablePlaylist: Hashable, Identifiable, Sendable {
     public let id: MediaItem.ID
     public let name: String
     public let itemCount: Int
-    /// The entry of the item being added, when it's in the playlist already. Removing goes by
-    /// entry.
-    public let entryID: String?
+    /// Whether the playlist holds the item being added already. `false` also when that couldn't
+    /// be checked, so the playlist is still offered, as Wholphin offers every one.
+    public let holdsItem: Bool
 
-    public init(id: MediaItem.ID, name: String, itemCount: Int, entryID: String? = nil) {
+    public init(id: MediaItem.ID, name: String, itemCount: Int, holdsItem: Bool = false) {
         self.id = id
         self.name = name
         self.itemCount = itemCount
-        self.entryID = entryID
+        self.holdsItem = holdsItem
     }
 }
 
@@ -26,7 +27,8 @@ public extension JellyfinSession {
     /// asks about each whether the user may edit it.
     ///
     /// Wholphin doesn't look inside, so the same item can go in twice; here a playlist holding
-    /// it offers to take it out instead.
+    /// it offers to take it out instead. That check reads only the playlist's item IDs, not its
+    /// entries, and a playlist whose check fails is offered as Wholphin offers it.
     func editablePlaylists(for itemID: MediaItem.ID, limit: Int = 25) async throws -> [EditablePlaylist] {
         let parameters = Paths.GetItemsParameters(
             userID: userID,
@@ -41,25 +43,16 @@ public extension JellyfinSession {
         let playlists = found.compactMap { dto in
             dto.id.map { EditablePlaylist(id: $0, name: dto.name ?? "", itemCount: dto.childCount ?? 0) }
         }
-        let editable = try await withThrowingTaskGroup(of: EditablePlaylist?.self) { group in
-            for playlist in playlists {
-                group.addTask {
-                    guard try await canEditPlaylist(id: playlist.id) else { return nil }
-                    return try await EditablePlaylist(
-                        id: playlist.id,
-                        name: playlist.name,
-                        itemCount: playlist.itemCount,
-                        entryID: playlistEntry(for: itemID, in: playlist.id),
-                    )
-                }
-            }
-            return try await group.reduce(into: [MediaItem.ID: EditablePlaylist]()) { found, playlist in
-                if let playlist {
-                    found[playlist.id] = playlist
-                }
-            }
+        let checked = await boundedMap(playlists.count, width: 6) { index in
+            await attempt { try await editable(playlists[index], holding: itemID) }
         }
-        return playlists.compactMap { editable[$0.id] }
+        return try checked.compactMap { result in
+            if case let .failure(error) = result, error as? SessionError == .signedOut {
+                throw SessionError.signedOut
+            }
+            // Any other failure was a check of whether the user may edit it, which leaves it out.
+            return try? result.get()
+        }
     }
 
     /// Adds an item to the end of a playlist. For a series, season or album the server adds what
@@ -71,9 +64,40 @@ public extension JellyfinSession {
         ))
     }
 
+    /// Takes an item out of a playlist. Only now are the playlist's entries read, to find the
+    /// item's, since removing goes by entry.
+    func removeFromPlaylist(_ playlistID: MediaItem.ID, itemID: MediaItem.ID) async throws {
+        guard let entry = try await playlistEntry(for: itemID, in: playlistID) else { return }
+        try await removeFromPlaylist(playlistID, entryID: entry)
+    }
+
     /// Takes an entry out of a playlist.
     func removeFromPlaylist(_ playlistID: MediaItem.ID, entryID: String) async throws {
         try await send(Paths.removeItemFromPlaylist(playlistID: playlistID, entryIDs: [entryID]))
+    }
+
+    /// The playlist, saying whether it holds the item, or `nil` when the user may not edit it.
+    private func editable(
+        _ playlist: EditablePlaylist,
+        holding itemID: MediaItem.ID,
+    ) async throws -> EditablePlaylist? {
+        guard try await canEditPlaylist(id: playlist.id) else { return nil }
+        let holdsItem: Bool
+        do {
+            // Just the IDs of what it holds, however long it is.
+            let ids = try await send(Paths.getPlaylist(playlistID: playlist.id)).itemIDs
+            holdsItem = ids.contains { JellyfinID.compact($0) == JellyfinID.compact(itemID) }
+        } catch SessionError.signedOut {
+            throw SessionError.signedOut
+        } catch {
+            holdsItem = false
+        }
+        return EditablePlaylist(
+            id: playlist.id,
+            name: playlist.name,
+            itemCount: playlist.itemCount,
+            holdsItem: holdsItem,
+        )
     }
 
     /// The item's entry in a playlist, or `nil` when it isn't in it.

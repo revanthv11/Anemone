@@ -24,9 +24,9 @@ final class ItemContextActions {
     /// Marks changed from menus, which cards show until their pages reload.
     let marks = CardMarksStore()
     let menu: CardMenu
-    /// Goes up whenever a menu saves a change or playback ends, so pages listing items by their
-    /// state, like Favorites, load again.
-    private(set) var revision = 0
+    /// The last favourite a menu added or removed, so the Favorites page can load that row again.
+    /// Other changes show on the cards through `marks`, and need no reload.
+    private(set) var favoriteChange: FavoriteChange?
     var playback: PlaybackRequest?
     var alert: ItemAlert?
     /// The item whose playlist choice is showing.
@@ -48,6 +48,9 @@ final class ItemContextActions {
             return false
         }
         note(state, for: target.id, given: given)
+        if case .favorite = change {
+            favoriteChange = FavoriteChange(serial: (favoriteChange?.serial ?? 0) + 1, kind: target.item.kind)
+        }
         return true
     }
 
@@ -56,7 +59,7 @@ final class ItemContextActions {
         var details = target.details
         // A card without the user's state, or one a menu or the player has changed since, may not
         // have the current resume position.
-        if !target.knowsState || marks.marks(for: target.id, given: given) != given {
+        if !target.knowsState || marks.savedMarks(for: target.id, given: given) != nil {
             do {
                 details = try await browse.session.itemDetails(id: target.id)
             } catch {
@@ -85,13 +88,19 @@ final class ItemContextActions {
 
     private func note(_ state: ItemDetails.UserState, for id: MediaItem.ID, given: CardMarks) {
         var badges = CardBadges(isFavorite: state.isFavorite, isPlayed: state.isPlayed)
-        // Only on cards that show a count; the server's answer to a change doesn't always have one.
-        if given.badges.unplayedCount != nil {
-            badges.unplayedCount = state.unplayedCount ?? (state.isPlayed ? 0 : given.badges.unplayedCount)
-        }
+        // The server's answer to a change doesn't always have a count. Cards of the item that show
+        // one take it from here, and only those do.
+        badges.unplayedCount = state.unplayedCount ?? given.badges.unplayedCount.map { state.isPlayed ? 0 : $0 }
         marks.record(CardMarks(badges: badges, progress: state.progress), for: id, replacing: given)
-        revision += 1
     }
+}
+
+/// A favourite added or removed from a card's menu.
+struct FavoriteChange: Equatable {
+    /// Counts the changes, so changing the same kind of item twice is two changes.
+    let serial: Int
+    /// The changed item's type, whose row on the Favorites page it's in.
+    let kind: MediaItem.Kind
 }
 
 /// The item a card's menu is about, and the user's state with it when the card knows it.
@@ -126,10 +135,10 @@ struct MenuTarget {
 /// Puts the card menu in the environment and shows what its entries open.
 private struct ItemContextActionsHost: ViewModifier {
     @Environment(BrowseModel.self) private var browse
-    @State private var actions = ItemContextActions()
+    @StateObject private var owner = ItemContextActionsOwner()
 
     func body(content: Content) -> some View {
-        @Bindable var actions = actions
+        @Bindable var actions = owner.actions
         content
             .environment(\.cardMenu, actions.menu)
             .environment(actions)
@@ -141,6 +150,14 @@ private struct ItemContextActionsHost: ViewModifier {
                 PlaylistPicker(item: item)
             }
     }
+}
+
+/// Builds the actions once for the host. `@State` would build a new model, with its marks store,
+/// each time the modifier is created, and throw all but the first away; `@StateObject` builds
+/// its object only for the first. Nothing is published here: views observe the actions
+/// themselves.
+private final class ItemContextActionsOwner: ObservableObject {
+    let actions = ItemContextActions()
 }
 
 /// A card's menu: Wholphin's entries for what the card knows about its item.
@@ -166,13 +183,13 @@ private struct ItemContextMenu: View {
     }
 
     private func entries(for target: MenuTarget) -> [ItemMenuEntry] {
-        let shown = actions.marks.marks(for: target.id, given: given)
-        let state = if shown != given {
-            // What the menu last saved, which is newer than what the card holds.
+        let state = if let saved = actions.marks.savedMarks(for: target.id, given: given) {
+            // What a menu last saved for the item, from any of its cards, which is newer than what
+            // this card holds.
             ItemMenuState(
-                isPlayed: shown.badges.isPlayed,
-                isFavorite: shown.badges.isFavorite,
-                isResumable: (shown.progress ?? 0) > 0,
+                isPlayed: saved.badges.isPlayed,
+                isFavorite: saved.badges.isFavorite,
+                isResumable: (saved.progress ?? 0) > 0,
             )
         } else if target.knowsState {
             target.details.menuState
@@ -295,7 +312,7 @@ private struct PlaylistPicker: View {
                                 PlaylistLabel(playlist: playlist)
                             }
                             .disabled(isSaving)
-                            .accessibilityValue(playlist.entryID == nil ? "" : "Has this item")
+                            .accessibilityValue(playlist.holdsItem ? "Has this item" : "")
                             .accessibilityIdentifier("playlist.\(playlist.id)")
                         }
                     }
@@ -327,8 +344,8 @@ private struct PlaylistPicker: View {
         isSaving = true
         defer { isSaving = false }
         do {
-            if let entry = playlist.entryID {
-                try await browse.session.removeFromPlaylist(playlist.id, entryID: entry)
+            if playlist.holdsItem {
+                try await browse.session.removeFromPlaylist(playlist.id, itemID: item.id)
             } else {
                 try await browse.session.addToPlaylist(playlist.id, itemID: item.id)
             }
@@ -344,7 +361,7 @@ private struct PlaylistLabel: View {
 
     var body: some View {
         HStack(spacing: 24) {
-            Image(systemName: playlist.entryID == nil ? "plus" : "checkmark")
+            Image(systemName: playlist.holdsItem ? "checkmark" : "plus")
                 .frame(width: 40)
             Text(playlist.name.isEmpty ? "Untitled" : playlist.name)
             Spacer()

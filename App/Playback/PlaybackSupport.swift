@@ -62,7 +62,10 @@ extension BrowseModel {
 
     /// The player for a request. Every player is built here, with the features every player gets.
     func player(for request: PlaybackRequest) -> PlaybackController {
-        PlaybackController(session: session, request: request)
+        let player = PlaybackController(session: session, request: request)
+        // Theme music (Phase 5c) stops from now until the player closes.
+        ThemeMusic.shared.hold(while: player)
+        return player
     }
 
     /// What the player says when it can't play.
@@ -102,7 +105,13 @@ private extension BrowseModel {
         shuffles: Bool = false,
         following: PlaybackRequest.Following? = nil,
     ) -> PlaybackRequest {
-        PlaybackRequest(queue: queue, shuffles: shuffles, following: following)
+        PlaybackRequest(
+            queue: queue,
+            shuffles: shuffles,
+            following: following,
+            // Cinema-mode intros (Phase 5c) play before what's asked for.
+            intros: CinemaIntros.finder(on: session),
+        )
     }
 
     /// One entry: the item from `position`, with what the player shows about it.

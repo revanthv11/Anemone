@@ -32,7 +32,8 @@ struct LibraryRoot: View {
             LiveTVLibraryView(library: library, path: $path)
         case .music:
             MusicLibraryView(library: library, path: $path)
-        case .photos:
+        // Jellyfin's "Home Videos and Photos" libraries too, as in Wholphin.
+        case .photos, .homeVideos:
             PhotoLibraryView(library: library, path: $path)
         default:
             LibraryScreen(library: library, path: $path)
