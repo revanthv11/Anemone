@@ -14,7 +14,9 @@ struct Reloading {
     var isAsking = false
     /// Whether a reload came while the server was asked. Once the request has gone out, its
     /// answer is dropped and the server asked again, for what's chosen by then, so quick picks
-    /// in the Audio and Subtitles menus come to one more request rather than one each.
+    /// in the Audio and Subtitles menus come to one more request rather than one each. A pick
+    /// made while features prepared the request, before `TrackSelection` read the picks, is in
+    /// it already (see `includesPicks()`).
     var asksAgain = false
 
     /// Another entry: its streams are `loaded` until it's reloaded, and it plays once it's ready.
@@ -26,6 +28,18 @@ struct Reloading {
     /// A request for a stream is about to be prepared, so picks from now on are in it.
     mutating func asks(allowsDirect: Bool) {
         self.allowsDirect = allowsDirect
+        asksAgain = false
+    }
+
+    /// The stream playing directly, or directly streamed, failed: the retry is a transcode, and
+    /// so is a reload that comes before it, rather than the same stream once more.
+    mutating func directFailed() {
+        allowsDirect = false
+    }
+
+    /// `TrackSelection`, which reloads for picks, put every pick so far in the request being
+    /// prepared, so a reload one of them asked for meanwhile needn't ask the server again.
+    mutating func includesPicks() {
         asksAgain = false
     }
 

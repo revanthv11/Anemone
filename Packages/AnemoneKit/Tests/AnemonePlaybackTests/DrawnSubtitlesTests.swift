@@ -40,8 +40,10 @@ struct DrawnSubtitlesTests {
     }
 
     /// A player choosing tracks for the fixture's multi-track file, with a profile that likes
-    /// English, and getting HLS back whose text subtitles come as files of their own.
-    private func player(_ drawn: DrawnSubtitles) -> PlaybackController {
+    /// English, and getting HLS back whose text subtitles come as files of their own. Track
+    /// selection hears of each stream first when `selectionFirst`, with a feature between that
+    /// takes its time, so it says what to draw before the drawn subtitles hear of the stream.
+    private func player(_ drawn: DrawnSubtitles, selectionFirst: Bool = false) -> PlaybackController {
         let selection = TrackSelection(
             server: TrackSelection.Server(
                 itemTracks: { ItemTracks(itemID: $0, sources: [.init(id: $0, tracks: .multiTrack)]) },
@@ -53,7 +55,7 @@ struct DrawnSubtitlesTests {
         return PlaybackController(
             request: PlaybackRequest(.item("m1")),
             engine: engine,
-            features: [drawn, selection, log],
+            features: selectionFirst ? [selection, SlowLoading(), drawn, log] : [drawn, selection, log],
             positionInterval: .milliseconds(10),
         ) { [requests] request in
             requests.append(request)
@@ -200,8 +202,9 @@ struct DrawnSubtitlesTests {
         #expect(await eventually { !playback.accessories.menus.contains { $0.id == DrawnSubtitles.delayMenuID } })
         try pick("subtitles.6", in: "subtitles", of: playback)
         #expect(await eventually { drawn.track?.index == 6 })
-        let menu = playback.accessories.menus.first { $0.id == DrawnSubtitles.delayMenuID }
-        #expect(menu?.title == "Subtitle delay: +1 s")
+        #expect(await eventually {
+            playback.accessories.menus.first { $0.id == DrawnSubtitles.delayMenuID }?.title == "Subtitle delay: +1 s"
+        })
 
         let next = PlaybackStream.withSubtitleFiles("m2", TrackRequest(mediaSourceID: "m2", audioIndex: 1))
         await drawn.handle(.loaded(next, playback.queue.current), in: playback)
@@ -221,16 +224,49 @@ struct DrawnSubtitlesTests {
         try? await Task.sleep(for: .milliseconds(50))
         #expect(drawn.update(at: .seconds(1)) == nil)
         #expect(drawn.cues.isEmpty)
-        #expect(drawn.track?.index == 6)
+        #expect(drawn.track == nil)
+        #expect(!playback.accessories.menus.contains { $0.id == DrawnSubtitles.delayMenuID })
+        // Picking it again tries again.
+        try pick("subtitles.6", in: "subtitles", of: playback)
+        #expect(await eventually { fetches.all.count == 3 })
+        try? await Task.sleep(for: .milliseconds(50))
 
         try pick("subtitles.forced", in: "subtitles", of: playback)
-        #expect(await eventually { fetches.all.count == 3 })
+        #expect(await eventually { fetches.all.count == 4 })
         try pick("subtitles.4", in: "subtitles", of: playback)
         #expect(await eventually { drawn.track?.index == 4 })
         try? await Task.sleep(for: .milliseconds(300))
         #expect(await cues(at: .seconds(1), in: drawn) == ["Track 4 one"])
         // The forced track's file came late, and wasn't kept.
-        #expect(fetches.all.map(\.index) == [4, 6, 5])
+        #expect(fetches.all.map(\.index) == [4, 6, 6, 5])
+    }
+
+    @Test func `the delay menu shows once the file is read, not while it's fetched or when it fails`() async throws {
+        let drawn = drawn(failing: [6], slow: [5, 6], delay: .milliseconds(200))
+        let playback = player(drawn)
+        await start(playback)
+        let hasMenu = { playback.accessories.menus.contains { $0.id == DrawnSubtitles.delayMenuID } }
+        #expect(await eventually { hasMenu() })
+
+        try pick("subtitles.forced", in: "subtitles", of: playback)
+        #expect(await eventually { fetches.all.count == 2 })
+        #expect(!hasMenu())
+        #expect(await eventually { hasMenu() })
+
+        try pick("subtitles.6", in: "subtitles", of: playback)
+        #expect(await eventually { fetches.all.count == 3 })
+        #expect(!hasMenu())
+        try? await Task.sleep(for: .milliseconds(300))
+        #expect(!hasMenu())
+    }
+
+    @Test func `track selection can say what to draw before the drawn subtitles hear of the stream`() async {
+        let drawn = drawn()
+        let playback = player(drawn, selectionFirst: true)
+        await start(playback)
+
+        #expect(await eventually { drawn.track?.index == 4 })
+        #expect(await cues(at: .seconds(1), in: drawn) == ["Track 4 one"])
     }
 
     @Test func `following the engine keeps what shows up to date`() async {
@@ -264,7 +300,10 @@ struct DrawnSubtitlesTests {
         #expect(drawn.track == nil)
         #expect(fetches.all.count == 1)
     }
+}
 
+/// Which style the drawn subtitles take.
+struct DrawnSubtitleStyleTests {
     @Test func `video in HDR or Dolby Vision takes the HDR style`() {
         func stream(_ range: VideoRangeType?) -> PlaybackStream {
             PlaybackStream(
@@ -282,6 +321,16 @@ struct DrawnSubtitlesTests {
         #expect(!stream(.doviWithSDR).isHDR)
         #expect(!stream(.unknown).isHDR)
         #expect(!stream(nil).isHDR)
+    }
+}
+
+/// A feature that takes a moment over each new stream, as one reporting to the server does.
+@MainActor
+private final class SlowLoading: PlaybackFeature {
+    func handle(_ event: PlaybackEvent, in _: PlaybackController) async {
+        if case .loaded = event {
+            try? await Task.sleep(for: .milliseconds(50))
+        }
     }
 }
 

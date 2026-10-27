@@ -41,6 +41,9 @@ public struct PlaybackStream: Hashable, Sendable {
     /// The version's video as the server read it from the file, before any transcode; `nil` when
     /// PlaybackInfo didn't describe it.
     public let video: MediaVersion.Video?
+    /// How long the version runs, as the server read it from the file (PlaybackInfo's
+    /// `RunTimeTicks`); `nil` for a live stream, or when the server doesn't know.
+    public let runtime: Duration?
 
     public init(
         itemID: MediaItem.ID,
@@ -53,6 +56,7 @@ public struct PlaybackStream: Hashable, Sendable {
         subtitleStreamIndex: Int? = nil,
         tracks: [MediaTrack] = [],
         video: MediaVersion.Video? = nil,
+        runtime: Duration? = nil,
     ) {
         self.itemID = itemID
         self.url = url
@@ -64,6 +68,7 @@ public struct PlaybackStream: Hashable, Sendable {
         self.subtitleStreamIndex = subtitleStreamIndex
         self.tracks = tracks
         self.video = video
+        self.runtime = runtime
     }
 }
 
@@ -221,6 +226,7 @@ extension PlaybackStream {
             subtitleStreamIndex: source.defaultSubtitleStreamIndex,
             tracks: (source.mediaStreams ?? []).compactMap(MediaTrack.init),
             video: source.mediaStreams?.first { $0.type == .video }.map(MediaVersion.Video.init),
+            runtime: source.runTimeTicks.map(Duration.init(ticks:)),
         )
     }
 

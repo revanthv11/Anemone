@@ -16,6 +16,7 @@ struct MPVSeekTests {
         #expect(await eventually { client.commands.count == 2 })
         let second = Task { await engine.seek(to: .seconds(45)) }
         #expect(await eventually { client.commands.count == 3 })
+        engine.reply(on: client)
         engine.handle(.seek(entry: 1))
         engine.handle(.playbackRestart(entry: 1))
 
@@ -62,6 +63,7 @@ struct MPVSeekTests {
 
         let seek = Task { await engine.seek(to: .seconds(30)) }
         #expect(await eventually { time.running == 1 })
+        engine.reply(on: client)
         engine.handle(.seek(entry: 1))
         time.pass()
         // Now waiting for it to land.
@@ -79,6 +81,7 @@ struct MPVSeekTests {
 
         let seek = Task { await engine.seek(to: .seconds(30)) }
         #expect(await eventually { time.running == 1 })
+        engine.reply(on: client)
         engine.handle(.seek(entry: 1))
         time.pass()
         #expect(await eventually { time.running == 1 })
@@ -96,8 +99,74 @@ struct MPVSeekTests {
 
         let seek = Task { await engine.seek(to: .seconds(30)) }
         #expect(await eventually { time.running == 1 })
+        engine.reply(on: client)
         engine.handle(.seek(entry: 1))
         time.pass()
+
+        #expect(await seek.value == false)
+    }
+
+    /// libmpv's seek event doesn't say which seek it's for: one for an older seek, sent before
+    /// libmpv replied to the newest, is that older one's.
+    @Test func `an older seek's event doesn't put the newest seek on the landing timeout`() async {
+        let client = FakeMPVClient()
+        let time = ManualTime()
+        let engine = MPVPlayerEngine.testing(client, time: time)
+        _ = engine.loadAndStart(on: client)
+
+        let older = Task { await engine.seek(to: .seconds(30)) }
+        #expect(await eventually { client.asyncIDs.count == 1 })
+        engine.reply(on: client)
+        let newest = Task { await engine.seek(to: .seconds(45)) }
+        #expect(await eventually { client.asyncIDs.count == 2 })
+        // The older seek starts and lands before libmpv has replied to the newest.
+        engine.handle(.seek(entry: 1))
+        engine.handle(.playbackRestart(entry: 1))
+        // The newest's start timeout, and the older one's, which the newest replaced.
+        #expect(await eventually { time.running == 2 })
+        // libmpv never starts the newest, as on a live stream: it gives up on the start timeout.
+        engine.reply(on: client)
+        time.pass()
+
+        #expect(await newest.value == false)
+        #expect(await older.value == false)
+        #expect(time.running == 0)
+    }
+
+    @Test func `the newest seek starts and lands with the events after libmpv's reply to it`() async {
+        let client = FakeMPVClient()
+        let time = ManualTime()
+        let engine = MPVPlayerEngine.testing(client, time: time)
+        _ = engine.loadAndStart(on: client)
+
+        let older = Task { await engine.seek(to: .seconds(30)) }
+        #expect(await eventually { client.asyncIDs.count == 1 })
+        engine.reply(on: client)
+        engine.handle(.seek(entry: 1))
+        let newest = Task { await engine.seek(to: .seconds(45)) }
+        #expect(await eventually { client.asyncIDs.count == 2 })
+        // The older one's restart is still on its way.
+        engine.handle(.playbackRestart(entry: 1))
+        engine.reply(on: client)
+        engine.handle(.seek(entry: 1))
+        #expect(await eventually { time.running == 2 })
+        time.pass()
+        #expect(await eventually { time.running == 1 })
+        engine.handle(.playbackRestart(entry: 1))
+
+        #expect(await newest.value == true)
+        #expect(await older.value == false)
+    }
+
+    @Test func `a seek libmpv replies that it refused doesn't get there, at once`() async {
+        let client = FakeMPVClient()
+        let time = ManualTime()
+        let engine = MPVPlayerEngine.testing(client, time: time)
+        _ = engine.loadAndStart(on: client)
+
+        let seek = Task { await engine.seek(to: .seconds(30)) }
+        #expect(await eventually { client.asyncIDs.count == 1 })
+        engine.reply(on: client, succeeded: false)
 
         #expect(await seek.value == false)
     }

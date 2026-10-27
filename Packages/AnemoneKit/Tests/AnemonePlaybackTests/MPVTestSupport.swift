@@ -40,6 +40,17 @@ final class FakeMPVClient: MPVClient {
         return true
     }
 
+    /// The IDs of the commands sent with `commandAsync`, oldest first, for the replies a test
+    /// hands the engine.
+    private(set) var asyncIDs: [UInt64] = []
+
+    func commandAsync(_ arguments: [String], id: UInt64) -> Bool {
+        commands.append(arguments)
+        guard let name = arguments.first, !refusedCommands.contains(name) else { return false }
+        asyncIDs.append(id)
+        return true
+    }
+
     func loadFile(_ arguments: [String]) -> MPVLoadResult {
         commands.append(arguments)
         guard !refusesLoads else { return .refused }
@@ -168,6 +179,13 @@ extension MPVPlayerEngine {
         let log = loadLog(path)
         start(client.entries.last ?? 0)
         return log
+    }
+
+    /// libmpv's reply to the newest command sent to `client` with `commandAsync`, such as a seek:
+    /// it took it, or refused it.
+    func reply(on client: FakeMPVClient, succeeded: Bool = true) {
+        guard let id = client.asyncIDs.last else { return }
+        handle(.commandReply(id: id, succeeded: succeeded))
     }
 
     /// libmpv's events as it starts, opens and plays `entry`.

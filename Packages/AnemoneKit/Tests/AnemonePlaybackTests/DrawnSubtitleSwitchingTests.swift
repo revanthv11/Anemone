@@ -21,24 +21,20 @@ struct DrawnSubtitleSwitchingTests {
             to: track(6),
             in: stream,
             options: [],
-            burnsInStyled: true,
         ) == .drawn(track(6)))
-        #expect(try TrackSwitching.subtitle(from: track(4), to: nil, in: stream, options: [], burnsInStyled: true)
+        #expect(try TrackSwitching.subtitle(from: track(4), to: nil, in: stream, options: [])
             == .inPlace(nil))
     }
 
     @Test func `picture subtitles, and ASS on AVPlayer, are still burned in`() throws {
-        #expect(try TrackSwitching.subtitle(from: track(4), to: track(7), in: stream, options: [], burnsInStyled: true)
+        #expect(try TrackSwitching.subtitle(from: track(4), to: track(7), in: stream, options: [])
             == .reload)
-        #expect(try TrackSwitching.subtitle(from: track(4), to: track(8), in: stream, options: [], burnsInStyled: true)
+        #expect(try TrackSwitching.subtitle(from: track(4), to: track(8), in: stream, options: [])
             == .reload)
-        // Were it not burned in, the server's plain text of it would be drawn.
-        #expect(try TrackSwitching.subtitle(from: nil, to: track(7), in: stream, options: [], burnsInStyled: false)
-            == .drawn(track(7)))
     }
 
     @Test func `a live stream doesn't offer subtitles sent as files`() throws {
-        #expect(try !TrackSwitching.switchesInPlace(to: track(4), in: stream, burnsInStyled: true))
+        #expect(try !TrackSwitching.switchesInPlace(to: track(4), in: stream))
     }
 
     @Test func `MPV's tracks include the files, so it switches among them and nothing is drawn`() throws {
@@ -47,29 +43,27 @@ struct DrawnSubtitleSwitchingTests {
             PlayerTrack(id: $0, kind: .subtitle, title: "Subtitle \($0)", language: "en", isSelected: $0 == 1)
         }
 
-        #expect(TrackSwitching.listed(.subtitle, in: stream, drawsFiles: false).map(\.index) == [4, 5, 6, 7])
+        #expect(TrackSwitching.listed(.subtitle, in: stream, rendering: .mpv).map(\.index) == [4, 5, 6, 7])
         #expect(try TrackSwitching.subtitle(
             from: track(4),
             to: track(6),
             in: stream,
             options: options,
-            burnsInStyled: true,
-            drawsFiles: false,
+            rendering: .mpv,
         ) == .inPlace(options[2]))
         #expect(try TrackSwitching.subtitle(
             from: nil,
             to: track(7),
             in: stream,
             options: options,
-            burnsInStyled: false,
-            drawsFiles: false,
+            rendering: .mpv,
         ) == .inPlace(options[3]))
-        #expect(try TrackSwitching.switchesInPlace(to: track(4), in: stream, burnsInStyled: true, drawsFiles: false))
+        #expect(try TrackSwitching.switchesInPlace(to: track(4), in: stream, rendering: .mpv))
     }
 
     @Test @MainActor func `only AVPlayer has the files drawn`() {
-        #expect(TrackSelection.drawsFiles(in: TrackEngine()))
-        #expect(!TrackSelection.drawsFiles(in: MPVPlayerEngine.testing(nil)))
+        #expect(TrackSelection.rendering(in: TrackEngine()) == .avPlayer)
+        #expect(TrackSelection.rendering(in: MPVPlayerEngine.testing(nil)) == .mpv)
     }
 }
 

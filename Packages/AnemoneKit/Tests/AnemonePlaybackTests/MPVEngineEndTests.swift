@@ -1,3 +1,4 @@
+import AnemoneJellyfin
 @testable import AnemonePlayback
 import Foundation
 import Testing
@@ -48,6 +49,36 @@ struct MPVEngineEndTests {
         #expect(MPVPlayerEngine.isRealEnd(at: .seconds(30), of: nil))
     }
 
+    /// libmpv only estimates the duration of some files played directly, such as TS and AVI.
+    @Test func `the end is a cut-off only when it's short of both the server's runtime and libmpv's duration`() {
+        // libmpv's estimate is long, the server's runtime right: the end.
+        #expect(MPVPlayerEngine.isRealEnd(at: .seconds(600), of: .seconds(700), runtime: .seconds(600)))
+        // libmpv's duration is right where the server's runtime isn't.
+        #expect(MPVPlayerEngine.isRealEnd(at: .seconds(600), of: .seconds(600), runtime: .seconds(700)))
+        // Short of both.
+        #expect(!MPVPlayerEngine.isRealEnd(at: .seconds(100), of: .seconds(600), runtime: .seconds(600)))
+        // Either alone, when the other isn't known.
+        #expect(!MPVPlayerEngine.isRealEnd(at: .seconds(100), of: nil, runtime: .seconds(600)))
+        #expect(MPVPlayerEngine.isRealEnd(at: .seconds(595), of: nil, runtime: .seconds(600)))
+        #expect(MPVPlayerEngine.isRealEnd(at: .seconds(30), of: nil, runtime: nil))
+    }
+
+    @Test func `the end of a file whose duration libmpv overestimates is the end at the server's runtime`() async {
+        let client = FakeMPVClient()
+        let engine = MPVPlayerEngine.testing(client)
+        let log = engine.loadAndStart(on: client)
+        engine.setRuntime(.seconds(600), forStreamFrom: URL(filePath: "/m.mkv"))
+        // The runtime of a stream another has replaced is dropped.
+        engine.setRuntime(.seconds(900), forStreamFrom: URL(filePath: "/other.mkv"))
+        client.properties["time-pos"] = "599"
+        client.properties["duration"] = "700"
+
+        engine.handle(.property("eof-reached", .flag(true)))
+
+        #expect(await eventually { log.events.last == "ended" })
+        #expect(!log.isFinished)
+    }
+
     /// Wholphin's retry as a transcode, for a direct play that stops partway, rather than Up
     /// Next and a session ended at the duration.
     @Test func `a direct play cut off partway is retried as a transcode from where it stopped`() async {
@@ -76,6 +107,39 @@ struct MPVEngineEndTests {
         #expect(client.commands.last?[1] == FakeStreams.stream("m1", method: .transcode).url.absoluteString)
         #expect(client.commands.last?.last?.hasSuffix("start=100.000") == true)
         #expect(!features.events.contains("ended"))
+        await playback.stop()
+    }
+
+    /// A TS file played directly, whose duration libmpv overestimates, plays to its end as the
+    /// server measured it: Up Next rather than a retry.
+    @Test func `a direct play that ends at the server's runtime isn't retried`() async {
+        let client = FakeMPVClient()
+        let engine = MPVPlayerEngine.testing(client)
+        let features = EventLog()
+        let playback = PlaybackController(
+            request: PlaybackRequest(.item("m1")),
+            engine: engine,
+            features: [MPVRuntime(), features],
+            positionInterval: .seconds(60),
+        ) { request in
+            PlaybackStream(
+                itemID: request.itemID,
+                url: URL(filePath: "/m1.ts"),
+                method: .directPlay,
+                playSessionID: "ps",
+                runtime: .seconds(600),
+            )
+        }
+        await playback.start()
+        engine.start(client.entries[0])
+        #expect(await eventually { playback.state.isPlaying })
+        client.properties["time-pos"] = "600"
+        client.properties["duration"] = "742"
+
+        engine.handle(.property("eof-reached", .flag(true)))
+
+        #expect(await eventually { features.events.contains("ended") })
+        #expect(client.entries.count == 1)
         await playback.stop()
     }
 
