@@ -14,6 +14,8 @@ struct CollectionPage: View {
     @State private var memory = RowMemory()
     /// In the order the sort asks for.
     @State private var items: [ItemDetails]?
+    /// The sort and filter `items` were loaded with, so Play follows them only while they show.
+    @State private var itemsQuery: CollectionDisplay.Query?
     @State private var problem: String?
     @State private var alert: ItemAlert?
     @State private var playback: PlaybackRequest?
@@ -96,6 +98,7 @@ struct CollectionPage: View {
                 sort: query.sort,
                 filter: query.filter,
             )
+            itemsQuery = query
             problem = nil
         } catch {
             // A failed refresh keeps the rows already showing.
@@ -106,11 +109,15 @@ struct CollectionPage: View {
         }
     }
 
-    /// In the order and with the filters the page shows, as Wholphin's Play All takes them.
+    /// In the order and with the filters the page shows, as Wholphin's Play All takes them, from
+    /// the items it lists rather than asking for them again.
     private func play(shuffled: Bool) {
         let order = display.map { (sort: $0.sort, filter: $0.filter) }
+        let shown = itemsQuery != nil && itemsQuery == display?.query ? items : nil
         Task {
-            await browse.playQueue(of: collection, shuffled: shuffled, order: order) { playback = $0 } failed: {
+            await browse.playQueue(of: collection, shuffled: shuffled, order: order, shown: shown) {
+                playback = $0
+            } failed: {
                 alert = $0
             }
         }
