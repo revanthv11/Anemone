@@ -118,11 +118,11 @@ private struct DeepLinkPage: View {
             item = details.item
             // Music has its own player later (Phase 5b); its page says so on Play.
             guard details.isPlayable, details.item.kind != .audio else { return }
-            let position: Duration? = switch start {
+            let from: Duration? = switch start {
             case .resume: details.userState.resumePosition
             case let .position(position): position
             }
-            playback = browse.playback(of: details, from: position)
+            playback = browse.playback(of: details, from: from)
         } catch {
             problem = browse.problem(with: error, doing: "open this item on \(browse.server.name)")
         }

@@ -16,55 +16,62 @@ private let log = Logger(subsystem: "com.revanthv11.anemone.topshelf", category:
 /// locked, or the server can't be reached; the app asks tvOS to load it again when that changes.
 final class ContentProvider: TVTopShelfContentProvider {
     /// The completion-handler form: the content isn't `Sendable`, so the async override can't
-    /// return it under strict concurrency.
+    /// return it under strict concurrency. The task only carries `Sendable` rows; the content is
+    /// built from them where the handler is called.
     override func loadTopShelfContent(completionHandler: @escaping ((any TVTopShelfContent)?) -> Void) {
         let reply = Reply(completionHandler)
         Task {
-            guard let profile = await SignedInProfile.current() else {
-                reply.send(nil)
-                return
-            }
-            do {
-                let rows = try await profile.session.topShelfRows(options: profile.options)
-                reply.send(rows.isEmpty ? nil : Self.content(for: rows, of: profile))
-            } catch {
-                log.error("Couldn't load the rows: \(error, privacy: .public)")
-                reply.send(nil)
-            }
+            let rows = await Self.loadRows()
+            reply.send(rows)
         }
     }
 
-    private static func content(for rows: [TopShelfRow], of profile: SignedInProfile) -> any TVTopShelfContent {
-        TVTopShelfSectionedContent(sections: rows.map { section(for: $0, of: profile) })
+    /// The rows for the profile the app opens on, or `nil` when there's nothing to show.
+    private static func loadRows() async -> LoadedRows? {
+        guard let profile = await SignedInProfile.current() else { return nil }
+        do {
+            let rows = try await profile.session.topShelfRows(options: profile.options)
+            return rows.isEmpty ? nil : LoadedRows(profile: profile, rows: rows)
+        } catch {
+            log.error("Couldn't load the rows: \(error, privacy: .public)")
+            return nil
+        }
+    }
+}
+
+/// What the Top Shelf shows, before it's turned into TVServices' types.
+private struct LoadedRows: Sendable {
+    let profile: SignedInProfile
+    let rows: [TopShelfRow]
+
+    var content: any TVTopShelfContent {
+        TVTopShelfSectionedContent(sections: rows.map(section))
     }
 
-    private static func section(
-        for row: TopShelfRow,
-        of profile: SignedInProfile,
-    ) -> TVTopShelfItemCollection<TVTopShelfSectionedItem> {
-        let collection = TVTopShelfItemCollection(items: row.items.map { item(for: $0, of: profile) })
+    private func section(for row: TopShelfRow) -> TVTopShelfItemCollection<TVTopShelfSectionedItem> {
+        let collection = TVTopShelfItemCollection(items: row.items.map(item))
         collection.title = row.title
         return collection
     }
 
-    private static func item(for media: MediaItem, of profile: SignedInProfile) -> TVTopShelfSectionedItem {
-        let item = TVTopShelfSectionedItem(identifier: media.id)
-        item.title = media.topShelfTitle
+    private func item(for media: MediaItem) -> TVTopShelfSectionedItem {
+        let shelfItem = TVTopShelfSectionedItem(identifier: media.id)
+        shelfItem.title = media.topShelfTitle
         // 16:9 art, as Wholphin's Watch Next row uses.
-        item.imageShape = .hdtv
+        shelfItem.imageShape = .hdtv
         if let image = media.thumbImage {
-            item.setImageURL(profile.session.imageURL(for: image, maxWidth: 640), for: .screenScale1x)
-            item.setImageURL(profile.session.imageURL(for: image, maxWidth: 1280), for: .screenScale2x)
+            shelfItem.setImageURL(profile.session.imageURL(for: image, maxWidth: 640), for: .screenScale1x)
+            shelfItem.setImageURL(profile.session.imageURL(for: image, maxWidth: 1280), for: .screenScale2x)
         }
-        item.playbackProgress = media.progress ?? 0
-        item.displayAction = TVTopShelfAction(url: profile.link(.item(id: media.id)))
-        item.playAction = TVTopShelfAction(url: profile.link(.play(id: media.id, position: nil)))
-        return item
+        shelfItem.playbackProgress = media.progress ?? 0
+        shelfItem.displayAction = TVTopShelfAction(url: profile.link(.item(id: media.id)))
+        shelfItem.playAction = TVTopShelfAction(url: profile.link(.play(id: media.id, position: nil)))
+        return shelfItem
     }
 }
 
 /// The system's completion handler, which may be called from any thread once, carried into the
-/// task that loads the content.
+/// task that loads the rows.
 private final class Reply: @unchecked Sendable {
     private let handler: ((any TVTopShelfContent)?) -> Void
 
@@ -72,8 +79,8 @@ private final class Reply: @unchecked Sendable {
         self.handler = handler
     }
 
-    func send(_ content: (any TVTopShelfContent)?) {
-        handler(content)
+    func send(_ rows: LoadedRows?) {
+        handler(rows?.content)
     }
 }
 
