@@ -3,8 +3,8 @@ import AnemoneUI
 import SwiftUI
 
 /// A library's items as a grid that pages in ahead of focus, with Wholphin's alphabet bar,
-/// position footer, Back to jump to the top, the card menu on a long press, and (when asked for)
-/// paging with the remote's page buttons. The same grid draws the list layouts, one title per
+/// position footer, Back to jump to the top, and (when asked for) the card menu on a long press
+/// and paging with the remote's page buttons. The same grid draws the list layouts, one title per
 /// row, and the Genres and Studios tabs.
 ///
 /// One `LazyVGrid` in a vertical `ScrollView`, with no focus section of its own; see
@@ -29,6 +29,10 @@ struct LibraryGrid<Header: View, Card: View>: View {
     /// Whether the remote's page buttons page through the grid. It's opt-in, since hearing them
     /// takes a gesture recognizer on the window.
     let hearsPageButtons: Bool
+    /// Whether a long press on a card opens the card menu. It's opt-in, since pages that open
+    /// their cards in their own way (photo albums, say) would get a menu whose Go to does
+    /// something else.
+    let showsCardMenu: Bool
     /// Draws an entry, or its placeholder while its page loads, at a width in points and pixels.
     let card: (_ entry: LibraryEntry?, _ width: CGFloat, _ pixelWidth: Int) -> Card
     let header: Header
@@ -52,6 +56,7 @@ struct LibraryGrid<Header: View, Card: View>: View {
         onExitTop: (() -> Void)? = nil,
         emptyMessage: String? = nil,
         hearsPageButtons: Bool = false,
+        showsCardMenu: Bool = false,
         @ViewBuilder card: @escaping (_ entry: LibraryEntry?, _ width: CGFloat, _ pixelWidth: Int) -> Card,
         @ViewBuilder header: () -> Header,
     ) {
@@ -65,6 +70,7 @@ struct LibraryGrid<Header: View, Card: View>: View {
         self.onExitTop = onExitTop
         self.emptyMessage = emptyMessage
         self.hearsPageButtons = hearsPageButtons
+        self.showsCardMenu = showsCardMenu
         self.card = card
         self.header = header()
     }
@@ -185,6 +191,7 @@ struct LibraryGrid<Header: View, Card: View>: View {
                     index: index,
                     pager: pager,
                     isListRow: options.layout != .grid,
+                    showsCardMenu: showsCardMenu,
                     width: cardWidth,
                     card: card,
                     onSelect: onSelect,
@@ -297,6 +304,7 @@ private struct GridCell<Card: View>: View {
     /// List rows show focus as a highlight; cards lift their artwork, which needs a borderless
     /// button.
     let isListRow: Bool
+    let showsCardMenu: Bool
     let width: CGFloat
     let card: (LibraryEntry?, CGFloat, Int) -> Card
     let onSelect: (MediaItem) -> Void
@@ -312,15 +320,21 @@ private struct GridCell<Card: View>: View {
         } label: {
             card(entry, width, Int(width * displayScale))
         }
-        Group {
+        let styled = Group {
             if isListRow {
                 button.buttonStyle(ListRowButtonStyle())
             } else {
                 button.buttonStyle(.borderless)
             }
         }
-        // On the button, which has focus; a card that gives no menu item gets no menu.
-        .cardMenu()
+        Group {
+            // On the button, which has focus; a card that gives no menu item gets no menu.
+            if showsCardMenu {
+                styled.cardMenu()
+            } else {
+                styled
+            }
+        }
         .accessibilityLabel(entry?.item.displayTitle ?? "Loading")
         .accessibilityIdentifier("grid.card.\(index)")
         .task {

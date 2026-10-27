@@ -124,6 +124,7 @@ struct LibraryItemsPage: View {
             onExitTop: onExitTop,
             emptyMessage: emptyMessage,
             hearsPageButtons: true,
+            showsCardMenu: true,
             header: {
                 if withHeader {
                     gridHeader(pager)
