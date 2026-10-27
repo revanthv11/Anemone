@@ -2,7 +2,8 @@ import AnemoneJellyfin
 import AnemoneUI
 import SwiftUI
 
-/// Wholphin's default home page: a header for the focused item over its backdrop, then rows.
+/// Wholphin's home page: a header for the focused item over its backdrop, then the rows chosen
+/// in Settings › Home.
 struct HomeView: View {
     /// Whether Home is the page chosen in the sidebar.
     let isSelected: Bool
@@ -24,6 +25,10 @@ struct HomeView: View {
                 // Home is the stack's root, which `itemPages(in:)` doesn't reach.
                 .environment(\.pageStack, stack)
                 .itemPages(in: stack)
+                .navigationDestination(for: HomeItemsLink.self) { link in
+                    HomeItemsPage(link: link)
+                        .environment(\.pageStack, stack)
+                }
         }
     }
 
@@ -240,7 +245,6 @@ private struct HomeRowView: View {
     let scrollTarget: CardID?
 
     @Environment(BrowseModel.self) private var browse
-    @Environment(\.displayScale) private var displayScale
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -248,21 +252,17 @@ private struct HomeRowView: View {
                 .font(.headline)
             ScrollViewReader { scroller in
                 ScrollView(.horizontal) {
-                    LazyHStack(spacing: HomeLayout.cardSpacing) {
-                        ForEach(row.items) { item in
-                            NavigationLink(value: item) {
-                                MediaCard(
-                                    title: item.displayTitle,
-                                    subtitle: item.subtitle ?? item.year.map(String.init),
-                                    imageURL: imageURL(for: item),
-                                    shape: row.shape,
-                                    width: row.shape.cardWidth,
-                                    progress: item.progress,
-                                )
+                    LazyHStack(spacing: CGFloat(row.config.viewOptions.spacing) * HomeCardStyle.spacingPointsPerDp) {
+                        ForEach(row.cards) { card in
+                            link(to: card) {
+                                HomeCardView(card: card, options: row.config.viewOptions)
                             }
                             .buttonStyle(.borderless)
-                            .focused(focusedCard, equals: CardID(rowID: row.id, itemID: item.id))
-                            .accessibilityIdentifier("card.\(row.id).\(item.id)")
+                            .focused(focusedCard, equals: CardID(rowID: row.id, itemID: card.id))
+                            .accessibilityIdentifier("card.\(row.id).\(card.id)")
+                            .removeFromNextUpMenu(isOffered: offersRemoveFromNextUp(card)) {
+                                Task { await browse.removeFromNextUp(card.item) }
+                            }
                         }
                     }
                     .padding(.vertical, HomeLayout.focusPadding)
@@ -279,8 +279,35 @@ private struct HomeRowView: View {
         .focusSection()
     }
 
-    private func imageURL(for item: MediaItem) -> URL? {
-        browse.imageURL(item.image(for: row.shape), width: row.shape.cardWidth * displayScale)
+    @ViewBuilder
+    private func link(to card: HomeCard, @ViewBuilder label: () -> some View) -> some View {
+        switch card.destination {
+        case .item:
+            NavigationLink(value: card.item, label: label)
+        case let .items(link):
+            NavigationLink(value: link, label: label)
+        }
+    }
+
+    /// Wholphin offers this on episodes in Next Up and the combined row.
+    private func offersRemoveFromNextUp(_ card: HomeCard) -> Bool {
+        card.item.kind == .episode && (row.config.kind == .nextUp || row.config.kind == .continueWatchingCombined)
+    }
+}
+
+private extension View {
+    /// Wholphin's "Remove from Next Up", on a long press. The card context menu (Phase 2h) will
+    /// take this over.
+    @ViewBuilder
+    func removeFromNextUpMenu(isOffered: Bool, action: @escaping () -> Void) -> some View {
+        if isOffered {
+            contextMenu {
+                Button("Remove from Next Up", systemImage: "minus.circle", action: action)
+                    .accessibilityIdentifier("home.removeFromNextUp")
+            }
+        } else {
+            self
+        }
     }
 }
 
@@ -314,35 +341,10 @@ private enum HomeLayout {
     static let headerSpacing: CGFloat = 24
     static let horizontalInset: CGFloat = 80
     static let rowSpacing: CGFloat = 16
-    static let cardSpacing: CGFloat = 40
     /// Room above and below each row so the focus lift isn't clipped.
     static let focusPadding: CGFloat = 30
     /// Backdrops are faded and dimmed, so 1080p is plenty even on a 4K screen.
     static let backdropPixelWidth: CGFloat = 1920
-}
-
-private extension HomeRow {
-    var title: String {
-        switch kind {
-        case .continueWatching: "Continue Watching"
-        case .nextUp: "Next Up"
-        case let .recentlyAdded(library): "Recently Added in \(library.name)"
-        }
-    }
-
-    /// Wholphin's default row styles: thumbs for watching rows, and per library type otherwise.
-    var shape: CardShape {
-        switch kind {
-        case .continueWatching, .nextUp:
-            .thumb
-        case let .recentlyAdded(library):
-            switch library.kind {
-            case .music: .square
-            case .photos, .homeVideos, .musicVideos: .thumb
-            default: .poster
-            }
-        }
-    }
 }
 
 extension CardShape {

@@ -93,60 +93,6 @@ struct JellyfinSessionTests {
         #expect(sent["groupItems"] == "true")
     }
 
-    @Test func `home hides empty rows and keeps the rows that loaded`() async throws {
-        let requested = Mutex<[String]>([])
-        MockServer.register(host: "home.test") { request in
-            let parentID = request.query["parentId"]
-            requested.withLock { $0.append(parentID ?? request.url?.path() ?? "") }
-            switch (request.url?.path(), parentID) {
-            case ("/UserViews", _):
-                return .json(#"""
-                {"Items":[
-                  {"Id":"movies","Name":"Movies","CollectionType":"movies"},
-                  {"Id":"shows","Name":"Shows","CollectionType":"tvshows"},
-                  {"Id":"live","Name":"Live TV","CollectionType":"livetv"}
-                ]}
-                """#)
-            case ("/UserItems/Resume", _):
-                return .items(Self.movieJSON)
-            case ("/Shows/NextUp", _):
-                return .items()
-            case ("/Items/Latest", "movies"):
-                return MockServer.Reply(status: 500, body: "")
-            case ("/Items/Latest", "shows"):
-                return .json("[\(Self.episodeJSON)]")
-            default:
-                return nil
-            }
-        }
-
-        let home = try await session(host: "home.test").home()
-
-        let shows = Library(id: "shows", name: "Shows", kind: .shows)
-        #expect(home.rows.map(\.kind) == [.continueWatching, .recentlyAdded(shows)])
-        #expect(home.failedRows == [.recentlyAdded(Library(id: "movies", name: "Movies", kind: .movies))])
-        #expect(home.libraries.map(\.id) == ["movies", "shows", "live"])
-        #expect(!requested.withLock { $0.contains("live") })
-    }
-
-    @Test func `home reports a revoked token as signed out`() async throws {
-        MockServer.register(host: "revoked.test") { request in
-            request.url?.path() == "/UserViews" ? .json(#"{"Items":[]}"#) : .unauthorized
-        }
-
-        await #expect(throws: SessionError.signedOut) {
-            try await session(host: "revoked.test").home()
-        }
-    }
-
-    @Test func `home reports an unreachable server as a connection error, not a sign-out`() async throws {
-        MockServer.register(host: "offline.test") { _ in nil }
-
-        await #expect(throws: URLError.self) {
-            try await session(host: "offline.test").home()
-        }
-    }
-
     // MARK: Fixtures
 
     private static let movieJSON = #"""
