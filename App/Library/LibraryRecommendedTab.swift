@@ -16,6 +16,7 @@ struct LibraryRecommendedTab: View {
     var onPastFirstRow: (Bool) -> Void = { _ in }
 
     @Environment(BrowseModel.self) private var browse
+    @Environment(\.theme) private var theme
     @State private var content = Content.loading
     @State private var focus = FocusedTitle()
     @FocusState private var focusedCard: CardID?
@@ -92,7 +93,7 @@ struct LibraryRecommendedTab: View {
     private func message(_ text: String, @ViewBuilder actions: () -> some View) -> some View {
         VStack(spacing: 24) {
             Text(text)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.secondaryText)
                 .multilineTextAlignment(.center)
             actions()
         }
@@ -157,11 +158,14 @@ private struct RecommendedRowView: View {
 
     @Environment(BrowseModel.self) private var browse
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.theme) private var theme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(row.title)
                 .font(.headline)
+                .foregroundStyle(theme.onBackground)
+                .accessibilityAddTraits(.isHeader)
             ScrollView(.horizontal) {
                 LazyHStack(spacing: RecommendedLayout.cardSpacing) {
                     ForEach(row.items) { item in
@@ -171,6 +175,7 @@ private struct RecommendedRowView: View {
                             MediaCard(
                                 title: item.displayTitle,
                                 subtitle: item.subtitle ?? item.year.map(String.init),
+                                spokenSubtitle: item.spokenSubtitle,
                                 imageURL: browse.imageURL(
                                     item.posterImage,
                                     width: RecommendedLayout.cardWidth * displayScale,
@@ -194,6 +199,10 @@ private struct RecommendedRowView: View {
             .scrollClipDisabled()
         }
         .focusSection()
+        // VoiceOver hears the row as a group named by its title, as on Home.
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text(verbatim: row.title))
+        .accessibilityIdentifier("library.row.\(row.kind.rawValue)")
     }
 }
 

@@ -17,9 +17,12 @@ struct ScreensaverView: View {
     @State private var slide: ScreensaverSlide?
     @State private var message: String?
     @State private var messagePlace = Alignment.bottomLeading
+    /// Read here, since this view's own environment is outside the `appTheme()` its body sets.
+    @AppStorage(Preferences.appThemeColors) private var themeColors
 
     var body: some View {
         ZStack {
+            // Behind the pictures, like the black around a photo, so it's not the theme's.
             Color.black
             if let slide {
                 SlideView(
@@ -33,7 +36,7 @@ struct ScreensaverView: View {
             } else if let message {
                 Text(message)
                     .font(.title2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryText)
                     .padding(.horizontal, ScreensaverLayout.horizontalInset)
                     .padding(.vertical, ScreensaverLayout.verticalInset)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: messagePlace)
@@ -61,14 +64,14 @@ struct ScreensaverView: View {
             let radius = max(geometry.size.width, geometry.size.height) / 1.5
             ZStack {
                 RadialGradient(
-                    stops: [.init(color: .clear, location: 0), .init(color: .black.opacity(0.25), location: 0.85)],
+                    stops: [.init(color: .clear, location: 0), .init(color: scrim(0.25), location: 0.85)],
                     center: .center,
                     startRadius: 0,
                     endRadius: radius,
                 )
                 if showsClock {
                     LinearGradient(
-                        stops: [.init(color: .black.opacity(0.6), location: 0), .init(color: .clear, location: 0.25)],
+                        stops: [.init(color: scrim(0.6), location: 0), .init(color: .clear, location: 0.25)],
                         startPoint: .top,
                         endPoint: .bottom,
                     )
@@ -76,6 +79,15 @@ struct ScreensaverView: View {
             }
         }
         .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private var theme: Theme {
+        Theme(themeColors)
+    }
+
+    private func scrim(_ alpha: Double) -> Color {
+        theme.scrim.withAlpha(alpha).color
     }
 
     private var clock: some View {
@@ -83,6 +95,7 @@ struct ScreensaverView: View {
             Text(context.date, format: .dateTime.hour().minute())
                 .font(.title3)
                 .monospacedDigit()
+                .foregroundStyle(theme.onBackground)
                 .accessibilityIdentifier("screensaver.clock")
         }
         .padding(.top, ScreensaverLayout.verticalInset)
@@ -139,6 +152,7 @@ private struct SlideView: View {
     let zoomDuration: Double?
 
     @State private var scale = 1.0
+    @Environment(\.theme) private var theme
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -149,6 +163,7 @@ private struct SlideView: View {
             LogoImage(url: logoURL, maxWidth: 480, height: 240) {
                 Text(slide.title)
                     .font(.title.bold())
+                    .foregroundStyle(theme.onBackground)
                     .lineLimit(2)
                     .frame(maxWidth: 960, alignment: .bottomLeading)
                     .shadow(radius: 8)
@@ -157,7 +172,7 @@ private struct SlideView: View {
             .padding(.bottom, ScreensaverLayout.verticalInset)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(slide.title)
+        .accessibilityLabel(Text(verbatim: slide.title))
         .accessibilityIdentifier("screensaver.slide")
         .onAppear {
             guard let zoomDuration else { return }

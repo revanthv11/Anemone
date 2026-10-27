@@ -17,6 +17,8 @@ enum MPVTrackList {
                 title: title(client.string(property("title")), language: language, id: id),
                 language: language,
                 isSelected: client.flag(property("selected")) ?? false,
+                codec: client.string(property("codec")),
+                isExternal: client.flag(property("external")),
             )
         }
     }

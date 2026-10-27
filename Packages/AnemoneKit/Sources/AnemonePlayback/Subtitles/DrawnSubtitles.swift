@@ -49,6 +49,9 @@ public final class DrawnSubtitles: PlaybackFeature {
     /// What `show(_:in:)` was asked to draw for a stream this hadn't heard of yet: features hear
     /// of a new stream in turn, and track selection can ask while one before this is busy.
     @ObservationIgnored private var wanted: (track: MediaTrack?, stream: PlaybackStream)?
+    /// The streams heard of that another has replaced, or that stopped, for this player: what
+    /// `show(_:in:)` is asked for one of them is late, not early, and draws nothing.
+    @ObservationIgnored private var replaced: Set<PlaybackStream> = []
     @ObservationIgnored private var request: SubtitleFileRequest?
     @ObservationIgnored private var timeline: SubtitleTimeline?
     /// Files already read for this player, so a reload for another audio track, or switching back,
@@ -76,11 +79,15 @@ public final class DrawnSubtitles: PlaybackFeature {
         case let .reloaded(stream):
             begin(stream)
         case .stopped:
+            if let stream {
+                replaced.insert(stream)
+            }
             stream = nil
             wanted = nil
             clear()
             if controller.isStopped {
                 read = [:]
+                replaced = []
             }
         default:
             break
@@ -90,6 +97,10 @@ public final class DrawnSubtitles: PlaybackFeature {
     /// Nothing is drawn for a new stream until `TrackSelection` says what to draw, unless it
     /// already has.
     private func begin(_ stream: PlaybackStream) {
+        if let old = self.stream {
+            replaced.insert(old)
+        }
+        replaced.remove(stream)
         self.stream = stream
         style = SubtitleStyles.current.style(forHDR: stream.isHDR)
         clear()
@@ -101,11 +112,13 @@ public final class DrawnSubtitles: PlaybackFeature {
 
     /// Draws `track`, a text subtitle that `stream` sends as a file of its own, or nothing. Asked
     /// for a stream before this has heard of it, it draws it once it does; asked for one that's
-    /// been replaced, nothing. While MPV plays, it draws nothing, since MPV shows that file
-    /// itself.
+    /// been replaced, nothing, and what's waiting for the next stream stays. While MPV plays,
+    /// it draws nothing, since MPV shows that file itself.
     public func show(_ track: MediaTrack?, in stream: PlaybackStream) {
         guard stream == self.stream else {
-            wanted = (track, stream)
+            if !replaced.contains(stream) {
+                wanted = (track, stream)
+            }
             return
         }
         wanted = nil

@@ -44,6 +44,7 @@ struct LibraryGrid<Header: View, Card: View>: View {
     @State private var scrollSize = CGSize.zero
     @State private var scrollPosition = ScrollPosition(edge: .top)
     @State private var measured = MeasuredLayout()
+    @Environment(\.theme) private var theme
 
     init(
         pager: LibraryPager,
@@ -84,7 +85,7 @@ struct LibraryGrid<Header: View, Card: View>: View {
                         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { measured.headerHeight = $0 }
                     if let emptyMessage, pager.count == 0 {
                         Text(emptyMessage)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(theme.secondaryText)
                             .frame(maxWidth: .infinity)
                             .padding(.top, 80)
                     } else {
@@ -216,13 +217,16 @@ struct LibraryGrid<Header: View, Card: View>: View {
         showsJumpBar ? GridLayout.jumpBarSpacing : GridLayout.horizontalInset
     }
 
+    /// Wholphin's position footer, in its colours for a label over artwork.
     private var footer: some View {
         Text("\(lastFocused + 1) / \(pager.count)")
             .font(.caption)
             .monospacedDigit()
+            .foregroundStyle(theme.onCardBadge)
             .padding(.horizontal, 16)
             .padding(.vertical, 6)
-            .background(.black.opacity(0.5), in: .capsule)
+            .background(theme.cardBadge, in: .capsule)
+            .accessibilityLabel(Text("\(lastFocused + 1) of \(pager.count)"))
             .accessibilityIdentifier("grid.position")
     }
 
@@ -335,7 +339,15 @@ private struct GridCell<Card: View>: View {
                 styled
             }
         }
-        .accessibilityLabel(entry?.item.displayTitle ?? "Loading")
+        // The card reads its own title, subtitle and marks; a card still waiting for its page has
+        // nothing to read yet.
+        .accessibilityLabel { label in
+            if entry == nil {
+                Text("Loading")
+            } else {
+                label
+            }
+        }
         .accessibilityIdentifier("grid.card.\(index)")
         .task {
             await pager.prefetch(around: index)

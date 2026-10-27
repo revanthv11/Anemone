@@ -10,10 +10,9 @@ import Foundation
 @MainActor
 public final class MPVExternalSubtitles: PlaybackFeature {
     /// The formats MPV fetches as they are: what its profile asks the server to deliver as
-    /// External, except TTML, which libmpv's FFmpeg can't read. The rest come as SRT, which the
-    /// server converts to.
+    /// External. The rest, such as TTML, which libmpv's FFmpeg can't read, come as SRT, which
+    /// the server converts to.
     static let formats = Set(MPVProfile.subtitleProfiles.filter { $0.method == .external }.compactMap(\.format))
-        .subtracting(["ttml"])
 
     private let session: JellyfinSession
 

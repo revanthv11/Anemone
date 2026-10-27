@@ -139,6 +139,31 @@ struct UpNextCreditsSeekTests: UpNextHarness {
         #expect(log.events.contains("stopped 100.0 seconds"))
     }
 
+    @Test func `with no countdown, the old entry's segment and button go as the credits move on`() async throws {
+        let recap = MediaSegment(id: "r1", kind: .recap, start: .seconds(10), end: .seconds(20))
+        let segments = SegmentSkipping(load: { [outro] _ in [recap, outro] }, behavior: { _ in .ask })
+        // Hears each event right after segment skipping: what's left the moment it moves on.
+        let probe = EventLog()
+        var leftOver: [String]?
+        probe.onEvent = { _, controller in
+            guard controller.queue.currentIndex == 1, leftOver == nil else { return }
+            let actions = controller.accessories.actions.map(\.id)
+            leftOver = [segments.offered?.id, segments.current?.id].compactMap(\.self) + actions
+        }
+        let (playback, _) = try player(countdown: .zero, timing: .duringCredits, others: [segments, probe])
+        await play(playback)
+        _ = await eventually { !segments.segments.isEmpty }
+        engine.currentTime = .seconds(11)
+        #expect(await eventually { segments.offered == recap })
+
+        engine.currentTime = .seconds(21)
+
+        #expect(await eventually { engine.loads.count == 2 })
+        // No segment offered or playing, and no skip button. Before, the recap's button and the
+        // outro lasted until the next entry's events: "r1", "o1", "segments.skip".
+        #expect(leftOver == [])
+    }
+
     @Test func `with no countdown, the credits move on without skipping them in the next entry`() async throws {
         let segments = SegmentSkipping(load: { [outro] _ in [outro] }, behavior: { _ in .autoSkip })
         let (playback, _) = try player(countdown: .zero, timing: .duringCredits, others: [segments])

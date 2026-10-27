@@ -53,13 +53,6 @@ public struct MediaVersion: Hashable, Identifiable, Sendable {
 }
 
 public extension JellyfinSession {
-    /// The item's versions in the server's order; the first is what plays unless one is picked.
-    /// `/Items/{id}` sends every field, media sources included.
-    func mediaVersions(of itemID: MediaItem.ID) async throws -> [MediaVersion] {
-        let item = try await send(Paths.getItem(itemID: itemID, userID: userID))
-        return (item.mediaSources ?? []).compactMap(MediaVersion.init)
-    }
-
     /// `playbackStream(for:…)` for the version the user picked for the item, as Wholphin's
     /// `ItemPlayback` does, or the server's first when none is picked. PlaybackInfo's answer
     /// settles whether the server still has the picked version: it answers one it no longer has

@@ -4,9 +4,9 @@ import Testing
 
 /// What Play and Shuffle on a collection ask the server for, and the queue they make.
 struct CollectionQueuesTests {
-    private static let videoTypes = "Movie,Episode,Video,MusicVideo"
+    static let videoTypes = "Movie,Episode,Video,MusicVideo"
 
-    private func session(host: String) throws -> JellyfinSession {
+    func session(host: String) throws -> JellyfinSession {
         try JellyfinSession(
             serverURL: #require(URL(string: "https://\(host)")),
             userID: "u1",
@@ -17,7 +17,7 @@ struct CollectionQueuesTests {
     }
 
     /// Answers `/Items` with `reply`, recording every request.
-    private func register(host: String, reply: @escaping @Sendable (SentRequest) -> String?) -> Recorder {
+    func register(host: String, reply: @escaping @Sendable (SentRequest) -> String?) -> Recorder {
         let recorder = Recorder()
         MockServer.register(host: host) { request in
             guard request.url?.path() == "/Items" else { return nil }
@@ -29,7 +29,8 @@ struct CollectionQueuesTests {
     @Test func `in its own order, a collection plays what its page lists and counts the rest`() async throws {
         let page = Self.items([Self.movie("m1"), Self.episode("e1"), Self.song("a1")])
         let recorder = register(host: "collection-own.test") { request in
-            request.query["parentId"] == "c1" ? page : nil
+            guard request.query["limit"] != "0" else { return #"{"Items":[],"TotalRecordCount":3}"# }
+            return request.query["parentId"] == "c1" ? page : nil
         }
 
         let found = try await session(host: "collection-own.test").collectionQueue(id: "c1", shuffled: false)
@@ -37,10 +38,30 @@ struct CollectionQueuesTests {
         #expect(found.items.map(\.id) == ["m1", "e1"])
         #expect(found.skippedCount == 1)
         #expect(found.overLimitCount == 0)
-        // Only the page's own request: nothing asked for everything in it at once.
-        let request = try #require(recorder.requests.only)
+        // The page's own request: nothing asked for everything in it at once. With the song left
+        // out, the server counts what's left out.
+        let pages = recorder.requests.filter { $0.query["limit"] != "0" }
+        let request = try #require(pages.only)
         #expect(request.query["sortBy"] == "Default")
         #expect(request.query["recursive"] != "true")
+        let count = try #require(recorder.requests.filter { $0.query["limit"] == "0" }.only)
+        #expect(count.query["recursive"] == "true")
+        #expect(count.query["includeItemTypes"] == nil)
+    }
+
+    @Test func `a collection of videos alone is played without counting anything`() async throws {
+        let recorder = register(host: "collection-videos.test") { request in
+            switch request.query["parentId"] {
+            case "c1": Self.items([Self.movie("m1"), Self.series("s1")])
+            case "s1": Self.items([Self.episode("e1")])
+            default: nil
+            }
+        }
+
+        let found = try await session(host: "collection-videos.test").collectionQueue(id: "c1", shuffled: false)
+
+        #expect(found.items.map(\.id) == ["m1", "e1"])
+        #expect(!recorder.requests.contains { $0.query["limit"] == "0" })
     }
 
     @Test func `a series plays its episodes where the page lists it, in order however it's sorted`() async throws {
@@ -179,11 +200,11 @@ struct CollectionQueuesTests {
         #expect(recorder.requests.first { $0.query["limit"] == "0" }?.query["isPlayed"] == "false")
     }
 
-    private static func items(_ items: [String]) -> String {
+    static func items(_ items: [String]) -> String {
         QueuesTests.items(items)
     }
 
-    private static func movie(_ id: String) -> String {
+    static func movie(_ id: String) -> String {
         #"{"Id":"\#(id)","Name":"Film \#(id)","Type":"Movie"}"#
     }
 
@@ -191,15 +212,19 @@ struct CollectionQueuesTests {
         #"{"Id":"\#(id)","Name":"Song \#(id)","Type":"Audio"}"#
     }
 
-    private static func series(_ id: String) -> String {
+    static func series(_ id: String) -> String {
         #"{"Id":"\#(id)","Name":"Show \#(id)","Type":"Series","IsFolder":true}"#
     }
 
-    private static func boxSet(_ id: String) -> String {
+    static func album(_ id: String) -> String {
+        #"{"Id":"\#(id)","Name":"Album \#(id)","Type":"MusicAlbum","IsFolder":true}"#
+    }
+
+    static func boxSet(_ id: String) -> String {
         #"{"Id":"\#(id)","Name":"Box \#(id)","Type":"BoxSet","IsFolder":true}"#
     }
 
-    private static func episode(_ id: String) -> String {
+    static func episode(_ id: String) -> String {
         QueuesTests.episode(id, season: 1, number: 1)
     }
 }

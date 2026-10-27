@@ -128,63 +128,7 @@ struct TrackSwitchingTests {
         #expect(try !inPlace(4, burned))
     }
 
-    /// MPV lists the subtitles in the file, then the files beside it that it adds, in the
-    /// server's order, then any it's given later, such as a downloaded one.
-    @Test func `MPV's subtitles go by position, the files it adds after the file's own`() {
-        let tracks = [
-            MediaTrack(index: 4, kind: .subtitle, language: "eng", codec: "subrip", delivery: .embedded),
-            MediaTrack(index: 7, kind: .subtitle, language: "spa", codec: "ass", delivery: .embedded),
-            MediaTrack(index: 8, kind: .subtitle, language: "ger", codec: "pgssub", isText: false, delivery: .embedded),
-            MediaTrack(
-                index: 10,
-                kind: .subtitle,
-                language: "eng",
-                codec: "subrip",
-                isExternal: true,
-                delivery: .external,
-            ),
-        ]
-        let stream = PlaybackStream(itemID: "m1", url: URL(filePath: "/m1.mkv"), method: .directPlay, tracks: tracks)
-        func options(_ count: Int) -> [PlayerTrack] {
-            (1 ... count).map { PlayerTrack(
-                id: $0,
-                kind: .subtitle,
-                title: "Track \($0)",
-                language: nil,
-                isSelected: false,
-            ) }
-        }
-        let withDownload = options(5)
-        let fileOnly = options(3)
-
-        #expect(TrackSwitching.listed(.subtitle, in: stream, rendering: .mpv).map(\.index) == [4, 7, 8, 10])
-        #expect(TrackSwitching.playerTrack(for: tracks[3], in: stream, options: withDownload, rendering: .mpv)
-            == withDownload[3])
-        // Before the file has opened, MPV lists only the file's own.
-        #expect(TrackSwitching.playerTrack(for: tracks[2], in: stream, options: fileOnly, rendering: .mpv)
-            == fileOnly[2])
-        #expect(TrackSwitching.playerTrack(for: tracks[3], in: stream, options: fileOnly, rendering: .mpv) == nil)
-        // It shows ASS and pictures itself, where AVPlayer has them burned in.
-        #expect(TrackSwitching.subtitle(
-            from: tracks[0],
-            to: tracks[2],
-            in: stream,
-            options: withDownload,
-            rendering: .mpv,
-        )
-            == .inPlace(withDownload[2]))
-        #expect(TrackSwitching.subtitle(
-            from: tracks[0],
-            to: tracks[1],
-            in: stream,
-            options: withDownload,
-            rendering: .mpv,
-        )
-            == .inPlace(withDownload[1]))
-        #expect(TrackSwitching.subtitle(from: tracks[0], to: tracks[2], in: stream, options: withDownload) == .reload)
-    }
-
-    @Test func `MPV still takes another stream for pictures a transcode burns in`() throws {
+    @Test func `on MPV, another stream is still asked for pictures a transcode burns in`() throws {
         let transcode = PlaybackStream.hls("m1", TrackRequest(audioIndex: 1, subtitleIndex: 4), method: .transcode)
 
         #expect(try TrackSwitching.subtitle(

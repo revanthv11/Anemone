@@ -1,5 +1,6 @@
 import AnemoneCore
 import AnemoneJellyfin
+import AnemoneUI
 import SwiftUI
 
 /// Password sign-in, with Quick Connect alongside when the server allows it.
@@ -15,6 +16,7 @@ struct SignInView: View {
     @State private var isQuickConnectAvailable = false
     @State private var quickConnectCode: String?
     @State private var quickConnectTask: Task<Void, Never>?
+    @Environment(\.theme) private var theme
 
     init(server: SavedServer, username: String?) {
         self.server = server
@@ -27,8 +29,10 @@ struct SignInView: View {
             VStack(alignment: .leading, spacing: 32) {
                 Text(usernameIsFixed ? "Sign in as \(username)" : "Sign in")
                     .font(.largeTitle.bold())
+                    .foregroundStyle(theme.onBackground)
+                    .accessibilityAddTraits(.isHeader)
                 Text(server.name)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryText)
                 if !usernameIsFixed {
                     TextField("Username", text: $username)
                         .textContentType(.username)
@@ -68,18 +72,23 @@ struct SignInView: View {
         VStack(alignment: .leading, spacing: 24) {
             Text("Quick Connect")
                 .font(.title2.bold())
+                .foregroundStyle(theme.onBackground)
+                .accessibilityAddTraits(.isHeader)
             if let quickConnectCode {
                 Text(quickConnectCode)
                     .font(.system(size: 96, weight: .bold, design: .monospaced))
+                    .foregroundStyle(theme.onBackground)
+                    // Read a character at a time, as it's typed.
+                    .accessibilityLabel(Text(verbatim: quickConnectCode).speechSpellsOutCharacters())
                     .accessibilityIdentifier("quickConnect.code")
                 Text(
                     "On a phone or computer that's signed in to \(server.name), " +
                         "open Quick Connect and enter this code.",
                 )
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.secondaryText)
             } else {
                 Text("Sign in by approving a code from a phone or computer that's already signed in.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryText)
                 Button("Use Quick Connect", action: startQuickConnect)
                     .accessibilityIdentifier("quickConnect.start")
             }

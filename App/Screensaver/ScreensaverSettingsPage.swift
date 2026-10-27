@@ -113,9 +113,12 @@ private struct ScreensaverChoiceList<Value: Hashable>: View {
                     Spacer()
                     if choice == selection {
                         Image(systemName: "checkmark")
+                            .accessibilityHidden(true)
                     }
                 }
             }
+            // VoiceOver hears the check as the row being selected.
+            .accessibilityAddTraits(choice == selection ? .isSelected : [])
         }
         .navigationTitle(title)
     }

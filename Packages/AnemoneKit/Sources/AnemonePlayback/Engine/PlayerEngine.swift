@@ -69,13 +69,28 @@ public struct PlayerTrack: Hashable, Sendable, Identifiable {
     /// A BCP 47 tag such as `en` or `pt-BR`, when the stream says.
     public let language: String?
     public let isSelected: Bool
+    /// The codec's name, such as `subrip` or `hdmv_pgs_subtitle`, when the engine says (MPV).
+    public let codec: String?
+    /// Whether it's a file added beside the stream rather than inside it, when the engine says
+    /// (MPV, for the subtitle files it's given).
+    public let isExternal: Bool?
 
-    public init(id: Int, kind: Kind, title: String, language: String?, isSelected: Bool) {
+    public init(
+        id: Int,
+        kind: Kind,
+        title: String,
+        language: String?,
+        isSelected: Bool,
+        codec: String? = nil,
+        isExternal: Bool? = nil,
+    ) {
         self.id = id
         self.kind = kind
         self.title = title
         self.language = language
         self.isSelected = isSelected
+        self.codec = codec
+        self.isExternal = isExternal
     }
 }
 

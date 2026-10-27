@@ -70,7 +70,7 @@ struct MPVTrackTests {
         try #require(menu?.options.first { $0.id == optionID }).select()
     }
 
-    @Test func `ASS is burned in for AVPlayer only`() async throws {
+    @Test func `only AVPlayer has ASS burned in`() async throws {
         let spanish = selection(ProfileTrackSettings(
             audioLanguage: "eng",
             subtitleLanguage: "spa",
@@ -85,13 +85,14 @@ struct MPVTrackTests {
         #expect(try #require(mpv).profile(from: MPVProfile.deviceProfile()) == MPVProfile.deviceProfile())
     }
 
-    @Test func `on MPV, ASS, pictures and files beside the video switch in the player`() async throws {
+    /// MPV playing the file, once it has added the Italian file to its tracks.
+    private func playing(features: [any PlaybackFeature] = []) async throws -> PlaybackController {
         let session = try StubServer.session(host: "mpv-tracks.test")
         let engine = MPVPlayerEngine.testing(client)
         let playback = PlaybackController(
             request: PlaybackRequest(.item("m1")),
             engine: engine,
-            features: [selection(), MPVExternalSubtitles(session: session), log],
+            features: [selection(), MPVExternalSubtitles(session: session)] + features + [log],
         ) { [requests] request in
             requests.append(request)
             return Self.stream(request)
@@ -108,6 +109,11 @@ struct MPVTrackTests {
         #expect(await eventually { log.events.contains { $0.hasPrefix("started") } })
         // The Italian file beside the video, added after the file's own.
         #expect(await eventually { client.tracks.count { $0.type == "sub" } == 7 })
+        return playback
+    }
+
+    @Test func `on MPV, ASS, pictures and files beside the video switch in the player`() async throws {
+        let playback = try await playing()
 
         try pick("subtitles.8", in: playback)
         #expect(await eventually { client.lastSet("sid") == "5" })
@@ -120,6 +126,21 @@ struct MPVTrackTests {
         #expect(client.entries.count == 1)
         #expect(requests.sent.count == 1)
         #expect(requests.sent.first?.profile == MPVProfile.deviceProfile())
+        await playback.stop()
+    }
+
+    @Test func `a switch in the player has the debug panel read the engine's tracks again`() async throws {
+        let details = PlaybackDetails { _, _ in SeekPreviews() }
+        let playback = try await playing(features: [details])
+        // The stream loaded, then the tracks chosen for it selected in the engine.
+        #expect(await eventually { details.trackChanges == 2 })
+
+        try pick("subtitles.8", in: playback)
+
+        // Before, only a new stream did, so its check mark stayed on the track switched from.
+        #expect(await eventually { details.trackChanges == 3 })
+        #expect(client.lastSet("sid") == "5")
+        #expect(client.entries.count == 1)
         await playback.stop()
     }
 }

@@ -151,6 +151,31 @@ struct DisplayCriteriaMatchingTests {
         #expect(await elapseReset())
     }
 
+    @Test func `a reset with no window to ask through tries again until the display takes it`() async throws {
+        let playback = try controller()
+        await playback.start()
+        await playback.stop()
+        // The app has gone to the background meanwhile: no window.
+        fakeDisplay.takesRequests = false
+        #expect(await eventually { sleeps.pending == [.seconds(2)] })
+
+        sleeps.elapse()
+
+        // Asked, but not taken: the mode stays recorded, and the reset owed.
+        #expect(await eventually { requests.count == 2 && sleeps.pending == [.seconds(2)] })
+        #expect(requests.last == .some(nil))
+        #expect(display.criteria?.frameRate == 23.976)
+        #expect(display.isResetPending)
+
+        fakeDisplay.takesRequests = true
+        sleeps.elapse()
+
+        #expect(await eventually { !display.isResetPending })
+        #expect(requests.count == 3)
+        #expect(requests.last == .some(nil))
+        #expect(display.criteria == nil)
+    }
+
     @Test func `a player opened straight after another keeps its mode`() async throws {
         let first = try controller()
         await first.start()

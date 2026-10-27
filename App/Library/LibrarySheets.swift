@@ -83,9 +83,12 @@ private struct FilterChoices: View {
                             Spacer()
                             if isSelected(option.id) {
                                 Image(systemName: "checkmark")
+                                    .accessibilityHidden(true)
                             }
                         }
                     }
+                    // VoiceOver hears the check as the row being selected.
+                    .accessibilityAddTraits(isSelected(option.id) ? .isSelected : [])
                 }
             } else if failed {
                 Text("Couldn't load the choices from \(browse.server.name).")
@@ -235,9 +238,11 @@ struct ViewOptionsSheet: View {
                             Spacer()
                             if columns == options.columns {
                                 Image(systemName: "checkmark")
+                                    .accessibilityHidden(true)
                             }
                         }
                     }
+                    .accessibilityAddTraits(columns == options.columns ? .isSelected : [])
                 }
                 .navigationTitle("Columns")
             }
