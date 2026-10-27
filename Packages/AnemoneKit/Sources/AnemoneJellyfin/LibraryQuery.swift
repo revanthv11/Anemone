@@ -127,14 +127,34 @@ public struct LibraryFilter: Hashable, Codable, Sendable {
 
 /// A library grid's contents: which library, in what order, narrowed how.
 public struct LibraryQuery: Hashable, Sendable {
+    /// Which of the library's items the grid lists: its own titles, or those behind one of
+    /// Wholphin's other library tabs.
+    public enum Scope: Hashable, Sendable {
+        /// The library's titles, as its Library tab lists them.
+        case titles
+        /// The collections (box sets) holding the library's movies, for its Collections tab.
+        case collections
+        /// The library's titles in one genre, by genre ID, opened from its Genres tab.
+        case genre(String)
+        /// The library's titles from one studio, by studio ID, opened from its Studios tab.
+        case studio(String)
+    }
+
     public var library: Library
     public var sort: LibrarySort
     public var filter: LibraryFilter
+    public var scope: Scope
 
-    public init(library: Library, sort: LibrarySort = .default, filter: LibraryFilter = LibraryFilter()) {
+    public init(
+        library: Library,
+        sort: LibrarySort = .default,
+        filter: LibraryFilter = LibraryFilter(),
+        scope: Scope = .titles,
+    ) {
         self.library = library
         self.sort = sort
         self.filter = filter
+        self.scope = scope
     }
 }
 
@@ -144,10 +164,14 @@ public struct LibraryEntry: Hashable, Identifiable, Sendable {
     /// The name the server sorts by, such as "matrix" for "The Matrix"; it picks the letter the
     /// alphabet bar highlights.
     public let sortName: String?
+    /// What the list layout and the details header show besides the card: watched and favourite
+    /// state, ratings and the logo. `nil` for entries that weren't loaded from a library.
+    public let details: ItemDetails?
 
-    public init(item: MediaItem, sortName: String?) {
+    public init(item: MediaItem, sortName: String?, details: ItemDetails? = nil) {
         self.item = item
         self.sortName = sortName
+        self.details = details
     }
 
     public var id: MediaItem.ID {
