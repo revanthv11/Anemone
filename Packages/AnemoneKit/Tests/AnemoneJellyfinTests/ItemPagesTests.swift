@@ -148,7 +148,12 @@ struct ItemPagesTests {
             #"{"Id":"inner","Name":"Inner Collection","Type":"BoxSet","ChildCount":2}"#,
         ))
 
-        let sections = try await session(host: "boxset.test").collectionSections(id: "c1")
+        let items = try await session(host: "boxset.test").collectionItems(
+            id: "c1",
+            sort: LibrarySort(.default),
+            filter: LibraryFilter(),
+        )
+        let sections = CollectionSection.sections(items)
 
         #expect(sections.map(\.kind) == [.movie, .series, .episode, .collection])
         #expect(sections.first?.items.map(\.id) == ["m1", "m2"])

@@ -42,6 +42,11 @@ enum ItemAction: Hashable {
     case shuffle
     case played
     case favorite
+    case trailer
+    case delete
+    case sort
+    case filter
+    case viewOptions
 }
 
 /// Each row's last-focused card, so coming back to a row lands where the user left it, as on
