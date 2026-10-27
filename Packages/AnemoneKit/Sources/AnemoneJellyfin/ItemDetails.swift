@@ -79,6 +79,9 @@ public struct ItemDetails: Hashable, Identifiable, Sendable {
     /// The item's IDs elsewhere, such as `"Tmdb": "603"`, which Seerr looks titles up by.
     /// `itemDetails(id:)` comes with them; rows may not.
     public var providerIDs: [String: String]
+    /// The item's versions (media sources) in the server's order, for the Version button.
+    /// `itemDetails(id:)` and episode lists come with them; other rows don't.
+    public var versions: [MediaVersion]
 
     public init(
         item: MediaItem,
@@ -99,6 +102,7 @@ public struct ItemDetails: Hashable, Identifiable, Sendable {
         creditCounts: CreditCounts = CreditCounts(),
         primaryImageAspectRatio: Double? = nil,
         providerIDs: [String: String] = [:],
+        versions: [MediaVersion] = [],
     ) {
         self.item = item
         self.tagline = tagline
@@ -118,6 +122,7 @@ public struct ItemDetails: Hashable, Identifiable, Sendable {
         self.creditCounts = creditCounts
         self.primaryImageAspectRatio = primaryImageAspectRatio
         self.providerIDs = providerIDs
+        self.versions = versions
     }
 
     public var id: MediaItem.ID {
@@ -265,6 +270,7 @@ extension ItemDetails {
             creditCounts: CreditCounts(movies: dto.movieCount, series: dto.seriesCount, episodes: dto.episodeCount),
             primaryImageAspectRatio: dto.primaryImageAspectRatio,
             providerIDs: dto.providerIDs ?? [:],
+            versions: (dto.mediaSources ?? []).compactMap(MediaVersion.init),
         )
     }
 }
