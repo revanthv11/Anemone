@@ -3,21 +3,39 @@ import AnemoneUI
 import SwiftUI
 
 /// A library's items as a grid that pages in ahead of focus, with Wholphin's alphabet bar,
-/// position footer, and Back to jump to the top.
+/// position footer, Back to jump to the top, and (when asked for) the card menu on a long press
+/// and paging with the remote's page buttons. The same grid draws the list layouts, one title per
+/// row, and the Genres and Studios tabs.
 ///
 /// One `LazyVGrid` in a vertical `ScrollView`, with no focus section of its own; see
 /// docs/spikes/home-focus.md.
-struct LibraryGrid<Header: View>: View {
+struct LibraryGrid<Header: View, Card: View>: View {
     let pager: LibraryPager
     let options: GridViewOptions
     /// Wholphin shows the alphabet bar only when the grid is sorted by name.
     let showsJumpBar: Bool
     /// Where a letter's items start in the grid.
     let position: (Character) async throws -> Int
-    let imageURL: (_ item: MediaItem, _ shape: CardShape, _ pixelWidth: Int) -> URL?
     let onSelect: (MediaItem) -> Void
-    var onFocus: (Int) -> Void = { _ in }
-    @ViewBuilder var header: Header
+    let onFocus: (Int) -> Void
+    /// Called as focus moves on from the first row (`true`) or back to it (`false`), so the
+    /// page can tuck its tabs away as Wholphin does.
+    let onPastFirstRow: (Bool) -> Void
+    /// Called as focus goes up past the alphabet bar's top letter, for the page to bring back its
+    /// tabs and move focus to them. `nil` on a page without tabs.
+    let onExitTop: (() -> Void)?
+    /// Shown under the header when the grid is empty; with none, an empty grid shows nothing.
+    let emptyMessage: String?
+    /// Whether the remote's page buttons page through the grid. It's opt-in, since hearing them
+    /// takes a gesture recognizer on the window.
+    let hearsPageButtons: Bool
+    /// Whether a long press on a card opens the card menu. It's opt-in, since pages that open
+    /// their cards in their own way (photo albums, say) would get a menu whose Go to does
+    /// something else.
+    let showsCardMenu: Bool
+    /// Draws an entry, or its placeholder while its page loads, at a width in points and pixels.
+    let card: (_ entry: LibraryEntry?, _ width: CGFloat, _ pixelWidth: Int) -> Card
+    let header: Header
 
     @FocusState private var focusedIndex: Int?
     /// Where focus goes when it comes back to the grid, and what the footer counts.
@@ -27,6 +45,36 @@ struct LibraryGrid<Header: View>: View {
     @State private var scrollPosition = ScrollPosition(edge: .top)
     @State private var measured = MeasuredLayout()
 
+    init(
+        pager: LibraryPager,
+        options: GridViewOptions,
+        showsJumpBar: Bool,
+        position: @escaping (Character) async throws -> Int,
+        onSelect: @escaping (MediaItem) -> Void,
+        onFocus: @escaping (Int) -> Void = { _ in },
+        onPastFirstRow: @escaping (Bool) -> Void = { _ in },
+        onExitTop: (() -> Void)? = nil,
+        emptyMessage: String? = nil,
+        hearsPageButtons: Bool = false,
+        showsCardMenu: Bool = false,
+        @ViewBuilder card: @escaping (_ entry: LibraryEntry?, _ width: CGFloat, _ pixelWidth: Int) -> Card,
+        @ViewBuilder header: () -> Header,
+    ) {
+        self.pager = pager
+        self.options = options
+        self.showsJumpBar = showsJumpBar
+        self.position = position
+        self.onSelect = onSelect
+        self.onFocus = onFocus
+        self.onPastFirstRow = onPastFirstRow
+        self.onExitTop = onExitTop
+        self.emptyMessage = emptyMessage
+        self.hearsPageButtons = hearsPageButtons
+        self.showsCardMenu = showsCardMenu
+        self.card = card
+        self.header = header()
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             ScrollView(.vertical) {
@@ -34,26 +82,49 @@ struct LibraryGrid<Header: View>: View {
                     header
                         .focusSection()
                         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { measured.headerHeight = $0 }
-                    grid
+                    if let emptyMessage, pager.count == 0 {
+                        Text(emptyMessage)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 80)
+                    } else {
+                        grid
+                    }
                 }
                 .padding(.leading, GridLayout.horizontalInset)
                 .padding(.trailing, trailingInset)
                 .padding(.vertical, GridLayout.focusPadding)
             }
+            // A vertical scroll view is only as wide as its content unless told otherwise.
+            .frame(maxWidth: .infinity)
             .scrollPosition($scrollPosition)
             .onGeometryChange(for: CGSize.self) { $0.size } action: { scrollSize = $0 }
             if showsJumpBar {
-                JumpBar(current: currentLetter) {
-                    // Known for certain here, unlike moves to the header or the sidebar.
-                    focusTracking.hasLeftGrid = true
-                } onSelect: { letter in
-                    jump(to: letter)
-                }
+                JumpBar(
+                    current: currentLetter,
+                    onFocus: {
+                        // Known for certain here, unlike moves to the header or the sidebar.
+                        focusTracking.hasLeftGrid = true
+                    },
+                    onLeaveTop: onExitTop,
+                    onSelect: { letter in
+                        jump(to: letter)
+                    },
+                )
                 .padding(.trailing, GridLayout.jumpBarInset)
             }
         }
         .overlay(alignment: .bottom) {
-            footer
+            if pager.count > 0 {
+                footer
+            }
+        }
+        .background {
+            if hearsPageButtons {
+                RemotePageButtons { forward in
+                    page(forward: forward)
+                }
+            }
         }
         .onExitCommand(perform: backToTop)
         .onChange(of: ObjectIdentifier(pager)) {
@@ -62,10 +133,22 @@ struct LibraryGrid<Header: View>: View {
             scrollPosition.scrollTo(edge: .top)
         }
         .onChange(of: focusedIndex) { _, index in
+            focusTracking.changes += 1
             guard let index else {
                 // Focus also passes through nil between cards, so it has only left the grid if
-                // the move that took it away was off an edge.
-                focusTracking.hasLeftGrid = focusTracking.lastMoveLeavesGrid
+                // the move that took it away was off an edge, or the alphabet bar has it.
+                focusTracking.hasLeftGrid = focusTracking.hasLeftGrid || focusTracking.lastMoveLeavesGrid
+                if !focusTracking.hasLeftGrid {
+                    // The press can be heard after focus has moved, so that move may not be known
+                    // yet; no card having taken focus a moment later settles it.
+                    let changes = focusTracking.changes
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(150))
+                        if focusTracking.changes == changes {
+                            focusTracking.hasLeftGrid = true
+                        }
+                    }
+                }
                 return
             }
             // Coming back from the header, the alphabet bar or the sidebar, the focus engine picks
@@ -77,6 +160,7 @@ struct LibraryGrid<Header: View>: View {
             let remembered = lastFocused
             lastFocused = index
             onFocus(index)
+            onPastFirstRow(index >= options.columnCount)
             // If the card can't take focus after all, focus stays here and is counted here.
             if returning, index != remembered, isOnScreen(remembered, near: index) {
                 focusedIndex = remembered
@@ -90,25 +174,26 @@ struct LibraryGrid<Header: View>: View {
         let cardWidth = options.cardWidth(in: scrollSize.width - GridLayout.horizontalInset - trailingInset)
         // The measured card includes its caption; before any card is measured, the artwork alone.
         let cardHeight = measured.cardHeight > 0 ? measured.cardHeight : cardWidth / options.shape.aspectRatio
-        let rows = max(Int(scrollSize.height / (cardHeight + options.spacing)), 1)
-        return abs(index / options.columns - other / options.columns) < rows
+        let rows = max(Int(scrollSize.height / (cardHeight + options.itemSpacing)), 1)
+        return abs(index / options.columnCount - other / options.columnCount) < rows
     }
 
     private var grid: some View {
         let cardWidth = options.cardWidth(in: scrollSize.width - GridLayout.horizontalInset - trailingInset)
         let columns = Array(
-            repeating: GridItem(.fixed(cardWidth), spacing: options.spacing, alignment: .top),
-            count: options.columns,
+            repeating: GridItem(.fixed(cardWidth), spacing: options.itemSpacing, alignment: .top),
+            count: options.columnCount,
         )
-        return LazyVGrid(columns: columns, alignment: .leading, spacing: options.spacing) {
+        return LazyVGrid(columns: columns, alignment: .leading, spacing: options.itemSpacing) {
             // No cards until the width is known, so none are laid out (and fetch artwork) at 1 pt.
             ForEach(0 ..< (scrollSize.width > 0 ? pager.count : 0), id: \.self) { index in
-                GridCard(
+                GridCell(
                     index: index,
                     pager: pager,
-                    options: options,
+                    isListRow: options.layout != .grid,
+                    showsCardMenu: showsCardMenu,
                     width: cardWidth,
-                    imageURL: imageURL,
+                    card: card,
                     onSelect: onSelect,
                 )
                 .focused($focusedIndex, equals: index)
@@ -117,11 +202,11 @@ struct LibraryGrid<Header: View>: View {
         }
         .onMoveCommand { direction in
             // Called for every press while a card has focus, whether or not focus moves.
-            let column = lastFocused % options.columns
+            let column = lastFocused % options.columnCount
             focusTracking.lastMoveLeavesGrid = switch direction {
             case .left: column == 0
-            case .right: column == options.columns - 1 || lastFocused == pager.count - 1
-            case .up: lastFocused < options.columns
+            case .right: column == options.columnCount - 1 || lastFocused == pager.count - 1
+            case .up: lastFocused < options.columnCount
             default: false
             }
         }
@@ -150,21 +235,42 @@ struct LibraryGrid<Header: View>: View {
     private func jump(to letter: Character) {
         Task {
             guard let index = try? await position(letter), index < pager.count else { return }
-            _ = try? await pager.load(at: index)
-            // Worked out rather than `scrollTo(id:)`, which also nudges the grid sideways.
-            let row = CGFloat(index / options.columns)
-            let gridTop = GridLayout.focusPadding + measured.headerHeight + GridLayout.headerSpacing
-            scrollPosition.scrollTo(y: gridTop + row * (measured.cardHeight + options.spacing))
-            lastFocused = index
-            focusedIndex = index
+            await jump(toIndex: index)
         }
+    }
+
+    /// Wholphin's paging with the remote: six rows down or up from the focused card, or more in
+    /// a big library. Only while a card has focus, as Wholphin hears the keys only in its grid.
+    private func page(forward: Bool) {
+        guard focusedIndex != nil else { return }
+        let index = LibraryJump.page(
+            from: lastFocused,
+            forward: forward,
+            columns: options.columnCount,
+            count: pager.count,
+        )
+        guard index != lastFocused else { return }
+        Task {
+            await jump(toIndex: index)
+        }
+    }
+
+    /// Loads the item's page, scrolls to its row and focuses it.
+    private func jump(toIndex index: Int) async {
+        _ = try? await pager.load(at: index)
+        // Worked out rather than `scrollTo(id:)`, which also nudges the grid sideways.
+        let row = CGFloat(index / options.columnCount)
+        let gridTop = GridLayout.focusPadding + measured.headerHeight + GridLayout.headerSpacing
+        scrollPosition.scrollTo(y: gridTop + row * (measured.cardHeight + options.itemSpacing))
+        lastFocused = index
+        focusedIndex = index
     }
 
     /// Wholphin's Back behaviour: from anywhere but the first card, Back returns to the top; from
     /// there, it does what it normally does (opens the sidebar).
     private var backToTop: (() -> Void)? {
         guard let focusedIndex, focusedIndex > 0 else { return nil }
-        let isNear = focusedIndex < options.columns * 6
+        let isNear = focusedIndex < options.columnCount * 6
         return {
             withAnimation(isNear ? .default : nil) {
                 scrollPosition.scrollTo(edge: .top)
@@ -187,112 +293,52 @@ private final class FocusTracking {
     var lastMoveLeavesGrid = false
     /// Focus went off the grid that way and hasn't come back yet.
     var hasLeftGrid = false
+    /// Counts focus changes in the grid, to tell whether focus has moved on since.
+    var changes = 0
 }
 
 /// One card. Kept separate so a page arriving redraws only the cards on screen, not the grid.
-private struct GridCard: View {
+private struct GridCell<Card: View>: View {
     let index: Int
     let pager: LibraryPager
-    let options: GridViewOptions
+    /// List rows show focus as a highlight; cards lift their artwork, which needs a borderless
+    /// button.
+    let isListRow: Bool
+    let showsCardMenu: Bool
     let width: CGFloat
-    let imageURL: (MediaItem, CardShape, Int) -> URL?
+    let card: (LibraryEntry?, CGFloat, Int) -> Card
     let onSelect: (MediaItem) -> Void
 
     @Environment(\.displayScale) private var displayScale
 
     var body: some View {
-        let item = pager.item(at: index)?.item
-        Button {
-            if let item {
+        let entry = pager.item(at: index)
+        let button = Button {
+            if let item = entry?.item {
                 onSelect(item)
             }
         } label: {
-            MediaCard(
-                title: item?.displayTitle ?? " ",
-                subtitle: item.flatMap { $0.subtitle ?? $0.year.map(String.init) },
-                imageURL: item.flatMap { imageURL($0, options.shape, Int(width * displayScale)) },
-                shape: options.shape,
-                width: width,
-                progress: item?.progress,
-                showsCaption: options.showTitles,
-            )
+            card(entry, width, Int(width * displayScale))
         }
-        .buttonStyle(.borderless)
-        .accessibilityLabel(item?.displayTitle ?? "Loading")
+        let styled = Group {
+            if isListRow {
+                button.buttonStyle(ListRowButtonStyle())
+            } else {
+                button.buttonStyle(.borderless)
+            }
+        }
+        Group {
+            // On the button, which has focus; a card that gives no menu item gets no menu.
+            if showsCardMenu {
+                styled.cardMenu()
+            } else {
+                styled
+            }
+        }
+        .accessibilityLabel(entry?.item.displayTitle ?? "Loading")
         .accessibilityIdentifier("grid.card.\(index)")
         .task {
             await pager.prefetch(around: index)
-        }
-    }
-}
-
-/// Wholphin's alphabet bar: a column of letters down the right edge. Entering it focuses the
-/// current letter.
-private struct JumpBar: View {
-    let current: Character
-    let onFocus: () -> Void
-    let onSelect: (Character) -> Void
-
-    @FocusState private var focusedLetter: Character?
-
-    var body: some View {
-        VStack(spacing: 2) {
-            ForEach(LibraryJump.letters, id: \.self) { letter in
-                Button {
-                    onSelect(letter)
-                } label: {
-                    Text(String(letter))
-                }
-                .buttonStyle(LetterButtonStyle(isCurrent: letter == current))
-                .focused($focusedLetter, equals: letter)
-                .accessibilityIdentifier("grid.letter.\(letter)")
-            }
-        }
-        .focusSection()
-        .defaultFocus($focusedLetter, current, priority: .userInitiated)
-        .onChange(of: focusedLetter) { _, letter in
-            if letter != nil {
-                onFocus()
-            }
-        }
-    }
-}
-
-private struct LetterButtonStyle: ButtonStyle {
-    let isCurrent: Bool
-
-    func makeBody(configuration: Configuration) -> some View {
-        LetterLabel(label: configuration.label, isCurrent: isCurrent, isPressed: configuration.isPressed)
-    }
-}
-
-private struct LetterLabel: View {
-    let label: ButtonStyleConfiguration.Label
-    let isCurrent: Bool
-    let isPressed: Bool
-
-    @Environment(\.isFocused) private var isFocused
-
-    var body: some View {
-        label
-            .font(.system(size: 20, weight: isCurrent ? .bold : .medium))
-            .foregroundStyle(foreground)
-            .frame(width: GridLayout.letterSize, height: GridLayout.letterSize)
-            .background {
-                Circle()
-                    .fill(isFocused ? AnyShapeStyle(.white) : AnyShapeStyle(.clear))
-            }
-            .scaleEffect(isFocused ? (isPressed ? 1.1 : 1.3) : 1)
-            .animation(.easeOut(duration: 0.15), value: isFocused)
-    }
-
-    private var foreground: AnyShapeStyle {
-        if isFocused {
-            AnyShapeStyle(.black)
-        } else if isCurrent {
-            AnyShapeStyle(.tint)
-        } else {
-            AnyShapeStyle(.secondary)
         }
     }
 }

@@ -1,24 +1,42 @@
 import Foundation
 import Synchronization
 
-/// The last request a test's fake server saw.
+/// The requests a test's fake server saw: the last one, and with `record(_:)` every one.
 final class Recorder: Sendable {
     let last = Mutex<SentRequest?>(nil)
+    private let all = Mutex<[SentRequest]>([])
 
     var request: SentRequest? {
         last.withLock(\.self)
+    }
+
+    /// Every request recorded with `record(_:)`, in the order the server saw them.
+    var requests: [SentRequest] {
+        all.withLock(\.self)
+    }
+
+    /// Notes a request as the last one and adds it to the rest. Returns what was noted, for a
+    /// fake server that answers by the request's path or query.
+    @discardableResult
+    func record(_ request: URLRequest) -> SentRequest {
+        let sent = SentRequest(request)
+        last.withLock { $0 = sent }
+        all.withLock { $0.append(sent) }
+        return sent
     }
 }
 
 /// What a test saw of a request.
 struct SentRequest: Sendable {
     let method: String?
+    let path: String
     let query: [String: String]
     /// Kept as data, since a decoded JSON dictionary isn't `Sendable`.
     let body: Data
 
     init(_ request: URLRequest) {
         method = request.httpMethod
+        path = request.url?.path() ?? ""
         query = request.url?.queryValues ?? [:]
         body = request.bodyData
     }

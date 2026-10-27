@@ -63,13 +63,12 @@ public extension JellyfinSession {
         parameters.startIndex = startIndex
         parameters.limit = limit
         parameters.enableTotalRecordCount = includeTotalCount
-        parameters.fields = [.sortName]
-        parameters.enableImageTypes = [.primary, .thumb, .backdrop]
+        // Wholphin's `SlimItemFields`: the overview is for the details header and list layout.
+        parameters.fields = [.sortName, .overview]
+        parameters.enableImageTypes = [.primary, .thumb, .backdrop, .logo]
         parameters.imageTypeLimit = 1
         let result = try await send(Paths.getItems(parameters: parameters))
-        let items = (result.items ?? []).compactMap { dto in
-            MediaItem(dto).map { LibraryEntry(item: $0, sortName: dto.sortName) }
-        }
+        let items = (result.items ?? []).compactMap(LibraryEntry.init)
         return LibraryPage(items: items, totalCount: includeTotalCount ? result.totalRecordCount ?? items.count : nil)
     }
 
@@ -158,6 +157,31 @@ public enum LibraryJump {
         // After "z" comes "{" in code-point order.
         return next < letters.endIndex ? letters[next].lowercased() : "{"
     }
+
+    /// Where a press of the remote's page up or down button moves focus from `index`, as
+    /// Wholphin's `CardGrid` pages with the remote's skip buttons: six rows at a time, or more in
+    /// a big library so its end stays a few presses away. Stays in the same column, and stops at
+    /// the first and last items.
+    public static func page(from index: Int, forward: Bool, columns: Int, count: Int) -> Int {
+        guard count > 0 else { return 0 }
+        let rows = switch count {
+        case 25000...: 500
+        case 7000...: 50
+        case 2000...: 15
+        default: 6
+        }
+        let step = max(columns, 1) * rows
+        return min(max(index + (forward ? step : -step), 0), count - 1)
+    }
+
+    /// Where `letter`'s items start in a list that's all loaded and sorted by name, A to Z, such
+    /// as a library's genres: the first one filed under the letter or a later one.
+    ///
+    /// - Returns: the list's count when nothing is filed under the letter or past it.
+    public static func position(of letter: Character, in sortNames: [String?]) -> Int {
+        guard let bound = lowerBound(of: letter) else { return 0 }
+        return sortNames.firstIndex { ($0 ?? "").lowercased() >= bound } ?? sortNames.count
+    }
 }
 
 extension LibraryQuery {
@@ -166,10 +190,26 @@ extension LibraryQuery {
         var parameters = Paths.GetItemsParameters(userID: userID)
         parameters.parentID = library.id
         parameters.excludeItemIDs = [library.id]
-        parameters.includeItemTypes = library.gridItemTypes
-        parameters.isRecursive = library.isGridRecursive
         (parameters.sortBy, parameters.sortOrder) = sortParameters
         filter.apply(to: &parameters)
+        switch scope {
+        case .titles:
+            parameters.includeItemTypes = library.gridItemTypes
+            parameters.isRecursive = library.isGridRecursive
+        case .collections:
+            // As Wholphin's Collections tab asks: the server finds the box sets holding the
+            // library's movies, though the box sets themselves live elsewhere.
+            parameters.includeItemTypes = [.boxSet]
+            parameters.isRecursive = true
+        case let .genre(id):
+            parameters.includeItemTypes = library.gridItemTypes
+            parameters.isRecursive = true
+            parameters.genreIDs = [id]
+        case let .studio(id):
+            parameters.includeItemTypes = library.gridItemTypes
+            parameters.isRecursive = true
+            parameters.studioIDs = [id]
+        }
         return parameters
     }
 
@@ -214,6 +254,13 @@ extension LibraryFilter {
         let discs = [(VideoType.bluRay, JellyfinAPI.VideoType.bluRay), (.dvd, .dvd)]
             .compactMap { videoTypes.contains($0) ? $1 : nil }
         parameters.videoTypes = discs.isEmpty ? nil : discs
+    }
+}
+
+extension LibraryEntry {
+    init?(_ dto: BaseItemDto) {
+        guard let details = ItemDetails(dto) else { return nil }
+        self.init(item: details.item, sortName: dto.sortName, details: details)
     }
 }
 
