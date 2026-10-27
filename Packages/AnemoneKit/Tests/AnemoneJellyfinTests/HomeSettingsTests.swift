@@ -109,6 +109,33 @@ struct HomeSettingsTests {
         #expect(try HomePageSettings(json: #require(prefs["home_settings"])) == settings)
     }
 
+    @Test func `an entry with nulls in it is read, and saved with its other fields`() async throws {
+        // What Jellyfin 12.3 sends for a client that never saved anything, plus a saved key.
+        let escaped = Self.savedJSON.replacingOccurrences(of: "\"", with: "\\\"")
+        let entry = #"""
+        {"Id":"default","SortBy":"SortName","RememberIndexing":false,"PrimaryImageHeight":250,
+         "ScrollDirection":"Horizontal","SortOrder":"Ascending","Client":"Anemone",
+         "CustomPrefs":{"tvhome":null,"home_settings":"\#(escaped)"}}
+        """#
+        let server = HomeServer("settings-nulls.test") { path, request in
+            guard path == "/DisplayPreferences/default" else { return nil }
+            return request.method == "POST" ? MockServer.Reply(status: 204, body: "") : .json(entry)
+        }
+        let session = try server.session()
+
+        let saved = try await session.savedHomePageSettings()
+        try await HomePreferencesWriter(session: session).update { $0["removeNextUp"] = #"{"value":{}}"# }
+
+        #expect(saved?.rows.count == 2)
+        let posted = try #require(server.requests(to: "/DisplayPreferences/default").last { $0.method == "POST" })
+        #expect(posted.json["SortBy"] as? String == "SortName")
+        #expect(posted.json["PrimaryImageHeight"] as? Int == 250)
+        #expect(posted.json["RememberIndexing"] as? Bool == false)
+        let prefs = try #require(posted.json["CustomPrefs"] as? [String: String])
+        #expect(prefs["home_settings"] == Self.savedJSON)
+        #expect(prefs["removeNextUp"] == #"{"value":{}}"#)
+    }
+
     @Test func `removing from next up marks the episode unwatched and notes its series`() async throws {
         let server = HomeServer("settings-remove.test") { path, request in
             switch (path, request.method) {

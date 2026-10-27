@@ -1,6 +1,5 @@
 import AnemoneCore
 import Foundation
-import JellyfinAPI
 
 /// Where the home page's settings live on the server: a DisplayPreferences entry's
 /// `customPrefs`, as Wholphin keeps them (`DisplayPreferencesService`). Anemone writes only its own
@@ -42,8 +41,8 @@ public extension JellyfinSession {
     /// The rows saved under `client`, or `nil` when there are none.
     ///
     /// - Throws: `HomeSettingsError.unsupportedVersion` for settings from a newer schema.
-    func savedHomePageSettings(client: String = HomeDisplayPreferences
-        .anemoneClient) async throws -> HomePageSettings?
+    func savedHomePageSettings(client: String = HomeDisplayPreferences.anemoneClient) async throws
+        -> HomePageSettings?
     {
         let prefs = try await customPrefs(client: client)
         return try prefs[HomeDisplayPreferences.homeSettingsKey].map(HomePageSettings.init(json:))
@@ -64,13 +63,10 @@ public extension JellyfinSession {
         return HomeSettingsResolution(settings: nil, source: .default)
     }
 
-    /// One DisplayPreferences entry's `customPrefs`. An entry that was never saved comes back empty.
+    /// One DisplayPreferences entry's `customPrefs` that have a value. An entry that was never
+    /// saved comes back empty.
     func customPrefs(client: String, id: String = HomeDisplayPreferences.id) async throws -> [String: String] {
-        try await displayPreferences(client: client, id: id).customPrefs ?? [:]
-    }
-
-    internal func displayPreferences(client: String, id: String) async throws -> DisplayPreferencesDto {
-        try await send(Paths.getDisplayPreferences(displayPreferencesID: id, userID: userID, client: client))
+        try await displayPreferences(client: client, id: id).customPrefs
     }
 
     private func skippingFailures<Value>(_ load: () async throws -> Value?) async throws -> Value? {
@@ -114,15 +110,10 @@ public actor HomePreferencesWriter {
         let task = Task {
             await previous?.value
             var entry = try await session.displayPreferences(client: client, id: HomeDisplayPreferences.id)
-            var prefs = entry.customPrefs ?? [:]
+            var prefs = entry.customPrefs
             try change(&prefs)
             entry.customPrefs = prefs
-            try await session.send(Paths.updateDisplayPreferences(
-                displayPreferencesID: HomeDisplayPreferences.id,
-                userID: session.userID,
-                client: client,
-                entry,
-            ))
+            try await session.saveDisplayPreferences(entry, client: client, id: HomeDisplayPreferences.id)
         }
         last = Task { _ = await task.result }
         try await task.value
