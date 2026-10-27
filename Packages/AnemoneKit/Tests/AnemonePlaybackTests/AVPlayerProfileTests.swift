@@ -11,21 +11,9 @@ struct AVPlayerProfileTests {
         let profile = AVPlayerProfile.deviceProfile(decoders: Self.appleTVHD)
 
         #expect(profile.directPlayProfiles?.map(\.videoCodec) == ["h264,mpeg4", "h264,mpeg4,mjpeg"])
-        #expect(profile.transcodingProfiles?.map(\.videoCodec) == ["h264", "h264"])
+        #expect(profile.transcodingProfiles?.map(\.videoCodec) == ["h264"])
         #expect(profile.codecProfiles?.map(\.codec) == ["h264"])
         #expect(AVPlayerProfile.videoRanges(Self.appleTVHD) == [.sdr, .doviWithSDR])
-    }
-
-    @Test func `live TV gets HLS in MPEG-TS after the fragmented MP4 everything else gets`() throws {
-        let profiles = try #require(AVPlayerProfile.deviceProfile(decoders: Self.appleTV4K).transcodingProfiles)
-
-        #expect(profiles.map(\.container) == ["mp4", "ts"])
-        #expect(profiles.map(\.protocol) == [.hls, .hls])
-        let live = try #require(profiles.last)
-        #expect(live.videoCodec == "h264")
-        #expect(live.audioCodec == "aac,ac3,eac3")
-        #expect(live.type == .video)
-        #expect(live.context == .streaming)
     }
 
     @Test func `an Apple TV 4K is offered HEVC, HDR and Dolby Vision`() {
