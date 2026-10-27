@@ -225,7 +225,22 @@ Not started. Ported from `StreamChoiceService`, remembered per item and per seri
 
 #### 3e: Anemone player overlay, seeking, chapters, trickplay
 
-Not started. Plex-style overlay: D-pad seek with acceleration, clickpad scrubbing, chapters, queue, trickplay, and the controls features add.
+- [x] Settings › Playback › Player Controls: the system player, still the default, or Anemone's overlay, with Wholphin's skip amounts (10 s back, 30 s forward), how long the controls stay up (5 s) and a debug panel. Engines that draw their own video, as MPV will, always get the overlay
+- [x] Wholphin's overlay over an `AVPlayerLayer`, driven only through the controller and its `PlayerEngine`: the title, episode, tracks playing and "Ends at"; the seek bar and its times; Previous, skip back, Play/Pause, skip forward and Next; a pause indicator. Previous restarts the entry unless it's within 3 s of the start, as in Wholphin
+- [x] D-pad seeking that speeds up while held. SwiftUI's move commands don't say how long a press lasts, so a view controller takes `pressesBegan` and `pressesEnded` before the focus engine, as Swiftfin's player does, and repeats a held press at Android's pace (every 50 ms after 500 ms) through Wholphin's `SeekAcceleration` tiers; with the controls hidden the first 8 repeats pass, as in Wholphin. The seek lands 750 ms after the last press, as Wholphin's seek bar waits; Select seeks at once and Menu drops it. Menu then hides the controls, then closes the player
+- [x] Swipe scrubbing on the clickpad, with the controls hidden or on the seek bar: a swipe across the surface covers a fifth of the video, between 2 and 10 minutes
+- [x] Trickplay thumbnails over the seek bar, from the item's trickplay for the version playing, at the widest width up to 480 px. Sheets come through the session, since they need the token, and the last three stay decoded
+- [x] The chapter row with the chapters' images, starting on the chapter playing, and the queue row with what plays after this entry, below the transport as in Wholphin
+- [x] What features add through `PlayerAccessories`: their actions over the video take focus when they appear, their menus open as lists over the controls, and the card shows above everything, as with the system player
+- [x] A debug panel behind a setting: the engine, play method and session, version, position, speed, trickplay, chapters and tracks
+
+Wholphin's `TODO()` crashes for the playlist and video-filter dialogs (`PlaybackPage.kt:292-296`) aren't ported: the overlay has neither action.
+
+Tested live in the simulator against the fixture server, with Anemone H264 Chapters (3 minutes, 6 chapters, trickplay): right twice with the controls hidden showed the compact seek bar with a thumbnail and landed a minute on; Select brought up the controls on Play/Pause; on the seek bar two presses moved 60 s with a thumbnail over the bar; down from the transport opened the chapter row on the chapter playing, and choosing an earlier one jumped there; Play/Pause paused and resumed, as the debug panel showed the controller heard; Menu hid the controls, then closed the player; and with 3c's `-fakeSegments`, Skip Intro showed over the video with focus and skipped the intro. And against the demo server, with Night of the Living Dead (96 minutes, trickplay): holding right for 2 s moved 11 minutes and then holding for 5 s moved 47, where the 2 s hold's pace would have reached 41 (a hold starts seeking after 0.9 s), and after closing the page offered Resume from where the seek had landed. With the setting left at System, the system player is unchanged. Jellyfin keeps no resume position for videos under 5 minutes, so the fixture movie's page offered Play again.
+
+Not verified live: swiping on the clickpad, which the simulator's UI tests can't do (the scrubbing itself is unit-tested), the queue row, which needs more than one entry (3b), and features' menus and cards in the overlay, since no feature adds any yet.
+
+Not yet: Now Playing and remote commands while the overlay plays, which 3f adds for both players; skip-back on resume; a playback speed menu.
 
 #### 3f: Now Playing, display matching and playback settings
 
