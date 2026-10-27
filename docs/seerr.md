@@ -64,4 +64,4 @@ DEBUG builds launched with `-seerrMock YES` sign in to a made-up server inside t
 
 ## CI
 
-CI's `seerr` job builds and tests with Seerr on, so it doesn't rot while the default build leaves it out. It runs the package tests with `--traits ANEMONE_SEERR` and the tvOS build with `ANEMONE_SEERR=1` and the build setting, as above. The `test` and `build` jobs keep Seerr off.
+CI's `seerr` job builds and tests with Seerr on, so it doesn't rot while the default build leaves it out. It runs the Seerr tests with `--traits ANEMONE_SEERR --filter Seerr` (the other tests don't depend on the flag, and the `test` job runs them) and the tvOS build with `ANEMONE_SEERR=1` and the build setting, as above. The `test` and `build` jobs keep Seerr off. Run the whole suite with the trait locally before a Seerr change.
