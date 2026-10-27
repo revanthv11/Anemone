@@ -37,7 +37,7 @@ struct SignedInView: View {
             }
             if FavoritesPage.isAvailable {
                 Tab("Favorites", systemImage: "heart", value: Destination.favorites) {
-                    FavoritesPage()
+                    FavoritesPage(isSelected: selection == .favorites)
                 }
             }
             // Hidden until the libraries load, so the sidebar never shows an empty heading.
