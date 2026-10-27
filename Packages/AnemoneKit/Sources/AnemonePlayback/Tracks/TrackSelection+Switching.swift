@@ -3,8 +3,9 @@ import AnemoneJellyfin
 
 /// Switching and remembering.
 extension TrackSelection {
-    /// Shows the entry's tracks: in the stream that's playing when it can (text subtitles that
-    /// come as files of their own are drawn), else by asking the server for another stream.
+    /// Shows the entry's tracks: in the stream that's playing when it can (over AVPlayer, text
+    /// subtitles that come as files of their own are drawn), else by asking the server for
+    /// another stream.
     func switchTracks(from previous: Entry, in controller: PlaybackController) async {
         guard let entry, let stream = entry.stream else { return }
         let engine = controller.engine
@@ -19,6 +20,7 @@ extension TrackSelection {
                 in: stream,
                 options: engine.tracks(.subtitle),
                 burnsInStyled: burnsInStyledSubtitles,
+                drawsFiles: Self.drawsFiles(in: engine),
             )
             reloads = reloads || change == .reload
         }

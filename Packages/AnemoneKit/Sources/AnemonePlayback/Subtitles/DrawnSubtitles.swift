@@ -15,7 +15,9 @@ import os
 ///
 /// `TrackSelection` says what to draw with `show(_:in:)`. Picture subtitles, and ASS on AVPlayer,
 /// are still burned in by the server, and subtitles inside a file AVPlayer plays directly (MP4's
-/// own text) are still the player's.
+/// own text) are still the player's. Nothing is drawn while MPV plays: MPV adds the files the
+/// server sends beside its stream to its own tracks and shows them itself
+/// (`MPVExternalSubtitles`), with libass and MPV's own delay.
 @MainActor
 @Observable
 public final class DrawnSubtitles: PlaybackFeature {
@@ -35,8 +37,8 @@ public final class DrawnSubtitles: PlaybackFeature {
     public private(set) var cues: [SubtitleCue] = []
     /// The user's style, or their HDR style for HDR video.
     public private(set) var style = SubtitleStyle.standard
-    /// The entry's subtitle delay while AVPlayer plays: later when positive. Each entry starts
-    /// without one, as in Wholphin. While MPV plays, its own delay (MPV's menu) applies instead.
+    /// The entry's subtitle delay: later when positive. Each entry starts without one, as in
+    /// Wholphin. MPV has its own for what it shows, in its own menu (`MPVSubtitleMenus`).
     public private(set) var delay = Duration.zero
 
     @ObservationIgnored private let server: Server
@@ -88,10 +90,11 @@ public final class DrawnSubtitles: PlaybackFeature {
     }
 
     /// Draws `track`, a text subtitle that `stream` sends as a file of its own, or nothing. Asked
-    /// for a stream other than the one playing, it does nothing.
+    /// for a stream other than the one playing, it does nothing; while MPV plays, it draws
+    /// nothing, since MPV shows that file itself.
     public func show(_ track: MediaTrack?, in stream: PlaybackStream) {
         guard stream == self.stream else { return }
-        guard let track, track.kind == .subtitle, track.isText else {
+        guard let track, track.kind == .subtitle, track.isText, controller?.engine.mpv == nil else {
             clear()
             return
         }
@@ -135,11 +138,6 @@ public final class DrawnSubtitles: PlaybackFeature {
         controller?.accessories.removeMenu(Self.delayMenuID)
     }
 
-    /// The delay that applies: MPV's while MPV plays, else the entry's.
-    var appliedDelay: Duration {
-        controller?.engine.mpv?.subtitleDelay ?? delay
-    }
-
     /// Shows the cues at `position` in the stream, shifted by the delay. Returns how long it is,
     /// at normal speed, until what shows changes; `nil` when nothing more will show.
     @discardableResult
@@ -150,7 +148,7 @@ public final class DrawnSubtitles: PlaybackFeature {
             }
             return nil
         }
-        let time = position - appliedDelay
+        let time = position - delay
         let showing = timeline.cues(at: time)
         if showing != cues {
             cues = showing
@@ -173,11 +171,10 @@ public final class DrawnSubtitles: PlaybackFeature {
 
     // MARK: - Delay
 
-    /// Wholphin's subtitle delay steps, as MPV's menu offers them, while subtitles are drawn
-    /// over AVPlayer. MPV's own menu covers them while MPV plays.
+    /// Wholphin's subtitle delay steps, as MPV's menu offers them, while subtitles are drawn.
     private func showMenu() {
         guard let controller else { return }
-        guard track != nil, controller.engine.mpv == nil else {
+        guard track != nil else {
             controller.accessories.removeMenu(Self.delayMenuID)
             return
         }

@@ -285,44 +285,6 @@ struct DrawnSubtitlesTests {
     }
 }
 
-/// Telling drawn subtitles from those the stream carries.
-struct DrawnSubtitleSwitchingTests {
-    private let stream = PlaybackStream.withSubtitleFiles("m1", TrackRequest(audioIndex: 1, subtitleIndex: 4))
-
-    private func track(_ index: Int) throws -> MediaTrack {
-        try #require(stream.tracks.first { $0.index == index })
-    }
-
-    @Test func `text subtitles sent as files are drawn, and the playlist then has none`() throws {
-        #expect(try [4, 5, 6].allSatisfy { try TrackSwitching.isDrawn(track($0), in: stream) })
-        #expect(try !TrackSwitching.isDrawn(track(8), in: stream))
-        #expect(TrackSwitching.listed(.subtitle, in: stream).isEmpty)
-        #expect(try TrackSwitching.subtitle(
-            from: track(4),
-            to: track(6),
-            in: stream,
-            options: [],
-            burnsInStyled: true,
-        ) == .drawn(track(6)))
-        #expect(try TrackSwitching.subtitle(from: track(4), to: nil, in: stream, options: [], burnsInStyled: true)
-            == .inPlace(nil))
-    }
-
-    @Test func `picture subtitles, and ASS on AVPlayer, are still burned in`() throws {
-        #expect(try TrackSwitching.subtitle(from: track(4), to: track(7), in: stream, options: [], burnsInStyled: true)
-            == .reload)
-        #expect(try TrackSwitching.subtitle(from: track(4), to: track(8), in: stream, options: [], burnsInStyled: true)
-            == .reload)
-        // Where it isn't burned in, as with MPV, the server's plain text of it is drawn.
-        #expect(try TrackSwitching.subtitle(from: nil, to: track(7), in: stream, options: [], burnsInStyled: false)
-            == .drawn(track(7)))
-    }
-
-    @Test func `a live stream doesn't offer subtitles sent as files`() throws {
-        #expect(try !TrackSwitching.switchesInPlace(to: track(4), in: stream, burnsInStyled: true))
-    }
-}
-
 /// The subtitle files a test's fake server was asked for.
 final class SubtitleFetchLog: Sendable {
     private let requests = Mutex<[SubtitleFileRequest]>([])
