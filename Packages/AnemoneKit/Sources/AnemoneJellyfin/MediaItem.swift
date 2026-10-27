@@ -14,6 +14,7 @@ public struct MediaItem: Hashable, Identifiable, Sendable {
         case video
         case musicVideo
         case musicAlbum
+        case musicArtist
         case audio
         case photo
         case folder
@@ -210,6 +211,7 @@ private extension MediaItem.Kind {
         .video: .video,
         .musicVideo: .musicVideo,
         .musicAlbum: .musicAlbum,
+        .musicArtist: .musicArtist,
         .audio: .audio,
         .photo: .photo,
         .folder: .folder,

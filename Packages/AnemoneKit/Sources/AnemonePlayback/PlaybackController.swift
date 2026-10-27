@@ -215,7 +215,11 @@ public final class PlaybackController: Identifiable {
         let entry = queue.current
         do {
             let stream = try await loadStream(entry.itemID, allowsDirect, stream?.mediaSourceID)
-            guard !isStopped, attempt == loads else { return }
+            guard !isStopped, attempt == loads else {
+                // Features never hear of a stream nothing plays, so a live stream it opened is closed here.
+                await feature(LiveStreamClosing.self)?.discard(stream)
+                return
+            }
             await play(stream, entry, from: position)
         } catch {
             guard !isStopped, attempt == loads else { return }

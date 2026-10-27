@@ -89,6 +89,8 @@ private struct ItemPage: View {
             PlaylistPage(playlist: $details)
         case .person:
             PersonPage(person: $details)
+        case .musicAlbum, .musicArtist, .audio:
+            MusicItemPage(details: $details)
         default:
             MoviePage(item: $details)
         }
