@@ -39,7 +39,7 @@ struct ChapterRow: View {
                 .focused(focus, equals: .chapter(chapter.id))
                 // The chapter and where it starts; the one playing reads as selected.
                 .accessibilityLabel(title)
-                .accessibilityValue(Text("Starts at \(chapter.start.spokenTime)"))
+                .accessibilityValue(Text("starts at \(chapter.start.spokenPosition)"))
                 .accessibilityAddTraits(chapter.id == playingChapter ? .isSelected : [])
                 .accessibilityIdentifier("player.chapter.\(chapter.id)")
             }

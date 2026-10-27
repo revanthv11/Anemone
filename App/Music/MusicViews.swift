@@ -127,7 +127,7 @@ struct SongRow: View {
                 Text(song.item.runtime?.clockText ?? "")
                     .monospacedDigit()
                     .foregroundStyle(theme.secondaryText)
-                    .accessibilityLabel(song.item.runtime?.spokenTime ?? "")
+                    .accessibilityLabel(song.item.runtime?.spokenPosition ?? "")
             }
             .font(.callout)
             .padding(.horizontal, 24)

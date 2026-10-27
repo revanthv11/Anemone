@@ -105,14 +105,14 @@ struct NowPlayingProgress: View {
         // One element, read as how far the song has got of how long it is.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Position")
-        .accessibilityValue(spokenPosition)
+        .accessibilityValue(spokenProgress)
         .accessibilityIdentifier("nowPlaying.position")
     }
 
     /// "1 minute, 5 seconds of 3 minutes, 20 seconds".
-    private var spokenPosition: Text {
-        guard let duration, duration > .zero else { return Text(position.spokenTime) }
-        return Text("\(position.spokenTime) of \(duration.spokenTime)")
+    private var spokenProgress: Text {
+        guard let duration, duration > .zero else { return Text(position.spokenPosition) }
+        return Text("\(position.spokenPosition) of \(duration.spokenPosition)")
     }
 
     private var fraction: CGFloat {

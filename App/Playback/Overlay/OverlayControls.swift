@@ -104,7 +104,7 @@ struct OverlayControls: View {
             transportButton(
                 .rewind,
                 systemImage: skipSymbol("gobackward", overlay.seeker.skipBack),
-                label: Text("Skip back \(overlay.seeker.skipBack.spokenTime)"),
+                label: Text("Skip back \(overlay.seeker.skipBack.spokenPosition)"),
             ) {
                 overlay.seeker.step(.back)
                 overlay.pulse()
@@ -120,7 +120,7 @@ struct OverlayControls: View {
             transportButton(
                 .forward,
                 systemImage: skipSymbol("goforward", overlay.seeker.skipForward),
-                label: Text("Skip forward \(overlay.seeker.skipForward.spokenTime)"),
+                label: Text("Skip forward \(overlay.seeker.skipForward.spokenPosition)"),
             ) {
                 overlay.seeker.step(.forward)
                 overlay.pulse()
@@ -298,15 +298,15 @@ struct SeekTrack: View {
         // One element, so focus and the time are found by the one identifier.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(showsPreview && sheets != nil ? "Seek, with a thumbnail" : "Seek")
-        .accessibilityValue(spokenPosition)
+        .accessibilityValue(spokenProgress)
         .accessibilityIdentifier(identifier)
     }
 
     /// "1 minute, 5 seconds of 10 minutes": where the bar is, and how long the video is.
-    private var spokenPosition: Text {
-        let position = seeker.shownPosition.spokenTime
+    private var spokenProgress: Text {
+        let position = seeker.shownPosition.spokenPosition
         guard let duration = seeker.duration, duration > .zero else { return Text(position) }
-        return Text("\(position) of \(duration.spokenTime)")
+        return Text("\(position) of \(duration.spokenPosition)")
     }
 
     private var track: some View {
