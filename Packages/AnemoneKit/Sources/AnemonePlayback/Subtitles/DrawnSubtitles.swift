@@ -13,7 +13,8 @@ import os
 /// whole, and both player screens draw what shows at the playing position
 /// (`App/Playback/Subtitles`). Switching between text subtitles then needs no new stream.
 ///
-/// `TrackSelection` says what to draw with `show(_:in:)`. Picture subtitles, and ASS on AVPlayer,
+/// `TrackSelection` says what to draw with `show(_:in:)`, whichever of the two hears of a new
+/// stream first. Picture subtitles, and ASS on AVPlayer,
 /// are still burned in by the server, and subtitles inside a file AVPlayer plays directly (MP4's
 /// own text) are still the player's. Nothing is drawn while MPV plays: MPV adds the files the
 /// server sends beside its stream to its own tracks and shows them itself
@@ -45,6 +46,9 @@ public final class DrawnSubtitles: PlaybackFeature {
     @ObservationIgnored private weak var controller: PlaybackController?
     /// The stream playing, from its `loaded` or `reloaded` until its `stopped`.
     @ObservationIgnored private var stream: PlaybackStream?
+    /// What `show(_:in:)` was asked to draw for a stream this hadn't heard of yet: features hear
+    /// of a new stream in turn, and track selection can ask while one before this is busy.
+    @ObservationIgnored private var wanted: (track: MediaTrack?, stream: PlaybackStream)?
     @ObservationIgnored private var request: SubtitleFileRequest?
     @ObservationIgnored private var timeline: SubtitleTimeline?
     /// Files already read for this player, so a reload for another audio track, or switching back,
@@ -73,6 +77,7 @@ public final class DrawnSubtitles: PlaybackFeature {
             begin(stream)
         case .stopped:
             stream = nil
+            wanted = nil
             clear()
             if controller.isStopped {
                 read = [:]
@@ -82,18 +87,28 @@ public final class DrawnSubtitles: PlaybackFeature {
         }
     }
 
-    /// Nothing is drawn for a new stream until `TrackSelection` says what to draw.
+    /// Nothing is drawn for a new stream until `TrackSelection` says what to draw, unless it
+    /// already has.
     private func begin(_ stream: PlaybackStream) {
         self.stream = stream
         style = SubtitleStyles.current.style(forHDR: stream.isHDR)
         clear()
+        if let wanted, wanted.stream == stream {
+            show(wanted.track, in: stream)
+        }
+        wanted = nil
     }
 
     /// Draws `track`, a text subtitle that `stream` sends as a file of its own, or nothing. Asked
-    /// for a stream other than the one playing, it does nothing; while MPV plays, it draws
-    /// nothing, since MPV shows that file itself.
+    /// for a stream before this has heard of it, it draws it once it does; asked for one that's
+    /// been replaced, nothing. While MPV plays, it draws nothing, since MPV shows that file
+    /// itself.
     public func show(_ track: MediaTrack?, in stream: PlaybackStream) {
-        guard stream == self.stream else { return }
+        guard stream == self.stream else {
+            wanted = (track, stream)
+            return
+        }
+        wanted = nil
         guard let track, track.kind == .subtitle, track.isText, controller?.engine.mpv == nil else {
             clear()
             return
@@ -107,21 +122,25 @@ public final class DrawnSubtitles: PlaybackFeature {
         clear()
         self.request = request
         self.track = track
-        showMenu()
         if let known = read[request] {
             timeline = known
+            showMenu()
             return
         }
+        // The delay menu shows once there's something to delay.
         loading = Task { [weak self, server] in
             do {
                 let timeline = try await server.timeline(request)
                 guard let self, !Task.isCancelled, self.request == request else { return }
                 read[request] = timeline
                 self.timeline = timeline
+                showMenu()
             } catch {
-                guard !Task.isCancelled else { return }
+                guard let self, !Task.isCancelled, self.request == request else { return }
                 let index = request.index
                 Self.log.error("Couldn't fetch subtitles \(index, privacy: .public): \(error, privacy: .public)")
+                // Nothing to draw, and asking for the track again fetches it again.
+                clear()
             }
         }
     }
@@ -174,7 +193,7 @@ public final class DrawnSubtitles: PlaybackFeature {
     /// Wholphin's subtitle delay steps, as MPV's menu offers them, while subtitles are drawn.
     private func showMenu() {
         guard let controller else { return }
-        guard track != nil else {
+        guard track != nil, timeline != nil else {
             controller.accessories.removeMenu(Self.delayMenuID)
             return
         }
