@@ -1,6 +1,7 @@
 import AnemoneJellyfin
 @testable import AnemonePlayback
 import Foundation
+import JellyfinAPI
 import Synchronization
 
 /// The server's side of song streams: what was asked for, and whether it fails.
@@ -127,22 +128,76 @@ final class LoadGate: Sendable {
     }
 }
 
-/// A remote that writes down what it hears.
+/// A fake engine whose seeks wait for the test to open `gate`, as AVPlayer's take a moment to
+/// get there; until then it tells the old time.
 @MainActor
-final class RecordingRemote: MusicRemote {
-    private(set) var attached = false
-    private(set) var detached = false
-    private(set) var statuses: [MusicPlayer.Status] = []
+final class SeekHoldingEngine: PlayerEngine {
+    let base = FakeEngine()
+    let gate: LoadGate
 
-    func attach(to _: MusicPlayer) {
-        attached = true
+    init(gate: LoadGate) {
+        self.gate = gate
     }
 
-    func update(from player: MusicPlayer) {
-        statuses.append(player.status)
+    var deviceProfile: DeviceProfile {
+        base.deviceProfile
     }
 
-    func detach() {
-        detached = true
+    var videoOutput: PlayerVideoOutput {
+        base.videoOutput
+    }
+
+    var currentTime: Duration {
+        base.currentTime
+    }
+
+    var duration: Duration? {
+        base.duration
+    }
+
+    var rate: Float {
+        get { base.rate }
+        set { base.rate = newValue }
+    }
+
+    func load(_ url: URL, from position: Duration?, metadata: PlaybackMetadata) -> AsyncStream<PlayerEvent> {
+        base.load(url, from: position, metadata: metadata)
+    }
+
+    func play() {
+        base.play()
+    }
+
+    func pause() {
+        base.pause()
+    }
+
+    func stop() {
+        base.stop()
+    }
+
+    func seek(to position: Duration) async -> Bool {
+        await gate.wait()
+        return await base.seek(to: position)
+    }
+
+    func tracks(_ kind: PlayerTrack.Kind) async -> [PlayerTrack] {
+        await base.tracks(kind)
+    }
+
+    func select(_ track: PlayerTrack?, _ kind: PlayerTrack.Kind) async {
+        await base.select(track, kind)
+    }
+}
+
+/// A feature whose `stopped` waits for the test, like a stop report to a slow server.
+@MainActor
+final class SlowStop: PlaybackFeature {
+    let gate = LoadGate()
+
+    func handle(_ event: PlaybackEvent, in _: PlaybackController) async {
+        if case .stopped = event {
+            await gate.wait()
+        }
     }
 }

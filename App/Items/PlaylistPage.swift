@@ -9,6 +9,7 @@ struct PlaylistPage: View {
     @Binding var playlist: ItemDetails
 
     @Environment(BrowseModel.self) private var browse
+    @Environment(MusicPlayer.self) private var music
     @FocusState private var focus: ItemFocus?
     @State private var memory = RowMemory()
     @State private var entries: [ItemDetails]?
@@ -21,6 +22,7 @@ struct PlaylistPage: View {
     @State private var problem: String?
     @State private var alert: ItemAlert?
     @State private var playback: PlaybackRequest?
+    @State private var showsNowPlaying = false
     @State private var focusedIndex = 0
     /// Follows the focused entry after a pause, like the home page's backdrop.
     @State private var backdropEntry: ItemDetails?
@@ -50,6 +52,7 @@ struct PlaylistPage: View {
         .player($playback) {
             await loadEntries()
         }
+        .nowPlaying(isPresented: $showsNowPlaying)
         .onChange(of: focus) { _, focus in
             memory.note(focus)
             if case let .card(_, item) = focus, let index = Int(item) {
@@ -117,6 +120,13 @@ struct PlaylistPage: View {
 
     private func play(shuffled: Bool) {
         Task {
+            // A playlist of songs plays as music (5b).
+            if await music.playPlaylist(playlist, entries: entries, shuffled: shuffled, browse: browse, failed: {
+                alert = .failed($0)
+            }) {
+                showsNowPlaying = true
+                return
+            }
             await browse.playQueue(of: playlist, shuffled: shuffled) { playback = $0 } failed: { alert = $0 }
         }
     }

@@ -10,6 +10,11 @@ import SwiftUI
 ///
 /// Wholphin's queue is a list that grows over the page when focused; here it's an Up Next row
 /// along the bottom, as on Apple TV, so the lyrics keep their own scrolling.
+///
+/// It shows over everything when music starts from a page, and in the sidebar's Now Playing
+/// entry (`NowPlayingTab`), as Wholphin's drawer opens it. Like Wholphin, which keeps the screen
+/// on only for video and slideshows, the in-app screensaver can come over it; the music plays on
+/// meanwhile, and the first press only closes the screensaver.
 struct NowPlayingPage: View {
     enum Focus: Hashable {
         case control(Control)
@@ -29,6 +34,10 @@ struct NowPlayingPage: View {
         case options
     }
 
+    /// Set when the sidebar shows the page: called once the music stops, to move to another
+    /// entry. Back from the buttons then opens the sidebar, as on its other pages.
+    var stopped: (() -> Void)?
+
     @Environment(MusicPlayer.self) private var player
     @Environment(BrowseModel.self) private var browse
     @Environment(\.dismiss) private var dismiss
@@ -42,6 +51,53 @@ struct NowPlayingPage: View {
     @State private var showsOptions = false
 
     var body: some View {
+        Group {
+            if stopped == nil {
+                page
+            } else {
+                // Back first scrolls the page's scroll view back to its top, and that would be
+                // the lyrics, which stay on the line being sung, so Back never reached the
+                // sidebar. tvOS looks at this one instead, which the page fills exactly, so it
+                // never scrolls.
+                ScrollView(.vertical) {
+                    page
+                        .containerRelativeFrame(.vertical, alignment: .top)
+                }
+            }
+        }
+        .background {
+            ZStack {
+                Color.black
+                if showsBackdrop, let image = backdrop?.image {
+                    BackdropImage(url: browse.imageURL(image, width: ItemLayout.backdropPixelWidth))
+                }
+            }
+            .ignoresSafeArea()
+        }
+        .defaultFocus($focus, .control(.playPause))
+        .onPlayPauseCommand {
+            player.togglePlayPause()
+        }
+        .onExitCommand(perform: exitAction)
+        .onChange(of: player.status) { _, status in
+            // Stopped here, or by a video starting.
+            if status == .idle {
+                if let stopped {
+                    stopped()
+                } else {
+                    dismiss()
+                }
+            }
+        }
+        .task(id: player.current?.id) {
+            await loadExtras()
+        }
+        .sheet(isPresented: $showsOptions) {
+            NowPlayingOptions()
+        }
+    }
+
+    private var page: some View {
         VStack(alignment: .leading, spacing: 20) {
             HStack(alignment: .center, spacing: 80) {
                 songDetails
@@ -62,39 +118,16 @@ struct NowPlayingPage: View {
         }
         .padding(.horizontal, 80)
         .padding(.top, 40)
-        .background {
-            ZStack {
-                Color.black
-                if showsBackdrop, let image = backdrop?.image {
-                    BackdropImage(url: browse.imageURL(image, width: ItemLayout.backdropPixelWidth))
-                }
-            }
-            .ignoresSafeArea()
-        }
-        .defaultFocus($focus, .control(.playPause))
-        .onPlayPauseCommand {
-            player.togglePlayPause()
-        }
-        .onExitCommand {
-            // Like Wholphin: Back from the lyrics or the queue goes to the buttons first.
-            switch focus {
-            case .lyric?, .entry?:
-                focus = .control(.playPause)
-            default:
-                dismiss()
-            }
-        }
-        .onChange(of: player.status) { _, status in
-            // Stopped here, or by a video starting.
-            if status == .idle {
-                dismiss()
-            }
-        }
-        .task(id: player.current?.id) {
-            await loadExtras()
-        }
-        .sheet(isPresented: $showsOptions) {
-            NowPlayingOptions()
+    }
+
+    /// Like Wholphin: Back from the lyrics or the queue goes to the buttons first. From the
+    /// buttons it leaves the page, or in the sidebar is left to the sidebar.
+    private var exitAction: (() -> Void)? {
+        switch focus {
+        case .lyric?, .entry?:
+            { focus = .control(.playPause) }
+        default:
+            stopped == nil ? { dismiss() } : nil
         }
     }
 

@@ -39,10 +39,7 @@ private final class MusicLifetime {
     let player: MusicPlayer
 
     init(session: JellyfinSession) {
-        let remote = NowPlayingRemote { song in
-            song.coverImage.flatMap { session.imageURL(for: $0, maxWidth: 600) }
-        }
-        player = MusicPlayer(session: session, remote: remote)
+        player = MusicPlayer(session: session)
     }
 
     deinit {
@@ -73,6 +70,29 @@ extension MusicPlayer {
                 }
             }
         }
+    }
+
+    /// Play or Shuffle on a playlist of songs, which plays as music, as Wholphin's playlist page
+    /// plays one through its `MusicService` (`PlaylistDetails`). Wholphin goes by the playlist's
+    /// media type, or failing that by its items being all songs; this goes by the items, fetched
+    /// here when the page hasn't loaded them yet. `false` for any other playlist, which is the
+    /// video player's.
+    func playPlaylist(
+        _ playlist: ItemDetails,
+        entries: [ItemDetails]?,
+        shuffled: Bool,
+        browse: BrowseModel,
+        failed: @escaping (String) -> Void,
+    ) async -> Bool {
+        var items = entries
+        if items == nil {
+            let session = browse.session
+            let id = playlist.id
+            items = await browse.optional(attempt { try await session.playlistItems(id: id) })
+        }
+        guard let items, !items.isEmpty, items.allSatisfy({ $0.item.kind == .audio }) else { return false }
+        play(.playlist(playlist.id), shuffled: shuffled, browse: browse, failed: failed)
+        return true
     }
 
     /// Wholphin's instant mix: songs like the item, chosen by the server.
