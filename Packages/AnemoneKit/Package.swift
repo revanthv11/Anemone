@@ -24,6 +24,9 @@ let package = Package(
         .package(url: "https://github.com/kean/Get", from: "2.2.1"),
         // Image loading and caching for artwork.
         .package(url: "https://github.com/kean/Nuke", from: "13.2.0"),
+        // libmpv with FFmpeg, libass and MoltenVK as prebuilt xcframeworks, for the MPV engine. The
+        // LGPL build, which leaves out samba. Pinned, since each release swaps all the binaries.
+        .package(url: "https://github.com/mpvkit/MPVKit", exact: "1.1.0-n9.0.2"),
     ],
     targets: [
         .target(name: "AnemoneCore"),
@@ -41,6 +44,9 @@ let package = Package(
                 "AnemoneCore",
                 "AnemoneJellyfin",
                 .product(name: "JellyfinAPI", package: "jellyfin-sdk-swift"),
+                // Not on macOS, so `swift test` doesn't link libmpv; the engine's libmpv calls are
+                // behind `#if os(tvOS) || os(iOS)`.
+                .product(name: "MPVKit", package: "MPVKit", condition: .when(platforms: [.tvOS, .iOS])),
             ],
         ),
         .target(name: "AnemoneSeerr", dependencies: ["AnemoneCore"]),
