@@ -15,6 +15,7 @@ struct LiveTVScheduleTests: LiveTVServerTesting {
             case "/LiveTv/Timers": Self.timers
             case "/LiveTv/SeriesTimers": Self.seriesTimers
             case "/LiveTv/Timers/t9": Self.timerOfRecordingWithoutTimes
+            case "/LiveTv/Timers/t8": Self.timerWithOnlyItsProgram
             default: nil
             }
         }
@@ -26,7 +27,7 @@ struct LiveTVScheduleTests: LiveTVServerTesting {
 
         let schedule = try await session(host: "active.test").liveTVSchedule()
 
-        #expect(schedule.active.map(\.id) == ["r1", "r2", "r3"])
+        #expect(schedule.active.map(\.id) == ["r1", "r2", "r3", "r5"])
         let recording = schedule.active[0].program
         #expect(recording.id == "p1")
         #expect(recording.name == "Now")
@@ -40,23 +41,36 @@ struct LiveTVScheduleTests: LiveTVServerTesting {
         #expect(query["limit"] == "100")
         #expect(query["userId"] == "u1")
         // Only a recording that came without times asks for its timer.
-        #expect(sent.all.filter { $0.key.hasPrefix("/LiveTv/Timers/") }.map(\.key) == ["/LiveTv/Timers/t9"])
+        let timers = sent.all.filter { $0.key.hasPrefix("/LiveTv/Timers/") }.map(\.key)
+        #expect(timers.sorted() == ["/LiveTv/Timers/t8", "/LiveTv/Timers/t9"])
     }
 
-    @Test func `a recording under way without times is listed with its timer's, or its own length`() async throws {
+    @Test func `a recording under way without times is listed with its timer's, padding included`() async throws {
         _ = registerSchedule(host: "untimed.test")
 
         let active = try await session(host: "untimed.test").liveTVSchedule().active
 
+        // The timer's own times, not its programme's, widened by its padding: when the server
+        // records, so the recording reads as under way until the server stops it.
         let fromTimer = try #require(active.first { $0.id == "r2" }).program
-        #expect(fromTimer.start == Self.date("2026-10-26T10:30:00Z"))
-        #expect(fromTimer.end == Self.date("2026-10-26T11:00:00Z"))
+        #expect(fromTimer.start == Self.date("2026-10-26T10:29:00Z"))
+        #expect(fromTimer.end == Self.date("2026-10-26T11:05:00Z"))
         #expect(fromTimer.channelID == "c9")
         #expect(fromTimer.timerID == "t9")
-        let fromLength = try #require(active.first { $0.id == "r3" }).program
-        #expect(fromLength.start == Self.date("2026-10-26T10:00:00Z"))
-        #expect(fromLength.duration == .seconds(1200))
-        // One with neither is left out, and logged.
+        let duringPostPadding = try #require(Self.date("2026-10-26T11:02:00Z"))
+        #expect(fromTimer.isAiring(at: duringPostPadding))
+        // A timer without times of its own gives its programme's.
+        let fromProgram = try #require(active.first { $0.id == "r5" }).program
+        #expect(fromProgram.start == Self.date("2026-10-26T12:00:00Z"))
+        #expect(fromProgram.end == Self.date("2026-10-26T12:30:00Z"))
+        #expect(fromProgram.channelID == "c8")
+        // A finished recording's length gives its end.
+        let finished = try #require(active.first { $0.id == "r3" }).program
+        #expect(finished.start == Self.date("2026-10-26T10:00:00Z"))
+        #expect(finished.duration == .seconds(1200))
+        // One under way has only the length recorded so far, which would end it about now; with
+        // nothing else to go on, it's left out, as is one with nothing at all.
+        #expect(!active.contains { $0.id == "r6" })
         #expect(!active.contains { $0.id == "r4" })
     }
 
@@ -118,21 +132,35 @@ struct LiveTVScheduleTests: LiveTVServerTesting {
         try? Date(text, strategy: .iso8601)
     }
 
-    /// One recording under way; one the server sent without times but with its timer; one with
-    /// its start and length but no end; and one with nothing to go on, which isn't listed.
+    /// One recording under way; one the server sent without times but with its timer; one whose
+    /// timer has only its programme's times; a finished one with its start and length but no end;
+    /// one under way with only those; and one with nothing to go on. The last two aren't listed.
     private static let recordings = MockServer.Reply.json(#"""
     {"Items":[{"Id":"r1","Name":"Now","Type":"Recording","TimerId":"t1","SeriesTimerId":"s1",
       "ProgramId":"p1","ChannelName":"Anemone One","IsSeries":true,"EpisodeTitle":"Stripes",
       "Status":"InProgress","ImageTags":{"Primary":"art"},
       "StartDate":"2026-10-26T10:00:00.0000000Z","EndDate":"2026-10-26T11:00:00.0000000Z"},
-     {"Id":"r2","Name":"No times","TimerId":"t9"},
-     {"Id":"r3","Name":"Own length","StartDate":"2026-10-26T10:00:00.0000000Z","RunTimeTicks":12000000000},
-     {"Id":"r4","Name":"Nothing to go on"}]}
+     {"Id":"r2","Name":"No times","TimerId":"t9","Status":"InProgress"},
+     {"Id":"r3","Name":"Finished","Status":"Completed","StartDate":"2026-10-26T10:00:00.0000000Z",
+      "RunTimeTicks":12000000000},
+     {"Id":"r4","Name":"Nothing to go on"},
+     {"Id":"r5","Name":"Programme times","TimerId":"t8","Status":"InProgress"},
+     {"Id":"r6","Name":"Length so far","Status":"InProgress","StartDate":"2026-10-26T10:00:00.0000000Z",
+      "RunTimeTicks":12000000000}]}
     """#)
 
+    /// Records from a minute before its start to five minutes after its end.
     private static let timerOfRecordingWithoutTimes = MockServer.Reply.json(#"""
-    {"Id":"t9","ChannelId":"c9","Name":"No times","Status":"InProgress",
-     "StartDate":"2026-10-26T10:30:00.0000000Z","EndDate":"2026-10-26T11:00:00.0000000Z"}
+    {"Id":"t9","ChannelId":"c9","Name":"No times","Status":"InProgress","PrePaddingSeconds":60,
+     "PostPaddingSeconds":300,"StartDate":"2026-10-26T10:30:00.0000000Z","EndDate":"2026-10-26T11:00:00.0000000Z",
+     "ProgramInfo":{"Id":"p9","ChannelId":"c9","Name":"No times",
+       "StartDate":"2026-10-26T10:35:00.0000000Z","EndDate":"2026-10-26T10:55:00.0000000Z"}}
+    """#)
+
+    private static let timerWithOnlyItsProgram = MockServer.Reply.json(#"""
+    {"Id":"t8","Name":"Programme times","Status":"InProgress",
+     "ProgramInfo":{"Id":"p8","ChannelId":"c8","Name":"Programme times",
+       "StartDate":"2026-10-26T12:00:00.0000000Z","EndDate":"2026-10-26T12:30:00.0000000Z"}}
     """#)
 
     /// A programme's timer, one set by time alone, and one with nothing to show.
