@@ -47,6 +47,9 @@ struct SettingsView: View {
                     page("Appearance", systemImage: "paintpalette", id: "appearance") {
                         AppearanceSettingsPage()
                     }
+                    page("Screensaver", systemImage: "sparkles.tv", id: "screensaver") {
+                        ScreensaverSettingsPage()
+                    }
                     page("About", systemImage: "info.circle", id: "about") {
                         AboutSettingsPage()
                     }

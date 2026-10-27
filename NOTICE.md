@@ -16,7 +16,7 @@ Some of Wholphin's device profile code is adapted from the official [jellyfin-an
 
 ## Swiftfin
 
-Anemone's AVPlayer device profile, the checks it makes on the server's media segments, the way its player overlay takes the Siri Remote's presses before the focus engine and passes on those it doesn't use, and the link that opens a YouTube trailer in the YouTube app are adapted from [Swiftfin](https://github.com/jellyfin/Swiftfin), the official Jellyfin client for Apple platforms.
+Anemone's AVPlayer device profile, the checks it makes on the server's media segments, the way its player overlay takes the Siri Remote's presses before the focus engine and passes on those it doesn't use, the link that opens a YouTube trailer in the YouTube app, and its Now Playing info and remote commands are adapted from [Swiftfin](https://github.com/jellyfin/Swiftfin), the official Jellyfin client for Apple platforms.
 
 - Copyright (c) Jellyfin & Jellyfin Contributors
 - Licensed under the Mozilla Public License, version 2.0, which allows combining it into this GPL-3.0 work
@@ -31,4 +31,4 @@ Anemone's AVPlayer device profile, the checks it makes on the server's media seg
 | [swift-nio-transport-services](https://github.com/apple/swift-nio-transport-services) (via jellyfin-sdk-swift) | Apache-2.0 |
 | [swift-nio](https://github.com/apple/swift-nio), [swift-atomics](https://github.com/apple/swift-atomics), [swift-collections](https://github.com/apple/swift-collections), [swift-system](https://github.com/apple/swift-system) (via swift-nio-transport-services) | Apache-2.0 |
 
-Update this table whenever a dependency is added.
+<!-- Update this table whenever a dependency is added, and run scripts/update-licenses.sh. Settings › About lists it. -->

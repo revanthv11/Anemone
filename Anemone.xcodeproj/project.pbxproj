@@ -13,6 +13,8 @@
 		0A0000000000000000000043 /* AnemonePlayback in Frameworks */ = {isa = PBXBuildFile; productRef = 0A0000000000000000000053 /* AnemonePlayback */; };
 		0A0000000000000000000044 /* AnemoneSeerr in Frameworks */ = {isa = PBXBuildFile; productRef = 0A0000000000000000000054 /* AnemoneSeerr */; };
 		0A0000000000000000000045 /* AnemoneUI in Frameworks */ = {isa = PBXBuildFile; productRef = 0A0000000000000000000055 /* AnemoneUI */; };
+		0A0000000000000000000046 /* AnemoneCore in Frameworks */ = {isa = PBXBuildFile; productRef = 0A0000000000000000000056 /* AnemoneCore */; };
+		0A0000000000000000000047 /* AnemoneJellyfin in Frameworks */ = {isa = PBXBuildFile; productRef = 0A0000000000000000000057 /* AnemoneJellyfin */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -56,6 +58,7 @@
 		0A0000000000000000000008 /* Exceptions for "App" folder in "Anemone" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Anemone.entitlements,
 				Info.plist,
 			);
 			target = 0A0000000000000000000020 /* Anemone */;
@@ -63,6 +66,7 @@
 		0A0000000000000000000006 /* Exceptions for "TopShelf" folder in "AnemoneTopShelf" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				AnemoneTopShelf.entitlements,
 				Info.plist,
 			);
 			target = 0A0000000000000000000021 /* AnemoneTopShelf */;
@@ -110,6 +114,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0A0000000000000000000046 /* AnemoneCore in Frameworks */,
+				0A0000000000000000000047 /* AnemoneJellyfin in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -192,10 +198,12 @@
 			);
 			name = AnemoneTopShelf;
 			packageProductDependencies = (
+				0A0000000000000000000056 /* AnemoneCore */,
+				0A0000000000000000000057 /* AnemoneJellyfin */,
 			);
 			productName = AnemoneTopShelf;
 			productReference = 0A0000000000000000000011 /* AnemoneTopShelf.appex */;
-			productType = "com.apple.product-type.tv-app-extension";
+			productType = "com.apple.product-type.app-extension";
 		};
 		0A0000000000000000000022 /* AnemoneUITests */ = {
 			isa = PBXNativeTarget;
@@ -382,6 +390,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				CODE_SIGN_ENTITLEMENTS = App/Anemone.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
@@ -407,6 +416,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				CODE_SIGN_ENTITLEMENTS = App/Anemone.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
@@ -431,6 +441,7 @@
 		0A0000000000000000000084 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = TopShelf/AnemoneTopShelf.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -453,6 +464,7 @@
 		0A0000000000000000000085 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = TopShelf/AnemoneTopShelf.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -575,6 +587,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 0A0000000000000000000050 /* XCLocalSwiftPackageReference "Packages/AnemoneKit" */;
 			productName = AnemoneUI;
+		};
+		0A0000000000000000000056 /* AnemoneCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0A0000000000000000000050 /* XCLocalSwiftPackageReference "Packages/AnemoneKit" */;
+			productName = AnemoneCore;
+		};
+		0A0000000000000000000057 /* AnemoneJellyfin */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0A0000000000000000000050 /* XCLocalSwiftPackageReference "Packages/AnemoneKit" */;
+			productName = AnemoneJellyfin;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
