@@ -13,6 +13,10 @@ struct PlaybackSettingsPage: View {
                 AutoplaySettingsPage()
             }
             .accessibilityIdentifier("settings.playback.autoplay")
+            NavigationLink("Audio and Subtitles") {
+                AudioSubtitleSettingsPage()
+            }
+            .accessibilityIdentifier("settings.playback.audioSubtitles")
             NavigationLink("Player Controls", destination: PlayerControlsSettingsPage.init)
                 .accessibilityIdentifier("settings.playback.playerControls")
             NavigationLink("Streaming and Display") {

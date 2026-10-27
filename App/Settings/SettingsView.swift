@@ -53,6 +53,9 @@ struct SettingsView: View {
                     page("Screensaver", systemImage: "sparkles.tv", id: "screensaver") {
                         ScreensaverSettingsPage()
                     }
+                    #if ANEMONE_SEERR
+                        page("Seerr", systemImage: "sparkle.magnifyingglass", id: "seerr") { SeerrSettingsPage() }
+                    #endif
                     page("About", systemImage: "info.circle", id: "about") {
                         AboutSettingsPage()
                     }

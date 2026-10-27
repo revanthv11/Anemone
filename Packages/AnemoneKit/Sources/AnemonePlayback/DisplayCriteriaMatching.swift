@@ -39,7 +39,7 @@ public final class DisplayCriteriaMatching: PlaybackFeature {
 
     public func handle(_ event: PlaybackEvent, in controller: PlaybackController) async {
         switch event {
-        case let .loaded(stream, _):
+        case let .loaded(stream, _), let .reloaded(stream):
             // PlaybackInfo described the video, so there's nothing more to ask the server.
             let criteria = (usesSystemPlayer ?? controller.engine.showsInSystemPlayer)
                 ? nil

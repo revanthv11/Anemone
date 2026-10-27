@@ -227,6 +227,20 @@ struct NowPlayingTests {
         await playback.stop()
     }
 
+    @Test func `a reload for another track keeps Now Playing and its artwork`() async throws {
+        let (playback, nowPlaying) = try controller([Self.entry("e1")])
+        await playback.start()
+        engine.send(.ready)
+        #expect(await eventually { nowPlaying.info?.artwork != nil })
+
+        playback.reload()
+
+        #expect(await eventually { streams.received.count == 2 })
+        #expect(await eventually { nowPlaying.info?.artwork != nil && center.isHandling })
+        #expect(artworkRequests.urls == [Self.poster])
+        await playback.stop()
+    }
+
     @Test func `the system's artwork is made once per entry, and position updates change only the timing`() throws {
         let system = FakeSystem()
         let center = SystemNowPlayingCenter(

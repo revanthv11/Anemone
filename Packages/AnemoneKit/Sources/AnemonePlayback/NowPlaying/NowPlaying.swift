@@ -91,6 +91,8 @@ public final class NowPlaying: PlaybackFeature {
             let method = String(describing: stream.method)
             Self.log.notice("Playing \(entry.itemID, privacy: .public) by \(method, privacy: .public)")
             loaded(entry, in: controller)
+        case .reloaded:
+            loaded(controller.queue.current, in: controller)
         case let .started(progress), let .position(progress), let .paused(progress), let .resumed(progress):
             guard controller === self.controller else { return }
             update(position: progress.position, isPlaying: !progress.isPaused)

@@ -55,7 +55,7 @@ public final class PlaybackLifecycle: PlaybackFeature {
     public func handle(_ event: PlaybackEvent, in controller: PlaybackController) async {
         self.controller = controller
         switch event {
-        case .loaded:
+        case .loaded, .reloaded:
             // The changes only say what happens from here on, and the app may have gone home
             // while the stream was loading.
             isInBackground = isAppInBackground()

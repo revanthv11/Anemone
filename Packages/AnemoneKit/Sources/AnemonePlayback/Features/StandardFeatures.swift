@@ -8,6 +8,7 @@ public extension PlaybackController {
             ProgressReporting(session: session),
             SegmentSkipping(session: session),
             UpNext(),
+            TrackSelection(session: session),
             PlaybackDetails(session: session),
             LiveStreamClosing(session: session),
             // Before Now Playing: stopped music gives up Now Playing and the remote's commands.

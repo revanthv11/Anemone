@@ -105,14 +105,18 @@ final class FakeStreams: Sendable {
 
     /// Direct play, or a transcode when direct play isn't allowed.
     var load: PlaybackController.StreamLoader {
-        { [self] itemID, allowsDirect, mediaSourceID in
+        { [self] request in
             requests.withLock {
-                $0.append(Request(itemID: itemID, allowsDirect: allowsDirect, mediaSourceID: mediaSourceID))
+                $0.append(Request(
+                    itemID: request.itemID,
+                    allowsDirect: request.allowsDirect,
+                    mediaSourceID: request.mediaSourceID,
+                ))
             }
             if let failure {
                 throw failure
             }
-            return Self.stream(itemID, method: allowsDirect ? .directPlay : .transcode)
+            return Self.stream(request.itemID, method: request.allowsDirect ? .directPlay : .transcode)
         }
     }
 
@@ -138,6 +142,7 @@ extension PlaybackEvent {
     var summary: String {
         switch self {
         case let .loaded(stream, entry): "loaded \(entry.itemID) \(stream.method)"
+        case let .reloaded(stream): "reloaded \(stream.itemID) \(stream.method)"
         case let .started(progress): "started \(progress.position)"
         case .position: "position"
         case let .paused(progress): "paused \(progress.position)"

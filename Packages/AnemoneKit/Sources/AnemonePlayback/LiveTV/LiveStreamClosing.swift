@@ -38,7 +38,8 @@ public final class LiveStreamClosing: PlaybackFeature {
 
     public func handle(_ event: PlaybackEvent, in _: PlaybackController) async {
         switch event {
-        case let .loaded(stream, _):
+        // A reload's stream opened a live stream of its own; the replaced one's `stopped` came first.
+        case let .loaded(stream, _), let .reloaded(stream):
             liveStreamID = stream.liveStreamID
             isUnderWay = false
         case .started:

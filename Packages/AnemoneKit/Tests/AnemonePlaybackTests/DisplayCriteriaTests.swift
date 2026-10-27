@@ -247,12 +247,12 @@ struct DisplayCriteriaMatchingTests {
             request: PlaybackRequest(queue: #require(PlaybackQueue(entries: entries))),
             engine: FakeEngine(),
             features: [matching],
-        ) { itemID, _, _ in
+        ) { request in
             PlaybackStream(
-                itemID: itemID,
-                url: URL(filePath: "/\(itemID)"),
+                itemID: request.itemID,
+                url: URL(filePath: "/\(request.itemID)"),
                 method: .directPlay,
-                mediaSourceID: "src-\(itemID)",
+                mediaSourceID: "src-\(request.itemID)",
                 video: video,
             )
         }

@@ -124,8 +124,8 @@ extension MusicPlayer {
             request: request,
             engine: engine,
             features: makeFeatures() + shared + [SongEvents(player: self, play: play)],
-        ) { _, allowsDirect, _ in
-            try await loadStream(song, allowsDirect)
+        ) { request in
+            try await loadStream(song, request.allowsDirect)
         }
         // The player moves on itself; nothing closes.
         controller.closesAtEnd = false
@@ -261,7 +261,7 @@ private final class SongEvents: PlaybackFeature {
     func handle(_ event: PlaybackEvent, in _: PlaybackController) async {
         guard let player else { return }
         switch event {
-        case let .loaded(stream, _):
+        case let .loaded(stream, _), let .reloaded(stream):
             method = stream.method
         case .started, .resumed:
             player.songStatus(.playing, play: play)

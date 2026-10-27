@@ -55,3 +55,23 @@ jobs:
           -scheme Anemone
           -destination 'generic/platform=tvOS Simulator'
           CODE_SIGNING_ALLOWED=NO
+
+  # The build and tests with Seerr on, which the jobs above leave out (docs/seerr.md).
+  seerr:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+      - name: Select Xcode
+        run: sudo xcode-select -s "$XCODE_PATH"
+      - name: Package tests with Seerr
+        run: swift test --package-path Packages/AnemoneKit --traits ANEMONE_SEERR
+      - name: Build tvOS app with Seerr
+        env:
+          ANEMONE_SEERR: "1"
+        run: >
+          xcodebuild build
+          -project Anemone.xcodeproj
+          -scheme Anemone
+          -destination 'generic/platform=tvOS Simulator'
+          CODE_SIGNING_ALLOWED=NO
+          'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) ANEMONE_SEERR'

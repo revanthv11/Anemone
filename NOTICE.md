@@ -16,10 +16,19 @@ Some of Wholphin's device profile code is adapted from the official [jellyfin-an
 
 ## Swiftfin
 
-Anemone's AVPlayer device profile, the checks it makes on the server's media segments, the way its player overlay takes the Siri Remote's presses before the focus engine and passes on those it doesn't use, the link that opens a YouTube trailer in the YouTube app, its Now Playing info and remote commands, and closing a live TV stream that never got under way are adapted from [Swiftfin](https://github.com/jellyfin/Swiftfin), the official Jellyfin client for Apple platforms.
+Anemone's AVPlayer device profile, the checks it makes on the server's media segments, the way its player overlay takes the Siri Remote's presses before the focus engine and passes on those it doesn't use, the link that opens a YouTube trailer in the YouTube app, its Now Playing info and remote commands, and closing a live TV stream that never got under way are adapted from [Swiftfin](https://github.com/jellyfin/Swiftfin), the official Jellyfin client for Apple platforms. So is the way the player matches the server's audio and subtitle streams to AVPlayer's tracks, decides when a track change needs a new stream, and burns in subtitles (`AnemonePlayback/Tracks/TrackSwitching.swift`).
 
 - Copyright (c) Jellyfin & Jellyfin Contributors
 - Licensed under the Mozilla Public License, version 2.0, which allows combining it into this GPL-3.0 work
+
+## Seerr
+
+Anemone's Seerr client, built only with `ANEMONE_SEERR` (see `docs/seerr.md`), is generated with [swift-openapi-generator](https://github.com/apple/swift-openapi-generator) (Apache-2.0, a build tool that isn't part of the app) from the API description of [Seerr](https://github.com/seerr-team/seerr), the request manager Overseerr and Jellyseerr became. Anemone uses Wholphin's copy of that file, `seerr-api.yml`; Wholphin's changes to it come under Wholphin's license, above.
+
+- Copyright (c) 2020 sct
+- Licensed under the MIT License
+
+<!-- Settings › About leaves this section and the Seerr client's packages below out of builds without ANEMONE_SEERR, by the names in App/Seerr/SeerrCredits.swift; keep them in step. -->
 
 ## Third-party packages
 
@@ -30,6 +39,7 @@ Anemone's AVPlayer device profile, the checks it makes on the server's media seg
 | [Nuke](https://github.com/kean/Nuke) | MIT |
 | [swift-nio-transport-services](https://github.com/apple/swift-nio-transport-services) (via jellyfin-sdk-swift) | Apache-2.0 |
 | [swift-nio](https://github.com/apple/swift-nio), [swift-atomics](https://github.com/apple/swift-atomics), [swift-collections](https://github.com/apple/swift-collections), [swift-system](https://github.com/apple/swift-system) (via swift-nio-transport-services) | Apache-2.0 |
+| [swift-openapi-runtime](https://github.com/apple/swift-openapi-runtime), [swift-openapi-urlsession](https://github.com/apple/swift-openapi-urlsession), [swift-http-types](https://github.com/apple/swift-http-types) (the Seerr client's) | Apache-2.0 |
 | [MPVKit](https://github.com/mpvkit/MPVKit) (its LGPL build; the libraries it bundles are listed below) | LGPL-3.0 |
 
 ## MPVKit and the libraries it bundles

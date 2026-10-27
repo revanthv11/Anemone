@@ -81,7 +81,8 @@ public final class UpNext: PlaybackFeature {
             ended(in: controller)
         case .failed:
             failed()
-        case .paused, .stopped:
+        case .paused, .stopped, .reloaded:
+            // A reload plays the same entry: an offer, or one cancelled, carries on.
             break
         }
     }

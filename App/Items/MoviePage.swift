@@ -144,6 +144,7 @@ struct MoviePage: View {
                 memory: memory,
             )
         }
+        SeerrItemRow(item: item, focus: $focus, memory: memory)
     }
 
     private func play(from position: Duration?) {
