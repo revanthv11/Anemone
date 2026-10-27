@@ -1,10 +1,14 @@
+import AnemoneCore
 import AnemoneJellyfin
+import AnemoneUI
 import SwiftUI
 
 /// Settings › Sidebar: which libraries the sidebar shows and in what order, like Wholphin's
-/// "Customize Navigation Drawer Items". Libraries switched off move to More.
+/// "Customize Navigation Drawer Items". Libraries switched off move to More. Below them, how
+/// library pages open.
 struct SidebarSettingsView: View {
     @Environment(BrowseModel.self) private var browse
+    @AppStorage(Preferences.rememberSelectedTab) private var remembersTab: Bool
 
     var body: some View {
         let preferences = browse.libraryPreferences
@@ -39,6 +43,14 @@ struct SidebarSettingsView: View {
                     ? "Your libraries appear here once they've loaded."
                     : "Libraries you switch off move to More in the sidebar.")
             }
+            Section {
+                Toggle("Remember selected tab", isOn: $remembersTab)
+                    .accessibilityIdentifier("settings.rememberSelectedTab")
+            } header: {
+                Text("Library pages")
+            } footer: {
+                Text("Movie and TV libraries open on the tab you chose there last, instead of Recommended.")
+            }
         }
         .navigationTitle("Sidebar")
     }
@@ -60,6 +72,8 @@ struct MoreLibrariesView: View {
             .navigationTitle("More")
             .navigationDestination(for: Library.self) { library in
                 LibraryRoot(library: library, path: $stack.path)
+                    // tvOS doesn't pass the stack's environment on to the pages pushed on it.
+                    .environment(\.pageStack, stack)
             }
             .itemPages(in: stack)
         }

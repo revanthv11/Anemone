@@ -8,6 +8,8 @@ struct FilterSheet: View {
     let library: Library
     @Binding var filter: LibraryFilter
     let cache: FilterChoiceCache
+    /// The kinds of filter to offer, when not all of the library's, such as on a genre's page.
+    var kinds: [LibraryFilter.Kind]?
 
     var body: some View {
         NavigationStack {
@@ -17,7 +19,7 @@ struct FilterSheet: View {
                         filter = LibraryFilter()
                     }
                 }
-                ForEach(library.filterKinds, id: \.self) { kind in
+                ForEach(kinds ?? library.filterKinds, id: \.self) { kind in
                     NavigationLink(value: kind) {
                         LabeledContent(kind.title, value: summary(of: kind))
                     }
@@ -177,26 +179,46 @@ final class FilterChoiceCache {
     var options: [LibraryFilter.Kind: [FilterOption]] = [:]
 }
 
-/// Wholphin's view options, the ones that fit a TV grid: card shape, columns and titles.
-/// Changes apply as they're made.
+/// Wholphin's view options, the ones that fit a TV grid: card shape, columns and titles; on
+/// library pages also the layout, the details header and the backdrop. Changes apply as they're
+/// made.
 struct ViewOptionsSheet: View {
     @Binding var options: GridViewOptions
     let defaults: GridViewOptions
+    /// Whether to offer the list layouts, details and backdrop, which only library pages draw.
+    var showsPageOptions = false
 
     var body: some View {
         NavigationStack {
             List {
-                Picker("Card shape", selection: $options.shape) {
-                    ForEach(CardShape.allCases, id: \.self) { shape in
-                        Text(shape.title)
+                if showsPageOptions {
+                    Picker("Layout", selection: $options.layout) {
+                        ForEach(GridViewOptions.Layout.allCases, id: \.self) { layout in
+                            Text(layout.title)
+                        }
                     }
+                    .accessibilityIdentifier("viewOptions.layout")
                 }
-                // Eleven choices don't fit side by side, a menu picker hides the label, and a
-                // navigation-link picker shows an empty page inside a sheet on tvOS 27.
-                NavigationLink(value: ColumnsPage()) {
-                    LabeledContent("Columns", value: "\(options.columns)")
+                // Wholphin's list layouts have no cards to size.
+                if options.layout == .grid || !showsPageOptions {
+                    Picker("Card shape", selection: $options.shape) {
+                        ForEach(CardShape.allCases, id: \.self) { shape in
+                            Text(shape.title)
+                        }
+                    }
+                    // Eleven choices don't fit side by side, a menu picker hides the label, and a
+                    // navigation-link picker shows an empty page inside a sheet on tvOS 27.
+                    NavigationLink(value: ColumnsPage()) {
+                        LabeledContent("Columns", value: "\(options.columns)")
+                    }
+                    Toggle("Show titles", isOn: $options.showTitles)
                 }
-                Toggle("Show titles", isOn: $options.showTitles)
+                if showsPageOptions {
+                    Toggle("Show details", isOn: $options.showsDetails)
+                        .accessibilityIdentifier("viewOptions.details")
+                    Toggle("Show backdrop", isOn: $options.showsBackdrop)
+                        .accessibilityIdentifier("viewOptions.backdrop")
+                }
                 Button("Reset to defaults") {
                     options = defaults
                 }
@@ -251,6 +273,17 @@ extension LibraryFilter.VideoType {
         case .threeD: "3D"
         case .bluRay: "Blu-ray"
         case .dvd: "DVD"
+        }
+    }
+}
+
+extension GridViewOptions.Layout {
+    /// Wholphin's names for its layouts.
+    var title: String {
+        switch self {
+        case .grid: "Grid"
+        case .list: "List"
+        case .denseList: "Dense list"
         }
     }
 }
