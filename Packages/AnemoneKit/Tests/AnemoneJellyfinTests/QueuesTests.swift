@@ -86,21 +86,18 @@ struct QueuesTests {
     }
 
     @Test func `a special next up at the very end starts the series again`() async throws {
+        let special = Self.items([Self.episode("sp1", season: 0, number: 1)])
         let all = Self.items([
             Self.episode("e1", season: 1, number: 1),
             Self.episode("e2", season: 1, number: 2),
             Self.episode("sp1", season: 0, number: 1),
         ])
         MockServer.register(host: "queue-last.test") { request in
-            switch request.url?.path() {
-            case "/Shows/NextUp":
-                .json(Self.items([Self.episode("sp1", season: 0, number: 1)]))
-            case "/Shows/s1/Episodes":
-                request.url?.queryValues["startItemId"] == "sp1"
-                    ? .json(Self.items([Self.episode("sp1", season: 0, number: 1)]))
-                    : .json(all)
-            default:
-                nil
+            let fromSpecial = request.url?.queryValues["startItemId"] == "sp1"
+            return switch request.url?.path() {
+            case "/Shows/NextUp": .json(special)
+            case "/Shows/s1/Episodes": .json(fromSpecial ? special : all)
+            default: nil
             }
         }
 
