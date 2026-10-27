@@ -28,6 +28,8 @@ Anemone's Seerr client, built only with `ANEMONE_SEERR` (see `docs/seerr.md`), i
 - Copyright (c) 2020 sct
 - Licensed under the MIT License
 
+<!-- Settings › About leaves this section and the Seerr client's packages below out of builds without ANEMONE_SEERR, by the names in App/Seerr/SeerrCredits.swift; keep them in step. -->
+
 ## Third-party packages
 
 | Package | License |

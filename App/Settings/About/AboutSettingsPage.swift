@@ -103,7 +103,8 @@ struct AppVersion {
 /// NOTICE.md and the full license texts, linked or copied into this folder so Xcode copies them
 /// into the app. `scripts/update-licenses.sh` refreshes the packages' texts.
 enum BundledLicenses {
-    static let notice: Notice? = text(named: "NOTICE", extension: "md").map(Notice.init(markdown:))
+    static let notice: Notice? = text(named: "NOTICE", extension: "md")
+        .map { Notice(markdown: $0).leavingOut(SeerrCredits.leftOut) }
 
     /// `Licenses/LICENSE-<name>.txt`, named after a NOTICE.md section ("Wholphin") or package ("Nuke").
     static func licenseText(for name: String) -> String? {

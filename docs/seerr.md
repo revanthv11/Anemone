@@ -1,33 +1,43 @@
 # Seerr
 
-Anemone can discover and request movies and shows through a [Seerr](https://github.com/seerr-team/seerr) server (Overseerr or Jellyseerr, as Seerr is now), as Wholphin does. It's built only when the `ANEMONE_SEERR` compilation condition is set, so App Store builds can leave it out. Without the condition, nothing of Seerr is compiled: no Discover tab, no Settings › Seerr, no Discover rows on item pages, and an empty `AnemoneSeerr` module.
+Anemone can discover and request movies and shows through a [Seerr](https://github.com/seerr-team/seerr) server (Overseerr or Jellyseerr, as Seerr is now), as Wholphin does. It's built only with `ANEMONE_SEERR`, so App Store builds can leave it out. Without it, nothing of Seerr is compiled, built or linked: no Discover tab, no Settings › Seerr, no Discover rows on item pages, an empty `AnemoneSeerr` module, none of the packages the Seerr client runs on, and no Seerr credits in Settings › About.
 
 ## Turning it on
 
-`ANEMONE_SEERR` is an active compilation condition. It has to reach both the app target and the package's targets, which take their build settings from different places, so it's set where each build gets its settings:
+`ANEMONE_SEERR` is two switches, one for each side of the build:
 
-- **App builds (`xcodebuild`):** pass it as a build setting on the command line. Settings given there apply to every target in the build, the package's included:
+- **The package's `ANEMONE_SEERR` trait.** It's off by default. It brings in swift-openapi-runtime, swift-openapi-urlsession and swift-http-types, which only `AnemoneSeerr` uses, and defines the `ANEMONE_SEERR` compilation condition in the package's targets.
+- **The app's `ANEMONE_SEERR` compilation condition**, for the Discover tab, Settings › Seerr and the rows on item pages.
+
+Each build sets both:
+
+- **App builds (`xcodebuild`):** `ANEMONE_SEERR=1` in the environment turns the trait on, and the build setting turns the condition on:
 
   ```
-  xcodebuild build -project Anemone.xcodeproj -scheme Anemone \
+  ANEMONE_SEERR=1 xcodebuild build -project Anemone.xcodeproj -scheme Anemone \
     -destination 'generic/platform=tvOS Simulator' \
     'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) ANEMONE_SEERR'
   ```
 
-  The same works for `build-for-testing` and `archive`.
+  The same works for `build-for-testing` and `archive`. `xcodebuild` can't choose a local package's traits on its command line, so `Package.swift` makes the trait a default one when it sees `ANEMONE_SEERR` set (to anything but `0` or `NO`) in its environment, which `xcodebuild` passes on to it.
 - **Package tests (`swift test`):**
 
   ```
-  swift test --package-path Packages/AnemoneKit -Xswiftc -DANEMONE_SEERR
+  swift test --package-path Packages/AnemoneKit --traits ANEMONE_SEERR
   ```
 
-- **In Xcode:** the project's own build settings don't reach package targets, so adding the condition to the project or the app target alone breaks the build: the app then uses Seerr types the package didn't build. Build with the flag from the command line, as above; the simulator can then run that build.
+  `ANEMONE_SEERR=1 swift test …` does the same.
+- **In Xcode:** build from the command line, as above; the simulator can then run that build. The project's own build settings don't reach the package, and an Xcode launched without `ANEMONE_SEERR` in its environment leaves the trait off.
 
-The default build, the one CI and App Store archives make, has Seerr off.
+The condition without the trait, such as `swift test -Xswiftc -DANEMONE_SEERR` or the build setting without the environment variable, stops the build with an error that points here, since the client would be compiled without its packages.
 
-The package always depends on swift-openapi-runtime, swift-openapi-urlsession and swift-http-types, whether Seerr is on or not, so `Package.resolved` is the same for both builds. With Seerr off they're built but nothing uses them.
+The default build, the one CI's `build` job and App Store archives make, has Seerr off. A trait only decides what's built: both `Package.resolved` files pin the Seerr client's packages, so neither changes when Seerr is turned on or off, and Seerr-on builds use the same versions every time.
 
-A package trait was the other option. `swift build --traits` would cover the package, but `xcodebuild` has no way to turn on a trait of a local package, and the app would still need its own condition.
+### Why a trait and an environment variable
+
+- **The packages.** Before the trait, `AnemoneSeerr` always depended on the client's three packages, so every build compiled and linked them even with Seerr off. The trait leaves them out of the build graph; SwiftPM and Xcode don't even fetch them then.
+- **The environment variable.** Xcode 26.4 and later can set a package's traits, but only in the project, for every build, and `xcodebuild` has no option for it. Reading the environment in `Package.swift` keeps the project file the same for both builds and lets CI turn Seerr on with a variable.
+- **The app's condition.** A trait only reaches the package's targets, so the app needs its own condition either way.
 
 ## The client
 
@@ -42,29 +52,14 @@ As in Wholphin at `cecfdae`, when a profile signs in, Anemone:
 1. reads the Seerr server the companion plugin ([jellyfin-plugin-wholphin](https://github.com/damontecres/jellyfin-plugin-wholphin)) sets up for everyone, from `GET /wholphin/seerrsettings`, and signs in with its API key or shared account. That login stays in memory: it's never saved, and a change in the plugin shows up the next time the profile signs in. Settings › Seerr shows such a server as "Managed by server", with Retry instead of Remove;
 2. otherwise, or when that fails, signs in with the server the profile added in Settings › Seerr. Its address, how it signs in and its password or API key are kept in the Keychain, one item per profile, under a service of their own (`com.revanthv11.anemone.seerr`), apart from the sign-ins item that's shared with the Top Shelf.
 
+Only the latest sign-in counts: a Retry while the first sign-in is still under way wins, even if the first ends later.
+
+A password sign-in keeps Seerr's session cookie in memory. When Seerr turns a request down because that session has gone, as after the server restarts, Anemone signs in again once, with the plugin's login from memory or the password read again from the Keychain, and sends the request again. If that fails, or an API key stops working, Seerr shows as failed, and Settings › Seerr offers Retry.
+
 ## Trying it without a Seerr server
 
-DEBUG builds launched with `-seerrMock YES` sign in to a made-up server inside the app (`App/Seerr/SeerrDebugServer.swift`), as if the plugin had set it up. `-seerrMock url` has the plugin give only its address, for the add page, and `-seerrMock failing` has its sign-in turned down, for Retry.
+DEBUG builds launched with `-seerrMock YES` sign in to a made-up server inside the app (`App/Seerr/SeerrDebugServer.swift`), as if the plugin had set it up. `-seerrMock url` has the plugin give only its address, for the add page, `-seerrMock failing` has its sign-in turned down, for Retry, and `-seerrMock lapsing` signs in with a password whose first session lapses as soon as it's used, so Anemone has to sign in again.
 
 ## CI
 
-A second job builds and tests with Seerr on, so it doesn't rot while the default build leaves it out:
-
-```yaml
-  seerr:
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@v7
-      - name: Select Xcode
-        run: sudo xcode-select -s "$XCODE_PATH"
-      - name: Package tests with Seerr
-        run: swift test --package-path Packages/AnemoneKit -Xswiftc -DANEMONE_SEERR
-      - name: Build tvOS app with Seerr
-        run: >
-          xcodebuild build
-          -project Anemone.xcodeproj
-          -scheme Anemone
-          -destination 'generic/platform=tvOS Simulator'
-          CODE_SIGNING_ALLOWED=NO
-          'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) ANEMONE_SEERR'
-```
+CI's `seerr` job builds and tests with Seerr on, so it doesn't rot while the default build leaves it out. It runs the package tests with `--traits ANEMONE_SEERR` and the tvOS build with `ANEMONE_SEERR=1` and the build setting, as above. The `test` and `build` jobs keep Seerr off.
