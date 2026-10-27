@@ -32,6 +32,7 @@ struct PersonPage: View {
                             )
                         }
                     }
+                    SeerrItemRow(item: person, focus: $focus, memory: memory)
                 }
                 .padding(.horizontal, ItemLayout.horizontalInset)
                 .padding(.top, ItemLayout.topInset)

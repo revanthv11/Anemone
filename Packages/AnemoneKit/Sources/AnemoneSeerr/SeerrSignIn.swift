@@ -65,7 +65,7 @@
         /// - nothing here holds up the add-server page (see `suggestedAddress`).
         ///
         /// - Parameter pluginSettings: reads the plugin's settings; `nil` when it has none.
-        public func connect(pluginSettings: () async throws -> SeerrPluginSettings?) async -> SeerrStatus {
+        public func connect(pluginSettings: @Sendable () async throws -> SeerrPluginSettings?) async -> SeerrStatus {
             let settings = try? await pluginSettings()
             var pluginFailure: SeerrFailure?
             if let settings, settings.canSignIn, let address = settings.address,

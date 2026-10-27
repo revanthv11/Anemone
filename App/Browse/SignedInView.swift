@@ -9,6 +9,9 @@ struct SignedInView: View {
         case home
         case search
         case favorites
+        #if ANEMONE_SEERR
+            case discover
+        #endif
         case library(Library.ID)
         case moreLibraries
         case settings
@@ -40,6 +43,9 @@ struct SignedInView: View {
                     FavoritesPage(isSelected: selection == .favorites)
                 }
             }
+            #if ANEMONE_SEERR
+                Tab("Discover", systemImage: "sparkle.magnifyingglass", value: Destination.discover) { DiscoverTab() }
+            #endif
             // Hidden until the libraries load, so the sidebar never shows an empty heading.
             if !browse.libraries.isEmpty {
                 TabSection("Libraries") {
@@ -66,6 +72,9 @@ struct SignedInView: View {
         .task {
             await browse.load()
         }
+        #if ANEMONE_SEERR
+        .seerr(browse)
+        #endif
     }
 }
 
