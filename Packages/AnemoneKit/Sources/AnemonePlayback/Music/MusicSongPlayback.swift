@@ -21,6 +21,7 @@ extension MusicPlayer {
         queue = MusicQueue()
         failure = nil
         position = .zero
+        seeksUnderWay = []
         duration = nil
         setStatus(.loading)
         return requests
@@ -89,6 +90,8 @@ extension MusicPlayer {
         controller = nil
         failure = nil
         position = .zero
+        // A new song starts from the top; a seek in the last one mustn't hold this one's clock.
+        seeksUnderWay = []
         duration = entry.song.item.runtime
         setStatus(paused ? .paused : .loading)
         Task {
@@ -164,7 +167,7 @@ extension MusicPlayer {
     func tick() {
         guard let engine = controller?.engine, status == .playing || status == .paused else { return }
         let time = engine.currentTime
-        if time != position {
+        if seeksUnderWay.isEmpty, time != position {
             position = time
         }
         if let length = engine.duration, length != duration {

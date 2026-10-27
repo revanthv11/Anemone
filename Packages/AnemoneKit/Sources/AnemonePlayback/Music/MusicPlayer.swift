@@ -75,6 +75,11 @@ public final class MusicPlayer {
     /// Counts queues asked for, so a source still paging in stops when another queue starts.
     @ObservationIgnored var requests = 0
     @ObservationIgnored var ticker: Task<Void, Never>?
+    /// Seeks on their way to the song's engine, which tells the old time until they land; the
+    /// ticker leaves `position` alone meanwhile, or it would put the old time back, and Previous
+    /// pressed twice would restart the song twice instead of going back a song.
+    @ObservationIgnored var seeksUnderWay: Set<Int> = []
+    @ObservationIgnored var seeks = 0
     /// Stops offering Now Playing once the music has been still for `offerTimeout`.
     @ObservationIgnored var offerExpiry: Task<Void, Never>?
 
@@ -314,12 +319,17 @@ public final class MusicPlayer {
         playCurrent(paused: status == .paused)
     }
 
+    /// Shows the new position at once, and keeps it until the engine gets there (`seeksUnderWay`).
     public func seek(to target: Duration) {
         guard let controller else { return }
         let clamped = max(.zero, duration.map { min(target, $0) } ?? target)
         position = clamped
+        seeks += 1
+        let seek = seeks
+        seeksUnderWay.insert(seek)
         Task {
             _ = await controller.engine.seek(to: clamped)
+            seeksUnderWay.remove(seek)
         }
     }
 
@@ -340,6 +350,7 @@ public final class MusicPlayer {
         setStatus(.idle)
         failure = nil
         position = .zero
+        seeksUnderWay = []
         duration = nil
         if Self.active === self {
             Self.active = nil

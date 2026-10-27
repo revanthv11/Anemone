@@ -1,6 +1,7 @@
 import AnemoneJellyfin
 @testable import AnemonePlayback
 import Foundation
+import JellyfinAPI
 import Synchronization
 
 /// The server's side of song streams: what was asked for, and whether it fails.
@@ -124,6 +125,68 @@ final class LoadGate: Sendable {
         for continuation in waiting {
             continuation.resume()
         }
+    }
+}
+
+/// A fake engine whose seeks wait for the test to open `gate`, as AVPlayer's take a moment to
+/// get there; until then it tells the old time.
+@MainActor
+final class SeekHoldingEngine: PlayerEngine {
+    let base = FakeEngine()
+    let gate: LoadGate
+
+    init(gate: LoadGate) {
+        self.gate = gate
+    }
+
+    var deviceProfile: DeviceProfile {
+        base.deviceProfile
+    }
+
+    var videoOutput: PlayerVideoOutput {
+        base.videoOutput
+    }
+
+    var currentTime: Duration {
+        base.currentTime
+    }
+
+    var duration: Duration? {
+        base.duration
+    }
+
+    var rate: Float {
+        get { base.rate }
+        set { base.rate = newValue }
+    }
+
+    func load(_ url: URL, from position: Duration?, metadata: PlaybackMetadata) -> AsyncStream<PlayerEvent> {
+        base.load(url, from: position, metadata: metadata)
+    }
+
+    func play() {
+        base.play()
+    }
+
+    func pause() {
+        base.pause()
+    }
+
+    func stop() {
+        base.stop()
+    }
+
+    func seek(to position: Duration) async -> Bool {
+        await gate.wait()
+        return await base.seek(to: position)
+    }
+
+    func tracks(_ kind: PlayerTrack.Kind) async -> [PlayerTrack] {
+        await base.tracks(kind)
+    }
+
+    func select(_ track: PlayerTrack?, _ kind: PlayerTrack.Kind) async {
+        await base.select(track, kind)
     }
 }
 
