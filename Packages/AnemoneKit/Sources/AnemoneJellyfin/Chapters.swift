@@ -38,12 +38,11 @@ public struct Chapter: Hashable, Identifiable, Sendable {
 }
 
 public extension [Chapter] {
-    /// Where in the list the chapter playing at `position` is: the last one starting at or before
-    /// it, or the first when it's before them all. `nil` when there are no chapters. Wholphin's
-    /// chapter row starts with this one in focus.
-    func index(at position: Duration) -> Int? {
-        guard !isEmpty else { return nil }
-        return (lastIndex { $0.start <= position }) ?? startIndex
+    /// The chapter playing at `position` in a list in playing order: the last one starting at or
+    /// before it, or the first when it's before them all. `nil` when there are no chapters.
+    /// Wholphin's chapter row starts with this one in focus.
+    func chapter(at position: Duration) -> Chapter? {
+        last { $0.start <= position } ?? first
     }
 }
 

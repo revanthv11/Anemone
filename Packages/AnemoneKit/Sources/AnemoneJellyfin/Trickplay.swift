@@ -103,6 +103,36 @@ extension Trickplay {
     }
 }
 
+public extension Trickplay {
+    /// Which sheets the player keeps decoded: the last few asked for. A decoded sheet is about
+    /// 23 MB at Jellyfin's default size, so a hold or swipe across a long video mustn't keep every
+    /// sheet it passed, nor one that finishes loading after seeking has moved on.
+    struct RecentSheets: Sendable {
+        public let limit: Int
+        /// Least recently asked for first, at most `limit` of them.
+        public private(set) var sheets: [Int] = []
+
+        public init(limit: Int) {
+            self.limit = limit
+        }
+
+        /// Notes that `sheet` was asked for. Returns the sheets that dropped out, whose decoded
+        /// images should go.
+        public mutating func ask(for sheet: Int) -> [Int] {
+            sheets.removeAll { $0 == sheet }
+            sheets.append(sheet)
+            let dropped = Array(sheets.dropLast(limit))
+            sheets.removeFirst(dropped.count)
+            return dropped
+        }
+
+        /// Whether a sheet that has just loaded is still wanted.
+        public func wants(_ sheet: Int) -> Bool {
+            sheets.contains(sheet)
+        }
+    }
+}
+
 /// What the player shows while seeking: the chapters, and trickplay thumbnails if the server
 /// made them.
 public struct SeekPreviews: Hashable, Sendable {

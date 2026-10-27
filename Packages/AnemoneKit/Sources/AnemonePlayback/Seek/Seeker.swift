@@ -41,7 +41,8 @@ public final class Seeker {
     @ObservationIgnored private let engine: any PlayerEngine
     @ObservationIgnored private let timing: Timing
     @ObservationIgnored private var held: HeldSeekPress?
-    @ObservationIgnored private var repeating: Task<Void, Never>?
+    /// Repeats a held press; internal so tests can wait for it to end.
+    @ObservationIgnored private(set) var repeating: Task<Void, Never>?
     @ObservationIgnored private var committing: Task<Void, Never>?
     /// Where the target was when the swipe began.
     @ObservationIgnored private var swipeOrigin: Duration?
@@ -60,6 +61,12 @@ public final class Seeker {
         self.skipForward = skipForward
         self.timing = timing
         refresh()
+    }
+
+    /// A press can outlive the player: it closes mid-hold and the press never ends.
+    isolated deinit {
+        repeating?.cancel()
+        committing?.cancel()
     }
 
     /// What the seek bar shows: where the user is seeking to, else where playback is.
@@ -99,8 +106,9 @@ public final class Seeker {
         let timing = timing
         repeating = Task { [weak self] in
             try? await Task.sleep(for: timing.repeatDelay)
-            while !Task.isCancelled {
-                self?.repeated()
+            // Ends with the seeker too, should the player close mid-hold without the press ending.
+            // `self?` rather than `guard let self`, so the seeker isn't kept through the sleep.
+            while !Task.isCancelled, self?.repeated() != nil {
                 try? await Task.sleep(for: timing.repeatInterval)
             }
         }

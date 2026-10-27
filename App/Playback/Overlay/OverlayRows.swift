@@ -14,8 +14,15 @@ struct ChapterRow: View {
     var focus: FocusState<OverlayFocus?>.Binding
     let choose: (Chapter) -> Void
 
+    /// Where focus starts: the card of the chapter playing at `position`.
+    static func playingFocus(_ chapters: [Chapter], at position: Duration) -> OverlayFocus? {
+        chapters.chapter(at: position).map { .chapter($0.id) }
+    }
+
     var body: some View {
-        OverlayRow(title: "Chapters") {
+        // Not lazy, so a late chapter's card is there for focus to move to as the row opens.
+        // Videos have few chapters.
+        OverlayRow(title: "Chapters", isLazy: false) {
             ForEach(chapters) { chapter in
                 Button {
                     choose(chapter)
@@ -24,15 +31,15 @@ struct ChapterRow: View {
                         imageURL: session.chapterImageURL(chapter, of: itemID, maxWidth: 480),
                         placeholder: "film",
                         title: chapter.name ?? "Chapter \(chapter.index + 1)",
-                        detail: chapter.start.timecode,
+                        detail: chapter.start.clockText,
                     )
                 }
                 .buttonStyle(.card)
-                .focused(focus, equals: .chapter(chapter.index))
-                .accessibilityIdentifier("player.chapter.\(chapter.index)")
+                .focused(focus, equals: .chapter(chapter.id))
+                .accessibilityIdentifier("player.chapter.\(chapter.id)")
             }
         }
-        .defaultFocus(focus, chapters.index(at: playing).map { .chapter(chapters[$0].index) })
+        .defaultFocus(focus, Self.playingFocus(chapters, at: playing))
     }
 }
 
@@ -65,9 +72,11 @@ struct QueueRow: View {
     }
 }
 
-/// A titled row of cards that scrolls sideways, as tall as its cards.
+/// A titled row of cards that scrolls sideways, as tall as its cards. A lazy row makes only the
+/// cards near the start, so it suits rows whose focus starts on the first card.
 private struct OverlayRow<Cards: View>: View {
     let title: String
+    var isLazy = true
     @ViewBuilder let cards: () -> Cards
 
     var body: some View {
@@ -75,8 +84,14 @@ private struct OverlayRow<Cards: View>: View {
             Text(title)
                 .font(.headline)
             ScrollView(.horizontal) {
-                LazyHStack(spacing: 40, content: cards)
-                    .padding(.vertical, 24)
+                Group {
+                    if isLazy {
+                        LazyHStack(spacing: 40, content: cards)
+                    } else {
+                        HStack(spacing: 40, content: cards)
+                    }
+                }
+                .padding(.vertical, 24)
             }
             .scrollClipDisabled()
             .fixedSize(horizontal: false, vertical: true)

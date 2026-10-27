@@ -93,6 +93,30 @@ struct SeekerTests {
         #expect((target - .seconds(60)).components.seconds.isMultiple(of: 30))
     }
 
+    @Test func `a hold stops repeating when the seeker goes away before the press ends`() async throws {
+        engine.duration = .seconds(5400)
+        engine.currentTime = .seconds(60)
+        var holding: Seeker? = seeker()
+        holding?.pressBegan(.forward, ignoredRepeats: 0)
+        #expect(await eventually { holding?.isSeeking == true })
+        let repeating = try #require(holding?.repeating)
+        weak var released: Seeker?
+        released = holding
+
+        // The player closes mid-hold, with no pressEnded or pressCancelled.
+        holding = nil
+
+        #expect(released == nil)
+        // The repeats end; before, they went on for good.
+        let ended = Flag()
+        Task {
+            await repeating.value
+            ended.isSet = true
+        }
+        #expect(await eventually { ended.isSet })
+        #expect(engine.currentTime == .seconds(60))
+    }
+
     @Test func `a cancelled press doesn't step`() {
         engine.currentTime = .seconds(40)
         let seeker = seeker(commitDelay: .seconds(60))
@@ -133,4 +157,9 @@ struct SeekerTests {
         #expect(await eventually { seeker.target == nil })
         #expect(engine.currentTime == .seconds(42))
     }
+}
+
+@MainActor
+private final class Flag {
+    var isSet = false
 }

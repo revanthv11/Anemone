@@ -142,6 +142,32 @@ struct TrickplayTests {
         #expect(headers.request?.query["ApiKey"] == nil)
     }
 
+    @Test func `keeps only the sheets asked for last`() {
+        var recent = Trickplay.RecentSheets(limit: 3)
+
+        #expect(recent.ask(for: 0) == [])
+        #expect(recent.ask(for: 1) == [])
+        #expect(recent.ask(for: 2) == [])
+        // Asked again, 0 is the latest, so 1 goes first.
+        #expect(recent.ask(for: 0) == [])
+        #expect(recent.ask(for: 5) == [1])
+        #expect(recent.sheets == [2, 0, 5])
+    }
+
+    @Test func `a sheet that loads after seeking moved on isn't wanted`() {
+        var recent = Trickplay.RecentSheets(limit: 3)
+        _ = recent.ask(for: 0)
+
+        // A fast hold passes several sheets while sheet 0 is still loading.
+        for sheet in 1 ... 6 {
+            _ = recent.ask(for: sheet)
+        }
+
+        #expect(!recent.wants(0))
+        #expect(recent.wants(6))
+        #expect(recent.sheets.count == 3)
+    }
+
     @Test func `points at a chapter's image by its index`() throws {
         let session = try session(host: "images.test")
         let chapter = Chapter(index: 3, name: "Act Two", start: .seconds(60), imageTag: "abc")
@@ -154,17 +180,18 @@ struct TrickplayTests {
     }
 
     @Test func `finds the chapter playing, or the first before them all`() {
+        // In playing order, with the server's indices, which needn't follow it.
         let chapters = [
-            Chapter(index: 0, name: "A", start: .seconds(10)),
-            Chapter(index: 1, name: "B", start: .seconds(60)),
-            Chapter(index: 2, name: "C", start: .seconds(120)),
+            Chapter(index: 1, name: "A", start: .seconds(10)),
+            Chapter(index: 2, name: "B", start: .seconds(60)),
+            Chapter(index: 0, name: "C", start: .seconds(120)),
         ]
 
-        #expect(chapters.index(at: .zero) == 0)
-        #expect(chapters.index(at: .seconds(59)) == 0)
-        #expect(chapters.index(at: .seconds(60)) == 1)
-        #expect(chapters.index(at: .seconds(5000)) == 2)
-        #expect([Chapter]().index(at: .seconds(5)) == nil)
+        #expect(chapters.chapter(at: .zero)?.name == "A")
+        #expect(chapters.chapter(at: .seconds(59))?.name == "A")
+        #expect(chapters.chapter(at: .seconds(60))?.name == "B")
+        #expect(chapters.chapter(at: .seconds(5000))?.id == 0)
+        #expect([Chapter]().chapter(at: .seconds(5)) == nil)
     }
 
     private static func info(width: Int) -> TrickplayInfoDto {

@@ -241,7 +241,7 @@ struct SeekTrack: View {
         // One element, so focus and the time are found by the one identifier.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(showsPreview && sheets != nil ? "Seek, with a thumbnail" : "Seek")
-        .accessibilityValue(seeker.shownPosition.timecode)
+        .accessibilityValue(seeker.shownPosition.clockText)
         .accessibilityIdentifier(identifier)
     }
 
@@ -265,9 +265,9 @@ struct SeekTrack: View {
             .frame(height: isFocused ? 12 : 6)
             .animation(.easeOut(duration: 0.15), value: isFocused)
             HStack {
-                Text(seeker.shownPosition.timecode)
+                Text(seeker.shownPosition.clockText)
                 Spacer()
-                Text("-" + max((seeker.duration ?? .zero) - seeker.shownPosition, .zero).timecode)
+                Text("-" + max((seeker.duration ?? .zero) - seeker.shownPosition, .zero).clockText)
             }
             .font(.callout.monospacedDigit())
             .foregroundStyle(.secondary)
@@ -283,7 +283,7 @@ private struct EndTime: View {
     var body: some View {
         if let duration = seeker.duration, duration > .zero {
             let remaining = max(duration - seeker.position, .zero) / Double(max(rate, 0.1))
-            Text("Ends at \(Date.now.addingTimeInterval(remaining / .seconds(1)), format: .dateTime.hour().minute())")
+            remaining.endsAtText(from: .now)
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }

@@ -41,16 +41,16 @@ struct OverlayDebugPanel: View {
             ("Play method", stream.map { "\($0.method)" } ?? "–"),
             ("Play session", stream?.playSessionID ?? "–"),
             ("Media source", stream?.mediaSourceID ?? "–"),
-            ("Position", "\(seeker.position.timecode) / \((seeker.duration ?? .zero).timecode)"),
+            ("Position", "\(seeker.position.clockText) / \((seeker.duration ?? .zero).clockText)"),
             ("Speed", String(format: "%.2f×", playback.engine.rate)),
             ("Paused", overlay.isPaused ? "yes" : "no"),
         ]
         if let target = seeker.target {
-            rows.append(("Seeking to", target.timecode))
+            rows.append(("Seeking to", target.clockText))
         }
         if let previews = details?.previews {
             let trickplay = previews.trickplay.map {
-                "\($0.width)×\($0.height), \($0.columns)×\($0.rows) a sheet, every \($0.interval.timecode)"
+                "\($0.width)×\($0.height), \($0.columns)×\($0.rows) a sheet, every \($0.interval.clockText)"
             }
             rows.append(("Trickplay", trickplay ?? "none"))
             rows.append(("Chapters", "\(previews.chapters.count)"))

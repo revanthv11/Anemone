@@ -18,9 +18,8 @@ final class TrickplaySheets {
     @ObservationIgnored private let session: JellyfinSession
     @ObservationIgnored private var jpegs: [Int: Data] = [:]
     @ObservationIgnored private var loading: Set<Int> = []
-    /// Decoded sheets, least recently asked for first.
-    @ObservationIgnored private var recent: [Int] = []
-    private static let decodedLimit = 3
+    /// The sheets that may be decoded. Every sheet in `images` is one of them.
+    @ObservationIgnored private var recent = Trickplay.RecentSheets(limit: 3)
 
     init(trickplay: Trickplay, session: JellyfinSession) {
         self.trickplay = trickplay
@@ -42,8 +41,9 @@ final class TrickplaySheets {
     /// the time without a thumbnail.
     func load(_ sheet: Int) {
         guard (0 ..< trickplay.sheetCount).contains(sheet) else { return }
-        recent.removeAll { $0 == sheet }
-        recent.append(sheet)
+        for old in recent.ask(for: sheet) where images[old] != nil {
+            images[old] = nil
+        }
         guard images[sheet] == nil, !loading.contains(sheet) else { return }
         loading.insert(sheet)
         Task {
@@ -56,12 +56,9 @@ final class TrickplaySheets {
                 jpegs[sheet] = fetched
                 jpeg = fetched
             }
-            guard let image = await Self.decode(jpeg) else { return }
+            // Seeking may have moved on while it loaded or decoded; then only the JPEG stays.
+            guard recent.wants(sheet), let image = await Self.decode(jpeg), recent.wants(sheet) else { return }
             images[sheet] = image
-            for old in recent.dropLast(Self.decodedLimit) {
-                images[old] = nil
-            }
-            recent = Array(recent.suffix(Self.decodedLimit))
         }
     }
 
@@ -110,7 +107,7 @@ struct SeekPreview: View {
                 }
                 .accessibilityIdentifier("player.preview")
             }
-            Text(position.timecode)
+            Text(position.clockText)
                 .font(.callout.monospacedDigit())
                 .padding(.horizontal, 12)
                 .padding(.vertical, 4)
@@ -136,18 +133,5 @@ struct AlongTrack: Layout {
         let centered = bounds.minX + bounds.width * min(max(fraction, 0), 1) - size.width / 2
         let left = min(max(centered, bounds.minX), max(bounds.maxX - size.width, bounds.minX))
         subview.place(at: CGPoint(x: left, y: bounds.minY), proposal: ProposedViewSize(size))
-    }
-}
-
-extension Duration {
-    /// "1:02:03", or "2:03" under an hour, as Wholphin's `formatDuration` shows times.
-    var timecode: String {
-        let total = max(Int(components.seconds), 0)
-        let hours = total / 3600
-        let minutes = total / 60 % 60
-        let seconds = total % 60
-        return hours > 0
-            ? String(format: "%d:%02d:%02d", hours, minutes, seconds)
-            : String(format: "%d:%02d", minutes, seconds)
     }
 }
