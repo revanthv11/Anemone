@@ -136,15 +136,18 @@ struct LibraryCategoryTab: View {
         guard !Task.isCancelled else { return }
         content = .loaded(pager, sortNames: entries.map { $0.sortName ?? $0.item.name })
         if kind == .genres {
-            do {
+            do throws(GenreArtCache.Failure) {
                 let art = try await GenreArtCache.shared.images(for: entries.map(\.id), in: library, session: session)
                 guard !Task.isCancelled else { return }
                 genreArt = art
-            } catch SessionError.signedOut {
-                browse.noteSignedOut()
-                content = .signedOut
             } catch {
-                // The cache throws nothing else; anything that did would leave the cards plain.
+                // Typed, so this covers every failure the cache can have; any other leaves the
+                // cards plain inside the cache.
+                switch error {
+                case .signedOut:
+                    browse.noteSignedOut()
+                    content = .signedOut
+                }
             }
         }
     }

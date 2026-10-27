@@ -107,6 +107,14 @@ public final class GenreArtCache {
     private var entries: [String: (fetched: Date, images: [String: ItemImage])] = [:]
     private let now: @MainActor () -> Date
 
+    /// Why the artwork couldn't be had, the one failure a page shows. Thrown typed, so a page's
+    /// `catch` covers exactly these cases: a case added later won't compile until the page
+    /// handles it, rather than vanishing into a catch-all.
+    public enum Failure: Error, Equatable {
+        /// The server no longer accepts the access token (`SessionError.signedOut`).
+        case signedOut
+    }
+
     public init(now: @escaping @MainActor () -> Date = { .now }) {
         self.now = now
     }
@@ -116,12 +124,12 @@ public final class GenreArtCache {
     ///
     /// - Returns: each genre's picture; none at all when it couldn't be loaded, so the cards
     ///   stay plain.
-    /// - Throws: `SessionError.signedOut` only, for the page to say so.
+    /// - Throws: `Failure.signedOut` only, for the page to say so.
     public func images(
         for genreIDs: [String],
         in library: Library,
         session: JellyfinSession,
-    ) async throws -> [String: ItemImage] {
+    ) async throws(Failure) -> [String: ItemImage] {
         try await images(key: "\(session.serverURL.absoluteString)|\(session.userID)|\(library.id)") {
             try await session.genreBackdrops(for: genreIDs, in: library)
         }
@@ -131,7 +139,7 @@ public final class GenreArtCache {
     public func images(
         key: String,
         fetch: @Sendable () async throws -> GenreBackdrops,
-    ) async throws -> [String: ItemImage] {
+    ) async throws(Failure) -> [String: ItemImage] {
         if let cached = entries[key], now().timeIntervalSince(cached.fetched) < Self.lifetime {
             return cached.images
         }
@@ -139,7 +147,7 @@ public final class GenreArtCache {
         do {
             backdrops = try await fetch()
         } catch SessionError.signedOut {
-            throw SessionError.signedOut
+            throw .signedOut
         } catch {
             // Anything else leaves the cards plain, as one genre's failed request does its card.
             return [:]

@@ -15,9 +15,27 @@ struct GenreArtCacheTests {
         #expect(failed.isEmpty)
         #expect(cancelled.isEmpty)
         #expect(unexpected.isEmpty)
-        await #expect(throws: SessionError.signedOut) {
+        await #expect(throws: GenreArtCache.Failure.signedOut) {
             try await cache.images(key: "k") { throw SessionError.signedOut }
         }
+    }
+
+    @Test func `genre art throws its own typed failure, which a page's catch covers case by case`() async {
+        let cache = GenreArtCache()
+        var caught: [GenreArtCache.Failure] = []
+
+        // As the Genres tab catches it: the error is typed, so the switch must name every case,
+        // and a new one fails to compile here and on the page instead of being swallowed.
+        do throws(GenreArtCache.Failure) {
+            _ = try await cache.images(key: "k") { throw SessionError.signedOut }
+        } catch {
+            switch error {
+            case .signedOut:
+                caught.append(error)
+            }
+        }
+
+        #expect(caught == [.signedOut])
     }
 
     @Test func `a full set of genre art is kept for two hours, a partial one not at all`() async throws {
