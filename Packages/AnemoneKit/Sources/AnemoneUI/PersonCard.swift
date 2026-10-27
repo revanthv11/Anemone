@@ -3,8 +3,9 @@ import SwiftUI
 /// A round photo with a name and role under it, for cast and crew rows, like Wholphin's
 /// `PersonCard`.
 ///
-/// Put it in a button styled `.personCard`: the photo lifts itself when focused, staying round.
-/// tvOS's own focus effects draw a square platter around it.
+/// Put it in a button styled `.personCard`: the photo lifts itself when focused, staying round,
+/// with a ring and a glow in the theme's focus colours. tvOS's own focus effects draw a square
+/// platter around it.
 public struct PersonCard: View {
     private let name: String
     private let role: String?
@@ -12,6 +13,7 @@ public struct PersonCard: View {
     private let width: CGFloat
 
     @Environment(\.isFocused) private var isFocused
+    @Environment(\.theme) private var theme
 
     public init(name: String, role: String?, imageURL: URL?, width: CGFloat) {
         self.name = name
@@ -24,23 +26,30 @@ public struct PersonCard: View {
         VStack(spacing: 12) {
             ZStack {
                 Circle()
-                    .fill(.quaternary)
+                    .fill(theme.surfaceVariant)
                 Image(systemName: "person.fill")
                     .font(.system(size: width / 3))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(theme.onSurfaceVariant)
                 ArtworkImage(url: imageURL)
             }
             .frame(width: width, height: width)
             .clipShape(.circle)
+            .overlay {
+                // Wholphin's focused person card: a 3 dp ring in the focus colour.
+                Circle()
+                    .strokeBorder(theme.focusRing, lineWidth: 6)
+                    .opacity(isFocused ? 1 : 0)
+            }
             .scaleEffect(isFocused ? 1.12 : 1)
-            .shadow(color: .black.opacity(isFocused ? 0.5 : 0), radius: 16, y: 10)
+            .shadow(color: isFocused ? theme.focusGlow.color : .clear, radius: 16, y: 10)
             VStack(spacing: 2) {
                 Text(name)
                     .font(.caption)
+                    .foregroundStyle(theme.onBackground)
                     .lineLimit(1)
                 Text(role ?? " ")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryText)
                     .lineLimit(1)
             }
             .frame(width: width + 40)

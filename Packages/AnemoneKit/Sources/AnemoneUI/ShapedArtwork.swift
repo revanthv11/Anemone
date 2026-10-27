@@ -1,13 +1,15 @@
 import SwiftUI
 
-/// Artwork in a fixed frame of a card shape, over a placeholder that shows until (or unless) the
-/// image arrives.
+/// Artwork in a fixed frame of a card shape, over a placeholder in the theme's colours that shows
+/// until (or unless) the image arrives.
 public struct ShapedArtwork: View {
     private let url: URL?
     private let shape: CardShape
     private let width: CGFloat
     private let cornerRadius: CGFloat
     private let placeholderOverride: String?
+
+    @Environment(\.theme) private var theme
 
     /// - Parameter placeholderSymbol: an SF Symbol to show until the image arrives, in place of
     ///   the shape's usual one.
@@ -28,10 +30,10 @@ public struct ShapedArtwork: View {
     public var body: some View {
         ZStack {
             Rectangle()
-                .fill(.quaternary)
+                .fill(theme.surfaceVariant)
             Image(systemName: placeholderOverride ?? placeholderSymbol)
                 .font(.system(size: 48))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(theme.onSurfaceVariant)
             ArtworkImage(url: url)
         }
         .frame(width: width, height: width / shape.aspectRatio)

@@ -2,7 +2,8 @@ import SwiftUI
 
 /// A poster, thumb or square card with a caption, for rows and grids.
 ///
-/// Put it in a borderless button: on tvOS the artwork lifts when focused, like the TV app.
+/// Put it in a borderless button: on tvOS the artwork lifts when focused, like the TV app, with a
+/// ring in the theme's focus colour, as Wholphin's cards have.
 public struct MediaCard: View {
     private let title: String
     private let subtitle: String?
@@ -15,6 +16,8 @@ public struct MediaCard: View {
     private let menuItem: CardMenuItem?
 
     @Environment(\.cardMenu) private var menu
+    @Environment(\.theme) private var theme
+    @Environment(\.isFocused) private var isFocused
 
     /// - Parameters:
     ///   - progress: from 0 to 1; draws a bar along the bottom when above 0.
@@ -50,10 +53,11 @@ public struct MediaCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.caption)
+                        .foregroundStyle(theme.onBackground)
                         .lineLimit(1)
                     Text(subtitle ?? " ")
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.secondaryText)
                         .lineLimit(1)
                 }
                 .frame(width: width, alignment: .leading)
@@ -75,7 +79,7 @@ public struct MediaCard: View {
     private func artwork(_ marks: CardMarks) -> some View {
         let badges = marks.badges
         let progress = marks.progress
-        return ShapedArtwork(url: imageURL, shape: shape, width: width)
+        return ShapedArtwork(url: imageURL, shape: shape, width: width, cornerRadius: Self.cornerRadius)
             .overlay(alignment: .bottom) {
                 if let progress, progress > 0 {
                     ProgressBar(progress: progress, width: width - 2 * Self.progressInset)
@@ -84,7 +88,7 @@ public struct MediaCard: View {
             }
             .overlay(alignment: .topLeading) {
                 if badges.isFavorite {
-                    Badge(systemImage: "heart.fill", tint: .red, label: "Favorite")
+                    Badge(systemImage: "heart.fill", tint: theme.favorite, fill: theme.cardBadge, label: "Favorite")
                         .padding(Self.progressInset)
                 }
             }
@@ -92,24 +96,38 @@ public struct MediaCard: View {
                 HStack(spacing: 8) {
                     // Partly watched items have the progress bar instead, as in Wholphin.
                     if badges.isPlayed, (progress ?? 0) <= 0 {
-                        Badge(systemImage: "checkmark", tint: .white, label: "Watched")
+                        Badge(
+                            systemImage: "checkmark",
+                            tint: theme.onWatchedBadge,
+                            fill: theme.watchedBadge,
+                            label: "Watched",
+                        )
                     }
                     if let count = badges.unplayedCount, count > 0 {
                         Text(count, format: .number.notation(.compactName))
                             .font(.caption2.bold())
                             .padding(.horizontal, 12)
                             .frame(minWidth: Badge.size, minHeight: Badge.size)
-                            .foregroundStyle(.white)
-                            .background(.black.opacity(0.6), in: .capsule)
+                            .foregroundStyle(theme.onCardBadge)
+                            .background(theme.cardBadge, in: .capsule)
                             .accessibilityLabel("\(count) unwatched")
                     }
                 }
                 .padding(Self.progressInset)
             }
+            .overlay {
+                if isFocused {
+                    RoundedRectangle(cornerRadius: Self.cornerRadius)
+                        .strokeBorder(theme.focusRing, lineWidth: Self.focusRingWidth)
+                }
+            }
             .liftOnFocus()
     }
 
     private static let progressInset: CGFloat = 12
+    private static let cornerRadius: CGFloat = 12
+    /// TV Material's 3 dp focus border, at Anemone's 2 points per dp of a 960 dp wide screen.
+    private static let focusRingWidth: CGFloat = 6
 }
 
 private extension View {
@@ -143,7 +161,8 @@ private struct Badge: View {
     static let size: CGFloat = 44
 
     let systemImage: String
-    let tint: Color
+    let tint: ThemeColor
+    let fill: ThemeColor
     let label: String
 
     var body: some View {
@@ -151,22 +170,25 @@ private struct Badge: View {
             .font(.caption2.bold())
             .foregroundStyle(tint)
             .frame(width: Self.size, height: Self.size)
-            .background(.black.opacity(0.6), in: .circle)
+            .background(fill, in: .circle)
             .accessibilityLabel(label)
     }
 }
 
+/// How much has been watched, in the theme's progress colours.
 private struct ProgressBar: View {
     let progress: Double
     let width: CGFloat
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         Capsule()
-            .fill(.black.opacity(0.5))
+            .fill(theme.progressTrack)
             .frame(width: width, height: 8)
             .overlay(alignment: .leading) {
                 Capsule()
-                    .fill(.white)
+                    .fill(theme.progress)
                     .frame(width: width * min(progress, 1))
             }
             .accessibilityElement()
