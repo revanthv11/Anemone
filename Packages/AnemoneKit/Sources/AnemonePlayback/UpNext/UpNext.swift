@@ -4,20 +4,25 @@ import Foundation
 /// Up Next and pass-out protection, ported from Wholphin's `PlaybackViewModel` and
 /// `PlaybackPage`. When an entry with another after it ends, a card offers the next one and
 /// counts down to playing it; Cancel closes the player. With "During the credits", the card comes
-/// when `SegmentSkipping` finds the outro instead, and Cancel keeps the credits playing until the
-/// card comes back at the end, as in Wholphin.
+/// when `SegmentSkipping` finds the outro instead, once for each outro and in place of its skip
+/// button, as in Wholphin; Cancel keeps the credits playing until the card comes back at the end.
+/// Moving on from the credits marks the entry played, which Wholphin doesn't (see `play(_:)`).
 ///
 /// Pass-out protection: once `passOutCount` entries have played on their own with no press on
 /// the remote, the card asks "Still watching?" instead, and playback stops when nobody answers.
 /// Wholphin stops counting down after two hours without a press; this counts entries.
 ///
-/// It also says so when the queue was built without items that can't play here.
+/// It also says so when the queue was built without items that can't play here, or that didn't
+/// fit in it.
 @MainActor
 public final class UpNext: PlaybackFeature {
     /// The cards it shows, by ID.
     public static let upNextCard = "upNext"
     public static let stillWatchingCard = "stillWatching"
     public static let skippedCard = "skipped"
+    /// Stands in for an outro segment's ID where the `-upNextCreditsAt` launch argument says the
+    /// credits start.
+    static let testCreditsID = "upNextCreditsAt"
 
     private let settings: Settings
     /// How long one second of a countdown takes; shorter in tests.
@@ -29,14 +34,22 @@ public final class UpNext: PlaybackFeature {
     private var offer: Offer?
     /// Counts down the card on offer.
     private var countdown: Task<Void, Never>?
-    /// Whether the entry playing has offered what's next at its credits, so it does once.
-    private var hasOfferedAtCredits = false
+    /// Wholphin's `outroShownSegments`: the credits in the entry playing that Up Next has come up
+    /// at, by segment ID, so it does once for each. A retry as a transcode keeps them, so a card
+    /// the user cancelled doesn't come back.
+    private var creditsOffered: Set<MediaSegment.ID> = []
+    /// The loaded entry's place in the queue and item, and whether its stream failed, to tell a
+    /// retry as a transcode from another entry, as segment skipping does.
+    private var loadedEntry: (index: Int, itemID: MediaItem.ID)?
+    private var hasFailed = false
     private var noteTimer: Task<Void, Never>?
     private var hasNotedSkipped = false
 
     private struct Offer {
         /// At the end of the entry rather than during its credits, so Cancel closes the player.
         var isAtEnd: Bool
+        /// The credits it came up at, if it did.
+        var creditsID: MediaSegment.ID?
     }
 
     /// - Parameter second: how long one second of a countdown takes, for tests.
@@ -46,19 +59,20 @@ public final class UpNext: PlaybackFeature {
     }
 
     public func handle(_ event: PlaybackEvent, in controller: PlaybackController) async {
-        self.controller = controller
+        follow(controller)
         switch event {
-        case .loaded:
-            withdraw()
-            hasOfferedAtCredits = false
+        case let .loaded(_, entry):
+            loaded(entry, at: controller.queue.currentIndex)
             controller.closesAtEnd = true
         case .started:
             noteSkipped(in: controller)
         case let .position(progress):
             // Segment skipping hears each event first, so it already knows the segment playing.
-            let isInOutro = controller.feature(SegmentSkipping.self)?.current?.kind == .outro
-            if isInOutro || settings.testCreditsStart.map({ progress.position >= $0 }) == true {
-                creditsStarted()
+            // Checked at each position too, for a next entry found after the credits started.
+            if let segment = controller.feature(SegmentSkipping.self)?.current, segment.kind == .outro {
+                creditsStarted(id: segment.id)
+            } else if let start = settings.testCreditsStart, progress.position >= start {
+                creditsStarted(id: Self.testCreditsID)
             }
         case .resumed:
             // Only a resume: the player pauses on its own at the end of an entry.
@@ -66,32 +80,75 @@ public final class UpNext: PlaybackFeature {
         case .ended:
             ended(in: controller)
         case .failed:
-            withdraw()
-        case .stopped:
-            if controller.isStopped {
-                withdraw()
-                noteTimer?.cancel()
-            }
-        case .paused, .reloaded:
+            failed()
+        case .paused, .stopped, .reloaded:
             // A reload plays the same entry: an offer, or one cancelled, carries on.
             break
         }
     }
 
-    /// Tells Up Next the credits have started in the entry playing, as the media segments
-    /// feature finds at an outro segment. With "During the credits", the card shows now rather
-    /// than at the end.
-    public func creditsStarted() {
-        guard let controller, !hasOfferedAtCredits, offer == nil, controller.queue.next != nil,
-              settings.timing == .duringCredits || settings.testCreditsStart != nil
+    /// Tells Up Next the credits with this ID, an outro segment's, have started in the entry
+    /// playing, as the media segments feature finds them. With "During the credits", the card
+    /// shows now rather than at the end, once for each.
+    public func creditsStarted(id: MediaSegment.ID) {
+        guard let controller, offer == nil, controller.queue.next != nil,
+              settings.timing == .duringCredits || settings.testCreditsStart != nil,
+              creditsOffered.insert(id).inserted
         else { return }
-        hasOfferedAtCredits = true
-        offerNext(atEnd: false, in: controller)
+        offerNext(atEnd: false, creditsID: id, in: controller)
     }
 
     /// A press or touch on the remote: someone's awake, so pass-out protection counts from 0.
     public func noteRemoteInput() {
         autoplaysWithoutInput = 0
+    }
+}
+
+/// Following the player.
+private extension UpNext {
+    /// The first time it hears from `controller`.
+    func follow(_ controller: PlaybackController) {
+        guard self.controller !== controller else { return }
+        self.controller = controller
+        // The moment the credits start, before segment skipping offers to skip them, so the card
+        // comes up in place of its skip button, as in Wholphin.
+        controller.feature(SegmentSkipping.self)?.onChange = { [weak self] segment in
+            if let segment, segment.kind == .outro {
+                self?.creditsStarted(id: segment.id)
+            }
+        }
+        // The player can close after the entry's session ended, while the card counts down over
+        // the last frame, and no `stopped` comes then.
+        controller.whenStopped { [weak self] in
+            self?.closed()
+        }
+    }
+
+    /// Starts afresh with each entry, but a retry as a transcode is the same one.
+    func loaded(_ entry: PlaybackQueue.Entry, at index: Int) {
+        withdraw()
+        let isRetry = hasFailed && loadedEntry?.index == index && loadedEntry?.itemID == entry.itemID
+        hasFailed = false
+        loadedEntry = (index, entry.itemID)
+        if !isRetry {
+            creditsOffered = []
+        }
+    }
+
+    /// The card goes with the stream. If a retry as a transcode follows, credits whose card was
+    /// still up bring it back; ones whose card the user cancelled don't.
+    func failed() {
+        hasFailed = true
+        if let creditsID = offer?.creditsID {
+            creditsOffered.remove(creditsID)
+        }
+        withdraw()
+    }
+
+    /// The player closed: nothing more to count down or show.
+    func closed() {
+        withdraw()
+        noteTimer?.cancel()
     }
 }
 
@@ -110,11 +167,11 @@ private extension UpNext {
         }
     }
 
-    func offerNext(atEnd: Bool, in controller: PlaybackController) {
+    func offerNext(atEnd: Bool, creditsID: MediaSegment.ID? = nil, in controller: PlaybackController) {
         let index = controller.queue.currentIndex + 1
         guard let next = controller.queue.next else { return }
         if settings.autoplays, settings.passOutCount > 0, autoplaysWithoutInput >= settings.passOutCount {
-            offer = Offer(isAtEnd: atEnd)
+            offer = Offer(isAtEnd: atEnd, creditsID: creditsID)
             count(down: settings.stillWatchingTimeout) { [weak self] left in
                 self?.showStillWatching(next, index: index, left: left)
             } then: { [weak self] in
@@ -123,7 +180,7 @@ private extension UpNext {
         } else if settings.autoplays, settings.countdown <= .zero {
             autoplay(index)
         } else {
-            offer = Offer(isAtEnd: atEnd)
+            offer = Offer(isAtEnd: atEnd, creditsID: creditsID)
             guard settings.autoplays else {
                 // Wholphin still offers the next entry, without counting down.
                 showUpNext(next, index: index, left: nil)
@@ -183,9 +240,12 @@ private extension UpNext {
         play(index)
     }
 
+    /// Moving on from the credits marks the entry played, as at its end. Wholphin reports where
+    /// it stopped instead, which leaves an entry whose credits start before the server's played
+    /// threshold (90% by default) to resume, in Continue Watching.
     func play(_ index: Int) {
         withdraw()
-        controller?.play(entryAt: index)
+        controller?.play(entryAt: index, markingCurrentPlayed: true)
     }
 
     /// At the end, closes the player; during the credits, lets them play.
@@ -237,17 +297,18 @@ private extension UpNext {
 }
 
 /// The note about skipped items.
-private extension UpNext {
+extension UpNext {
     /// Once, when the first entry gets under way.
-    func noteSkipped(in controller: PlaybackController) {
-        let count = controller.queue.skippedCount
-        guard !hasNotedSkipped, count > 0 else { return }
+    private func noteSkipped(in controller: PlaybackController) {
+        let queue = controller.queue
+        guard !hasNotedSkipped, queue.skippedCount + queue.overLimitCount > 0 else { return }
         hasNotedSkipped = true
         let accessories = controller.accessories
+        let (title, message) = Self.skippedNote(for: queue)
         accessories.show(PlayerCard(
             id: Self.skippedCard,
-            title: count == 1 ? "Skipping 1 item" : "Skipping \(count) items",
-            message: "Only videos play here for now.",
+            title: title,
+            message: message,
             actions: [
                 PlayerAction(id: "skipped.ok", title: "OK") {
                     accessories.dismissCard(Self.skippedCard)
@@ -261,6 +322,24 @@ private extension UpNext {
             guard !Task.isCancelled else { return }
             accessories.dismissCard(Self.skippedCard)
         }
+    }
+
+    /// How many items were left out, and why. Wholphin leaves out what's past its 100 items
+    /// without a word.
+    static func skippedNote(for queue: PlaybackQueue) -> (title: String, message: String) {
+        let playing = queue.entries.count
+        let skipped = queue.skippedCount
+        let overLimit = queue.overLimitCount
+        let title = if overLimit > 0 {
+            "Playing \(playing) of \(playing + skipped + overLimit) items"
+        } else {
+            skipped == 1 ? "Skipping 1 item" : "Skipping \(skipped) items"
+        }
+        let reasons = [
+            overLimit > 0 ? "A queue holds up to \(JellyfinSession.queueLimit) items." : nil,
+            skipped > 0 ? "Only videos play here for now." : nil,
+        ]
+        return (title, reasons.compactMap(\.self).joined(separator: "\n"))
     }
 }
 

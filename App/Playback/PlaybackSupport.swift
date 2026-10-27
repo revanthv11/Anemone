@@ -50,6 +50,7 @@ extension BrowseModel {
                 return
             }
             queue.skippedCount = found.skippedCount
+            queue.overLimitCount = found.overLimitCount
             // Playlists are shuffled here; the server shuffles the rest.
             play(request(queue, shuffles: shuffled && container.item.kind == .playlist))
         } catch {

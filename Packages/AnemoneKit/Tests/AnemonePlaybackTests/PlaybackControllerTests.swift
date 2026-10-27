@@ -121,6 +121,40 @@ struct PlaybackControllerTests {
         #expect(playback.hasEnded)
     }
 
+    @Test func `playing another entry can end the current one as played`() async throws {
+        let playback = try controller([.item("e1"), .item("e2"), .item("e3")])
+        await play(playback)
+        engine.currentTime = .seconds(70)
+
+        playback.play(entryAt: 1, markingCurrentPlayed: true)
+        #expect(await eventually { engine.loads.count == 2 })
+        engine.send(.ready)
+        _ = await eventually { log.events.count(where: { $0.hasPrefix("started") }) == 2 }
+        playback.play(entryAt: 2)
+        #expect(await eventually { engine.loads.count == 3 })
+
+        // At the first entry's end, then where the second was.
+        #expect(log.events.filter { $0.hasPrefix("stopped") } == ["stopped 100.0 seconds", "stopped 70.0 seconds"])
+    }
+
+    @Test func `what features wait for runs once the player closes`() async throws {
+        let playback = try controller()
+        playback.closesAtEnd = false
+        var closings = 0
+        playback.whenStopped { closings += 1 }
+        await play(playback)
+        engine.send(.ended)
+        _ = await eventually { log.events.last == "stopped 100.0 seconds" }
+        #expect(closings == 0)
+
+        await playback.stop()
+        await playback.stop()
+        #expect(closings == 1)
+        // After closing, at once.
+        playback.whenStopped { closings += 1 }
+        #expect(closings == 2)
+    }
+
     @Test func `a direct play that fails is retried as a transcode from the same position`() async throws {
         let streams = FakeStreams()
         let playback = try controller(streams: streams)
