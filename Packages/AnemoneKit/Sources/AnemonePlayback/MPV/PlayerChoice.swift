@@ -2,6 +2,7 @@ import AnemoneCore
 import AnemoneJellyfin
 import AVFoundation
 import JellyfinAPI
+import os
 import QuartzCore
 
 /// Which engine plays an entry.
@@ -120,6 +121,7 @@ public final class SwitchingEngine: PerEntryEngine, MPVEngineProviding {
 
     public func prepare(for entry: PlaybackQueue.Entry) async {
         let kind = await choose(entry)
+        Logger.mpv.info("Prefer MPV: \(entry.metadata.title, privacy: .public) plays in \(String(describing: kind))")
         guard kind != self.kind || !isShown else { return }
         if isShown {
             active.stop()

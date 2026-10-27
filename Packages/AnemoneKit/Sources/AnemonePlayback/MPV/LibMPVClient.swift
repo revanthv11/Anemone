@@ -1,7 +1,7 @@
+import os
 #if os(tvOS) || os(iOS)
     import Foundation
     import Libmpv
-    import os
     import QuartzCore
 
     /// libmpv itself, from MPVKit, drawing into a Metal layer through MoltenVK. Set up the way
@@ -195,7 +195,9 @@
         }
     }
 
-    extension Logger {
-        static let mpv = Logger(subsystem: "com.revanthv11.anemone", category: "mpv")
-    }
 #endif
+
+extension Logger {
+    /// libmpv's own messages and what the engine notes about them, in debug builds.
+    static let mpv = Logger(subsystem: "com.revanthv11.anemone", category: "mpv")
+}

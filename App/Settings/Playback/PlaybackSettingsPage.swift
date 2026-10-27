@@ -19,6 +19,8 @@ struct PlaybackSettingsPage: View {
                 StreamingSettingsPage()
             }
             .accessibilityIdentifier("settings.playback.streamingAndDisplay")
+            NavigationLink("Player", destination: PlayerEngineSettingsPage.init)
+                .accessibilityIdentifier("settings.playback.player")
         }
         .navigationTitle("Playback")
     }

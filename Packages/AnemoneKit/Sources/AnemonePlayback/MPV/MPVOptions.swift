@@ -1,4 +1,5 @@
 import AnemoneCore
+import Foundation
 
 extension PlayerBackend: PreferenceValue {}
 
@@ -43,6 +44,20 @@ struct MPVOptions: Equatable {
             ("demuxer-max-bytes", "64MiB"),
             ("demuxer-max-back-bytes", "64MiB"),
             ("video-rotate", "no"),
-        ]
+        ] + debugOptions
+    }
+
+    /// In debug builds, more libmpv options for live checks from a launch argument, such as
+    /// `-mpvOptions "aid=2,sid=4"` to play a file's second audio track and fourth subtitles.
+    private var debugOptions: [(String, String)] {
+        #if DEBUG
+            let text = UserDefaults.standard.string(forKey: "mpvOptions") ?? ""
+            return text.split(separator: ",").compactMap { option in
+                let parts = option.split(separator: "=", maxSplits: 1).map(String.init)
+                return parts.count == 2 ? (parts[0], parts[1]) : nil
+            }
+        #else
+            return []
+        #endif
     }
 }

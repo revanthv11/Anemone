@@ -1,5 +1,6 @@
 import Foundation
 import JellyfinAPI
+import os
 import QuartzCore
 #if os(tvOS) || os(iOS)
     import UIKit
@@ -209,6 +210,7 @@ public final class MPVPlayerEngine: PlayerEngine {
         guard load.isReady else {
             load.isReady = true
             current = load
+            logDecoding()
             load.events.yield(.ready)
             reportStatus()
             return
@@ -284,6 +286,16 @@ public final class MPVPlayerEngine: PlayerEngine {
         for (name, value) in subtitleStyles.style(forHDR: isHDR).mpvProperties {
             client.set(name, value)
         }
+    }
+
+    /// In debug builds, what libmpv decodes, for live checks in the console.
+    private func logDecoding() {
+        #if DEBUG
+            guard let client else { return }
+            let names = ["video-codec", "hwdec-current", "audio-codec-name", "audio-params/hr-channels", "sid", "vo"]
+            let values = names.map { "\($0)=\(client.string($0) ?? "-")" }.joined(separator: " ")
+            Logger.mpv.info("playing: \(values, privacy: .public)")
+        #endif
     }
 
     /// Ends the current stream's events; seeks waiting for it didn't get there.
