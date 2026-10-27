@@ -66,8 +66,13 @@ public extension JellyfinSession {
 
     /// Takes an item out of a playlist. Only now are the playlist's entries read, to find the
     /// item's, since removing goes by entry.
+    ///
+    /// - Throws: `PlaylistEditingError.notInPlaylist` when no entry holds the item, such as when
+    ///   it was taken out elsewhere since the playlist was checked.
     func removeFromPlaylist(_ playlistID: MediaItem.ID, itemID: MediaItem.ID) async throws {
-        guard let entry = try await playlistEntry(for: itemID, in: playlistID) else { return }
+        guard let entry = try await playlistEntry(for: itemID, in: playlistID) else {
+            throw PlaylistEditingError.notInPlaylist
+        }
         try await removeFromPlaylist(playlistID, entryID: entry)
     }
 
@@ -86,7 +91,7 @@ public extension JellyfinSession {
         do {
             // Just the IDs of what it holds, however long it is.
             let ids = try await send(Paths.getPlaylist(playlistID: playlist.id)).itemIDs
-            holdsItem = ids.contains { JellyfinID.compact($0) == JellyfinID.compact(itemID) }
+            holdsItem = ids.contains { Self.isSameItem($0, itemID) }
         } catch SessionError.signedOut {
             throw SessionError.signedOut
         } catch {
@@ -105,6 +110,20 @@ public extension JellyfinSession {
         let parameters = Paths.GetPlaylistItemsParameters(userID: userID, enableImages: false, enableUserData: false)
         let entries = try await send(Paths.getPlaylistItems(playlistID: playlistID, parameters: parameters)).items
         // Wholphin removes by item ID, which servers that don't send entry IDs accept.
-        return entries?.first { $0.id == itemID }.map { $0.playlistItemID ?? itemID }
+        return entries?
+            .first { $0.id.map { Self.isSameItem($0, itemID) } ?? false }
+            .map { $0.playlistItemID ?? $0.id ?? itemID }
     }
+
+    /// Whether two IDs name the same item. The server may write an ID with or without dashes,
+    /// and in either case, so membership and the entry lookup compare them alike.
+    private static func isSameItem(_ id: String, _ other: String) -> Bool {
+        JellyfinID.compact(id) == JellyfinID.compact(other)
+    }
+}
+
+/// Why a playlist couldn't be changed, beyond a failed request.
+public enum PlaylistEditingError: Error, Equatable {
+    /// The item to take out isn't in the playlist.
+    case notInPlaylist
 }

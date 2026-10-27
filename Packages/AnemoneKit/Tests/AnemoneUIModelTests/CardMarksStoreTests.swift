@@ -60,6 +60,23 @@ struct CardMarksStoreTests {
         #expect(store.marks(for: "m1", given: homeCard) == CardMarks())
     }
 
+    @Test func `an item changed back by its page's own button shows changed back on every card`() {
+        let store = CardMarksStore()
+        let unwatched = CardMarks(badges: CardBadges(isFavorite: true))
+        store.record(watched, for: "m1", replacing: homeCard)
+
+        // The item page, opened after the menu's change, marks it unwatched again with its own
+        // button, which records the change as menus do.
+        store.record(unwatched, for: "m1", replacing: watched)
+
+        // Its page, loaded again, and the home card, which can't tell, both lose the check.
+        #expect(store.marks(for: "m1", given: unwatched) == unwatched)
+        #expect(store.savedMarks(for: "m1", given: unwatched) == nil)
+        #expect(store.marks(for: "m1", given: homeCard) == CardMarks(badges: CardBadges(isFavorite: true)))
+        // A card still showing the menu's change catches up too.
+        #expect(store.marks(for: "m1", given: watched) == unwatched)
+    }
+
     @Test func `a favourite changed on a home card shows on the item page's card`() {
         let store = CardMarksStore()
         let pageCard = CardMarks(badges: CardBadges(isPlayed: true))
