@@ -149,14 +149,16 @@ struct CollectionPage: View {
     @ViewBuilder
     private var rows: some View {
         if let items, let display {
-            if items.isEmpty {
+            let typeRows = display.separateTypes ? CollectionSection.sections(items) : nil
+            // The rows leave out types without a row, so a collection of only those says this too.
+            if typeRows?.isEmpty ?? items.isEmpty {
                 Text(display.filter.isEmpty
                     ? "There's nothing in this collection yet."
                     : "Nothing in this collection matches the filters.")
                     .foregroundStyle(.secondary)
             }
-            if display.separateTypes {
-                ForEach(CollectionSection.sections(items)) { section in
+            if let typeRows {
+                ForEach(typeRows) { section in
                     ItemRow(
                         id: section.rowID,
                         title: section.title,
