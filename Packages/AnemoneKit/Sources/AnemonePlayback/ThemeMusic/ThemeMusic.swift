@@ -8,9 +8,10 @@ import os
 /// Settings asks for.
 ///
 /// Pages share one player, so going from a series to one of its seasons, which has the series'
-/// theme, carries on with the song where Wholphin starts it again. A video playing holds theme
-/// music back until its player closes, and the page's theme then plays again, as Wholphin's
-/// page does when it resumes. It never takes Now Playing or the remote's play and pause.
+/// theme, carries on with the song where Wholphin starts it again. A video player holds theme
+/// music back from when it opens until it closes (`hold(while:)`), and the page's theme then
+/// plays again, as Wholphin's page does when it resumes. It never takes Now Playing or the
+/// remote's play and pause.
 @MainActor
 public final class ThemeMusic {
     /// The player item pages share.
@@ -26,16 +27,29 @@ public final class ThemeMusic {
         let find: Finder
     }
 
+    /// A video player holding theme music back; weak, so one that went away without closing,
+    /// which shouldn't happen, doesn't hold it back for good.
+    @MainActor
+    private struct Hold {
+        weak var player: PlaybackController?
+
+        var isOpen: Bool {
+            player.map { !$0.isStopped } ?? false
+        }
+    }
+
     private let output: any ThemeMusicOutput
     private let volume: @MainActor () -> ThemeMusicVolume
     private var request: Request?
-    /// The page that last showed, which may be under a player.
-    private var lastPage: UUID?
     /// The item whose theme is loading or playing.
     private(set) var playing: MediaItem.ID?
     private var lookup: Task<Void, Never>?
-    /// Set while a video plays.
-    private(set) var isHeldForVideo = false
+    private var holds: [UUID: Hold] = [:]
+
+    /// Whether a video player is open.
+    var isHeldForVideo: Bool {
+        holds.values.contains(where: \.isOpen)
+    }
 
     init(output: any ThemeMusicOutput, volume: @escaping @MainActor () -> ThemeMusicVolume) {
         self.output = output
@@ -51,13 +65,9 @@ public final class ThemeMusic {
     /// A page shows `itemID`'s theme. The theme playing carries on when it's the same item's.
     ///
     /// - Parameter page: identifies the page, so only it can stop its theme with `hide(_:)`.
+    /// A page can show under a player, as when the app comes back to the foreground, or a link
+    /// opens an item's page with its player over it; its theme waits for the player to close.
     public func show(_ itemID: MediaItem.ID, for page: UUID, find: @escaping Finder) {
-        // Another page can't be under a player, so a video can't be holding it back. The same
-        // page can show again under one, as when the app comes back to the foreground.
-        if lastPage != page {
-            isHeldForVideo = false
-        }
-        lastPage = page
         request = Request(page: page, itemID: itemID, find: find)
         playRequested()
     }
@@ -70,16 +80,22 @@ public final class ThemeMusic {
         stop()
     }
 
-    /// A video started playing: theme music stops until its player closes.
-    public func videoStarted() {
-        isHeldForVideo = true
+    /// A video player opened, as Wholphin stops `ThemeSongPlayer` when its player opens: theme
+    /// music stops now, before anything loads, intros included, and stays stopped until the
+    /// player closes, however it closes, even when it shows an error first. Then the page
+    /// showing plays its theme again.
+    public func hold(while player: PlaybackController) {
+        let id = UUID()
+        holds = holds.filter { $0.value.player != nil }
+        holds[id] = Hold(player: player)
         stop()
+        player.whenStopped { [weak self] in
+            self?.release(id)
+        }
     }
 
-    /// The video player closed: the page showing plays its theme again.
-    public func videoClosed() {
-        guard isHeldForVideo else { return }
-        isHeldForVideo = false
+    private func release(_ id: UUID) {
+        guard holds.removeValue(forKey: id) != nil else { return }
         playRequested()
     }
 

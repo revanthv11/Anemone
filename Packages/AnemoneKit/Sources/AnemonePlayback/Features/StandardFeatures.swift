@@ -13,7 +13,6 @@ public extension PlaybackController {
             SkipBackOnResume(),
             PlaybackLifecycle(),
             DisplayCriteriaMatching(),
-            ThemeMusicStopping(),
         ]
     }
 }

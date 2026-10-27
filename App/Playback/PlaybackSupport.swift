@@ -62,7 +62,10 @@ extension BrowseModel {
 
     /// The player for a request. Every player is built here, with the features every player gets.
     func player(for request: PlaybackRequest) -> PlaybackController {
-        PlaybackController(session: session, request: request)
+        let player = PlaybackController(session: session, request: request)
+        // Theme music (Phase 5c) stops from now until the player closes.
+        ThemeMusic.shared.hold(while: player)
+        return player
     }
 
     /// What the player says when it can't play.
