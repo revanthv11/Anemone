@@ -1,15 +1,18 @@
+import AnemoneCore
 import AnemonePlayback
+import AnemoneUI
 import AVFoundation
 import AVKit
 import SwiftUI
 
-/// The full-screen player: the system player with its transport bar and info panel, until
-/// Anemone's own overlay comes later in Phase 3. What features add shows through it.
+/// The full-screen player: the system player with its transport bar and info panel, or Anemone's
+/// own overlay when Settings asks for it. What features add shows through either.
 struct PlayerScreen: View {
     let playback: PlaybackController
 
     @Environment(BrowseModel.self) private var browse
     @Environment(\.dismiss) private var dismiss
+    @AppStorage(Preferences.playerControls) private var controls
 
     var body: some View {
         Group {
@@ -53,16 +56,16 @@ struct PlayerScreen: View {
     @ViewBuilder
     private var video: some View {
         switch playback.engine.videoOutput {
-        case let .avPlayer(player):
+        case let .avPlayer(player) where controls == .system:
             let accessories = playback.accessories
             SystemPlayer(
                 player: player,
                 accessories: accessories,
                 shown: SystemPlayer.Shown(actions: accessories.actions, menus: accessories.menus),
             )
-        case .layer:
-            // Engines that draw their own layer need Anemone's overlay, which comes with MPV.
-            Color.black
+        default:
+            // Engines that draw their own layer, such as MPV, always need Anemone's overlay.
+            AnemonePlayer(playback: playback)
         }
     }
 }

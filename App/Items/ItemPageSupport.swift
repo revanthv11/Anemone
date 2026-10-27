@@ -177,8 +177,7 @@ extension ItemDetails {
         guard [.movie, .episode, .video, .musicVideo].contains(item.kind),
               let remaining = timeRemaining ?? item.runtime, remaining > .zero
         else { return nil }
-        let end = now.addingTimeInterval(TimeInterval(remaining.components.seconds))
-        return Text("Ends at \(end.formatted(date: .omitted, time: .shortened))")
+        return remaining.endsAtText(from: now)
     }
 }
 
@@ -196,6 +195,13 @@ extension Duration {
     /// "42:10", or "1:02:03" past an hour.
     var clockText: String {
         formatted(.time(pattern: self >= .seconds(3600) ? .hourMinuteSecond : .minuteSecond))
+    }
+
+    /// "Ends at 9:41 PM": when this much is over if it starts at `start`. The item page and the
+    /// player both show it.
+    func endsAtText(from start: Date) -> Text {
+        let end = start.addingTimeInterval(TimeInterval(components.seconds))
+        return Text("Ends at \(end.formatted(date: .omitted, time: .shortened))")
     }
 }
 

@@ -8,6 +8,7 @@ public extension PlaybackController {
             ProgressReporting(session: session),
             SegmentSkipping(session: session),
             UpNext(),
+            PlaybackDetails(session: session),
         ]
     }
 }
