@@ -1,10 +1,12 @@
 import AnemoneJellyfin
+import AnemoneUI
 import SwiftUI
 
 /// The series taken out of Next Up, each of which can go back, like Wholphin's
 /// `RemovedNextUpContent`.
 struct HomeRemovedNextUpPage: View {
     @Environment(BrowseModel.self) private var browse
+    @Environment(\.theme) private var theme
     @State private var content = Content.loading
 
     private enum Content {
@@ -47,7 +49,7 @@ struct HomeRemovedNextUpPage: View {
 
     private func message(_ text: String) -> some View {
         Text(text)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(theme.secondaryText)
             .focusable()
             .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

@@ -30,6 +30,7 @@ struct MusicRecommendedView: View {
     }
 
     @Environment(BrowseModel.self) private var browse
+    @Environment(\.theme) private var theme
     @FocusState private var focus: MusicFocus?
     @State private var rows: [Row: [MusicItem]] = [:]
     @State private var loaded = false
@@ -44,7 +45,7 @@ struct MusicRecommendedView: View {
                 }
                 if loaded, rows.values.allSatisfy(\.isEmpty) {
                     Text("Nothing to recommend in \(library.name) yet.")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.secondaryText)
                         .focusable()
                 } else if !loaded {
                     ProgressView()
@@ -96,6 +97,7 @@ struct MusicGenresView: View {
 
     @Environment(BrowseModel.self) private var browse
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.theme) private var theme
     @State private var genres: [MusicGenre]?
     @State private var problem: String?
 
@@ -122,12 +124,12 @@ struct MusicGenresView: View {
                 .padding(.vertical, GridLayout.focusPadding)
                 if genres.isEmpty {
                     Text("No genres in \(library.name).")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.secondaryText)
                         .focusable()
                 }
             } else if let problem {
                 Text(problem)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryText)
                     .focusable()
             } else {
                 ProgressView()

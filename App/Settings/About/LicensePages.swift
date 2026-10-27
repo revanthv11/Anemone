@@ -1,4 +1,5 @@
 import AnemoneCore
+import AnemoneUI
 import SwiftUI
 
 /// One project Anemone is based on or adapts code from, such as Wholphin or Swiftfin, as its
@@ -56,6 +57,8 @@ struct CreditPage: View {
 struct PackagePage: View {
     let package: Notice.Package
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         ReadingPage(title: package.name) {
             ReadingRow {
@@ -69,14 +72,15 @@ struct PackagePage: View {
             if let note = package.note {
                 ReadingRow {
                     Text(note)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.secondaryText)
                 }
             }
             if let text = BundledLicenses.licenseText(for: package.name) {
                 Text("License text")
                     .font(.headline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryText)
                     .padding(.top, 24)
+                    .accessibilityAddTraits(.isHeader)
                 LicenseParagraphs(text: text)
             }
         }
@@ -89,6 +93,8 @@ struct LicenseTextPage: View {
     /// The `LICENSE-<name>.txt` to show.
     let licenseName: String
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         ReadingPage(title: title) {
             if let text = BundledLicenses.licenseText(for: licenseName) {
@@ -96,7 +102,7 @@ struct LicenseTextPage: View {
             } else {
                 ReadingRow {
                     Text("This build is missing the license's text.")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.secondaryText)
                 }
             }
         }
@@ -151,6 +157,7 @@ private struct ReadingPage<Content: View>: View {
 private struct ReadingRow<Content: View>: View {
     @ViewBuilder let content: Content
 
+    @Environment(\.theme) private var theme
     @FocusState private var isFocused: Bool
 
     var body: some View {
@@ -158,7 +165,7 @@ private struct ReadingRow<Content: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
-            .background(.white.opacity(isFocused ? 0.12 : 0), in: .rect(cornerRadius: 12))
+            .background(isFocused ? theme.platter.color : .clear, in: .rect(cornerRadius: 12))
             .focusable()
             .focused($isFocused)
             .animation(.easeOut(duration: 0.15), value: isFocused)

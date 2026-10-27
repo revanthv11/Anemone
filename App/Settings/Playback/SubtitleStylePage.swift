@@ -1,5 +1,6 @@
 import AnemoneCore
 import AnemonePlayback
+import AnemoneUI
 import SwiftUI
 
 /// Wholphin's subtitle style page (`SubtitleStylePage`): font, edge, background and margin, with
@@ -94,6 +95,8 @@ struct SubtitleStylePage: View {
 private struct SubtitlePreview: View {
     let style: SubtitleStyle
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         Text("The quick brown fox jumps over the lazy dog")
             .font(.system(size: CGFloat(style.fontSize) * 1.6 * 1.5, weight: style.isBold ? .bold : .regular))
@@ -104,7 +107,9 @@ private struct SubtitlePreview: View {
             .padding(.horizontal, style.background == .none ? 0 : 12)
             .background(style.background == .none ? .clear : color(style.backgroundColor, style.backgroundOpacity))
             .frame(maxWidth: .infinity, minHeight: 160)
-            .background(.gray.opacity(0.4), in: RoundedRectangle(cornerRadius: 12))
+            .background(theme.surfaceVariant, in: RoundedRectangle(cornerRadius: 12))
+            .accessibilityLabel("Preview")
+            .accessibilityValue("The quick brown fox jumps over the lazy dog")
             .accessibilityIdentifier("settings.subtitleStyle.preview")
     }
 

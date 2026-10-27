@@ -95,9 +95,12 @@ private struct Choices<Value: Hashable>: View {
                     Spacer()
                     if choice == selection {
                         Image(systemName: "checkmark")
+                            .accessibilityHidden(true)
                     }
                 }
             }
+            // The check, for VoiceOver.
+            .accessibilityAddTraits(choice == selection ? .isSelected : [])
         }
         .navigationTitle(title)
     }

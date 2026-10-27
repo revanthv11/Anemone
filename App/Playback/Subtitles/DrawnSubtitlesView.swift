@@ -176,9 +176,11 @@ private struct SubtitleCues: View {
         .ignoresSafeArea()
         .allowsHitTesting(false)
         .animation(.easeInOut(duration: 0.25), value: clearance)
-        // For UI tests: what shows, read like a caption.
+        // For UI tests: what shows, read like a caption. Static text, never a control: it can't
+        // take focus, so VoiceOver doesn't stop on it while moving through the controls.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(cues.map(\.text).joined(separator: "\n"))
+        .accessibilityAddTraits(.isStaticText)
         .accessibilityIdentifier("player.subtitles")
     }
 }

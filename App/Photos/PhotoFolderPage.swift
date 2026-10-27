@@ -13,6 +13,7 @@ struct PhotoFolderPage: View {
 
     @Environment(BrowseModel.self) private var browse
     @AppStorage(Preferences.slideshowPlayVideos) private var slideshowPlaysVideos
+    @Environment(\.theme) private var theme
     @State private var sort: LibrarySort?
     @State private var content = Content.loading
     @State private var focusedIndex = 0
@@ -115,11 +116,13 @@ struct PhotoFolderPage: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(folder.name)
                     .font(.title2.bold())
+                    .foregroundStyle(theme.onBackground)
                     .lineLimit(1)
+                    .accessibilityAddTraits(.isHeader)
                 if let count {
                     Text(count == 1 ? "1 item" : "\(count.formatted()) items")
                         .font(.callout)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.secondaryText)
                 }
             }
             Spacer()
@@ -136,7 +139,7 @@ struct PhotoFolderPage: View {
                 .focusSection()
             VStack(spacing: 24) {
                 Text(text)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryText)
                     .multilineTextAlignment(.center)
                 actions()
             }

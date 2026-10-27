@@ -1,4 +1,5 @@
 import AnemoneCore
+import AnemoneUI
 import SwiftUI
 
 /// Settings: the account, then a page for each part of the app. Each page lives in its own
@@ -8,6 +9,7 @@ struct SettingsView: View {
     let user: SavedUser
 
     @Environment(AppModel.self) private var model
+    @AppStorage(Preferences.appThemeColors) private var themeColors
 
     var body: some View {
         NavigationStack {
@@ -47,7 +49,7 @@ struct SettingsView: View {
                     page("Interface", systemImage: "music.note.tv", id: "interface") {
                         InterfaceSettingsPage()
                     }
-                    page("Appearance", systemImage: "paintpalette", id: "appearance") {
+                    page("Appearance", systemImage: "paintpalette", id: "appearance", value: themeColors.title) {
                         AppearanceSettingsPage()
                     }
                     page("Screensaver", systemImage: "sparkles.tv", id: "screensaver") {
@@ -65,15 +67,19 @@ struct SettingsView: View {
         }
     }
 
+    /// A page's row. `value` is the page's one setting, such as the theme, for VoiceOver to read
+    /// after the page's name.
     private func page(
         _ title: String,
         systemImage: String,
         id: String,
+        value: String? = nil,
         @ViewBuilder destination: () -> some View,
     ) -> some View {
         NavigationLink(destination: destination) {
             Label(title, systemImage: systemImage)
         }
+        .accessibilityValue(value ?? "")
         .accessibilityIdentifier("settings.\(id)")
     }
 }
@@ -83,9 +89,11 @@ struct SettingsPlaceholder: View {
     let title: String
     let message: String
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         Text(message)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(theme.secondaryText)
             // Gives focus somewhere to rest.
             .focusable()
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

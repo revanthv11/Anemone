@@ -6,6 +6,8 @@ import SwiftUI
 /// it began before the window, the recording marker, and its category's colour.
 struct LiveTVProgramCell: View {
     let cell: LiveTVGuideCell
+    /// The row's channel, which VoiceOver names with the time.
+    let channel: String
     let colorCodes: Bool
     let select: () -> Void
 
@@ -17,6 +19,7 @@ struct LiveTVProgramCell: View {
                     if cell.continuesBefore {
                         Image(systemName: "chevron.left")
                             .font(.caption2.bold())
+                            .accessibilityHidden(true)
                     }
                     Text(program.name)
                         .font(.callout)
@@ -36,15 +39,18 @@ struct LiveTVProgramCell: View {
             }
         }
         .buttonStyle(GuideCellStyle(fill: fill))
+        // The button reads the programme, its episode and the recording marker; then when it's
+        // on and where.
+        .accessibilityValue(Text("\(program.timeRange()) on \(channel)"))
         .accessibilityIdentifier("guide.program.\(program.channelID).\(program.id)")
-        .accessibilityLabel(program.accessibilityText)
     }
 
-    private var fill: Color {
-        guard colorCodes, let color = cell.program.categoryColor else {
-            return .white.opacity(cell.program.isPlaceholder ? 0.06 : 0.12)
+    private var fill: GuideCellStyle.Fill {
+        if colorCodes, let color = cell.program.categoryColor {
+            .color(color)
+        } else {
+            cell.program.isPlaceholder ? .quietPlatter : .platter
         }
-        return color
     }
 }
 
@@ -54,6 +60,8 @@ struct LiveTVChannelCell: View {
     let channel: LiveTVChannel
     let logoURL: URL?
     let select: () -> Void
+
+    @Environment(\.theme) private var theme
 
     var body: some View {
         Button(action: select) {
@@ -74,14 +82,16 @@ struct LiveTVChannelCell: View {
                 if channel.isFavorite {
                     Image(systemName: "heart.fill")
                         .font(.caption2)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(theme.favorite)
                         .padding(6)
                 }
             }
         }
-        .buttonStyle(GuideCellStyle(fill: .white.opacity(0.18)))
+        .buttonStyle(GuideCellStyle(fill: .platter))
         .accessibilityIdentifier("guide.channel.\(channel.id)")
-        .accessibilityLabel(channel.isFavorite ? "\(channel.title), favorite" : channel.title)
+        // The number and name, and whether it's a favourite.
+        .accessibilityLabel(channel.title)
+        .accessibilityValue(channel.isFavorite ? "Favorite" : "")
     }
 }
 
@@ -89,14 +99,18 @@ struct LiveTVChannelCell: View {
 struct LiveTVGuideHeader: View {
     let program: LiveTVProgram?
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(program?.name ?? " ")
                 .font(.title2.bold())
+                .foregroundStyle(theme.onBackground)
                 .lineLimit(1)
                 .accessibilityIdentifier("guide.header.title")
             Text(program?.subtitle ?? " ")
                 .font(.headline)
+                .foregroundStyle(theme.onBackground)
                 .lineLimit(1)
             HStack(spacing: 16) {
                 Text(program?.quickDetails() ?? " ")
@@ -105,15 +119,15 @@ struct LiveTVGuideHeader: View {
                         .font(.caption.bold())
                         .padding(.horizontal, 10)
                         .padding(.vertical, 2)
-                        .overlay(Capsule().stroke(.secondary))
+                        .overlay(Capsule().stroke(theme.secondaryText))
                 }
             }
             .font(.callout)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(theme.secondaryText)
             Text(program?.overview ?? " ")
                 .font(.callout)
                 .lineLimit(3)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.secondaryText)
         }
         .frame(maxWidth: ItemLayout.textWidth, alignment: .leading)
         .frame(height: 230, alignment: .topLeading)
@@ -127,15 +141,17 @@ struct LiveTVTimeRuler: View {
     let window: DateInterval
     let width: CGFloat
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         ZStack(alignment: .topLeading) {
             ForEach(guide.halfHours(in: window), id: \.self) { mark in
                 Text(label(mark))
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryText)
                     .padding(.leading, 6)
                     .overlay(alignment: .leading) {
-                        Rectangle().fill(.secondary).frame(width: 2)
+                        Rectangle().fill(theme.secondaryText).frame(width: 2)
                     }
                     .offset(x: x(mark))
             }
@@ -155,10 +171,20 @@ struct LiveTVTimeRuler: View {
     }
 }
 
-/// A guide cell that fills white when focused, like Wholphin's, without tvOS's lift, which would
-/// cover the cells beside it.
+/// A guide cell on the theme's platter that turns light when focused, like Wholphin's, without
+/// tvOS's lift, which would cover the cells beside it.
 struct GuideCellStyle: ButtonStyle {
-    let fill: Color
+    /// What a cell is filled with at rest.
+    enum Fill {
+        case platter
+        /// Half as strong, for a stretch of the guide with nothing listed.
+        case quietPlatter
+        case clear
+        /// A programme category's colour, the same in every theme, as in Wholphin.
+        case color(Color)
+    }
+
+    let fill: Fill
 
     func makeBody(configuration: Configuration) -> some View {
         Cell(label: configuration.label, fill: fill, isPressed: configuration.isPressed)
@@ -166,15 +192,26 @@ struct GuideCellStyle: ButtonStyle {
 
     private struct Cell<Label: View>: View {
         let label: Label
-        let fill: Color
+        let fill: Fill
         let isPressed: Bool
 
         @Environment(\.isFocused) private var isFocused
+        @Environment(\.theme) private var theme
+
+        private var background: Color {
+            guard !isFocused else { return theme.focusedPlatter.color }
+            return switch fill {
+            case .platter: theme.platter.color
+            case .quietPlatter: theme.platter.withAlpha(theme.platter.alpha / 2).color
+            case .clear: .clear
+            case let .color(color): color
+            }
+        }
 
         var body: some View {
             label
-                .foregroundStyle(isFocused ? .black : .primary)
-                .background(isFocused ? .white : fill, in: .rect(cornerRadius: 8))
+                .foregroundStyle(isFocused ? theme.onFocusedPlatter : theme.onPlatter)
+                .background(background, in: .rect(cornerRadius: 8))
                 .padding(3)
                 .scaleEffect(isPressed ? 0.97 : 1)
                 .animation(.easeOut(duration: 0.12), value: isFocused)

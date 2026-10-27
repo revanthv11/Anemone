@@ -44,6 +44,7 @@ struct OverlayView: View {
     let session: JellyfinSession
 
     @AppStorage(Preferences.showDebugInfo) private var showsDebugInfo
+    @Environment(\.theme) private var theme
     @FocusState private var focus: OverlayFocus?
     @State private var sheets: TrickplaySheets?
 
@@ -64,7 +65,7 @@ struct OverlayView: View {
         ZStack(alignment: .bottom) {
             if overlay.controlsVisible {
                 LinearGradient(
-                    colors: [.clear, .black.opacity(0.5), .black.opacity(0.85)],
+                    colors: [.clear, theme.scrim.withAlpha(0.5).color, theme.scrim.withAlpha(0.85).color],
                     startPoint: .center,
                     endPoint: .bottom,
                 )
@@ -86,9 +87,13 @@ struct OverlayView: View {
                 .padding(.bottom, 60)
                 .background(alignment: .bottom) {
                     // Keeps the times readable over bright video.
-                    LinearGradient(colors: [.clear, .black.opacity(0.6)], startPoint: .top, endPoint: .bottom)
-                        .frame(height: 240)
-                        .ignoresSafeArea()
+                    LinearGradient(
+                        colors: [.clear, theme.scrim.withAlpha(0.6).color],
+                        startPoint: .top,
+                        endPoint: .bottom,
+                    )
+                    .frame(height: 240)
+                    .ignoresSafeArea()
                 }
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
@@ -208,22 +213,26 @@ struct OverlayView: View {
         HStack {
             Text(title)
                 .font(.headline)
-                .foregroundStyle(focus == target ? .primary : .secondary)
+                .foregroundStyle(focus == target ? theme.onBackground : theme.secondaryText)
                 .focusable()
                 .focused($focus, equals: target)
+                // Focusing it opens the row, so VoiceOver reads it as the row's heading.
+                .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier(identifier)
             Spacer(minLength: 0)
         }
         .focusSection()
     }
 
-    /// A line too faint to see that can still hold focus, for going back up a row.
+    /// A line too faint to see that can still hold focus, for going back up a row. VoiceOver
+    /// says where it goes, for the moment it holds focus.
     private func focusLine(_ target: OverlayFocus) -> some View {
         Color.white.opacity(0.001)
             .frame(maxWidth: .infinity)
             .frame(height: 2)
             .focusable()
             .focused($focus, equals: target)
+            .accessibilityLabel(target == .backToChapters ? "Back to chapters" : "Back to controls")
     }
 
     /// Tells the overlay where focus is, and moves between its pages when focus reaches a row
@@ -284,14 +293,15 @@ struct PlayerActionButton: View {
 private struct PauseIndicator: View {
     let isPaused: Bool
 
+    @Environment(\.theme) private var theme
     @State private var isShowing = false
 
     var body: some View {
         Image(systemName: "pause.fill")
             .font(.system(size: 72))
-            .foregroundStyle(.white)
+            .foregroundStyle(theme.onSurface)
             .padding(40)
-            .background(.black.opacity(0.4), in: Circle())
+            .background(theme.scrim.withAlpha(0.4), in: Circle())
             .scaleEffect(isShowing ? 1 : 0.6)
             .opacity(isShowing ? 1 : 0)
             .animation(.easeOut(duration: 0.3), value: isShowing)

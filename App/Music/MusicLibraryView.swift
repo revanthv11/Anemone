@@ -1,5 +1,6 @@
 import AnemoneJellyfin
 import AnemonePlayback
+import AnemoneUI
 import SwiftUI
 
 /// A music library, Wholphin's `CollectionFolderMusic`: tabs for Recommended, Albums, Artists,
@@ -31,6 +32,7 @@ struct MusicLibraryView: View {
     }
 
     @Environment(MusicPlayer.self) private var player
+    @Environment(\.theme) private var theme
     @State private var tab = Tab.recommended
     @State private var showsNowPlaying = false
     @FocusState private var focusedTab: Tab?
@@ -61,7 +63,9 @@ struct MusicLibraryView: View {
         HStack(spacing: 16) {
             Text(library.name)
                 .font(.title2.bold())
+                .foregroundStyle(theme.onBackground)
                 .padding(.trailing, 24)
+                .accessibilityAddTraits(.isHeader)
             ForEach(Tab.allCases) { item in
                 Button(item.title) {
                     tab = item
@@ -120,7 +124,8 @@ struct MusicLibraryView: View {
     }
 }
 
-/// A tab in a music library's tab row: underlined when it's the one showing.
+/// A tab in a music library's tab row: underlined in the theme's accent when it's the one
+/// showing, and on the theme's light platter when focused.
 private struct MusicTabStyle: ButtonStyle {
     let isSelected: Bool
 
@@ -132,18 +137,27 @@ private struct MusicTabStyle: ButtonStyle {
         let configuration: ButtonStyleConfiguration
         let isSelected: Bool
         @Environment(\.isFocused) private var isFocused
+        @Environment(\.theme) private var theme
+
+        private var textColor: ThemeColor {
+            if isFocused {
+                theme.onFocusedPlatter
+            } else {
+                isSelected ? theme.onBackground : theme.secondaryText
+            }
+        }
 
         var body: some View {
             configuration.label
                 .fontWeight(isSelected ? .semibold : .regular)
-                .foregroundStyle(isFocused ? AnyShapeStyle(.black) : AnyShapeStyle(isSelected ? .primary : .secondary))
+                .foregroundStyle(textColor)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 10)
-                .background(isFocused ? AnyShapeStyle(.white) : AnyShapeStyle(.clear), in: .capsule)
+                .background(isFocused ? theme.focusedPlatter.color : .clear, in: .capsule)
                 .overlay(alignment: .bottom) {
                     if isSelected, !isFocused {
                         Capsule()
-                            .fill(.tint)
+                            .fill(theme.accent)
                             .frame(height: 4)
                             .padding(.horizontal, 24)
                     }

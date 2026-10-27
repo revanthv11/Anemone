@@ -156,18 +156,24 @@ private struct PlaybackFailure: View {
     let message: String
     let close: () -> Void
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         VStack(spacing: 40) {
             Text("Can't play this")
                 .font(.title2.bold())
+                .foregroundStyle(theme.onBackground)
+                .accessibilityAddTraits(.isHeader)
             Text(message)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.secondaryText)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 1000)
             Button("OK", action: close)
                 .accessibilityIdentifier("player.close")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // A page, not video, so the theme's background rather than the player's black.
+        .background(theme.background)
         .accessibilityIdentifier("player.failure")
     }
 }
