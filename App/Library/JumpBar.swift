@@ -69,14 +69,7 @@ private struct LetterLabel: View {
         label
             .font(.system(size: 20, weight: isCurrent ? .bold : .medium))
             .foregroundStyle(foreground)
-            // Shorter when the page has less room, as under the tabs, so the bar fits from # to Z
-            // and its top stays below the tabs.
-            .frame(
-                minWidth: GridLayout.letterSize,
-                maxWidth: GridLayout.letterSize,
-                minHeight: GridLayout.minLetterHeight,
-                maxHeight: GridLayout.letterSize,
-            )
+            .frame(width: GridLayout.letterSize, height: GridLayout.letterSize)
             .background {
                 Circle()
                     .fill(isFocused ? AnyShapeStyle(.white) : AnyShapeStyle(.clear))

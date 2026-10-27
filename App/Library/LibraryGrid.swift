@@ -106,9 +106,6 @@ struct LibraryGrid<Header: View, Card: View>: View {
                     },
                 )
                 .padding(.trailing, GridLayout.jumpBarInset)
-                // Like the grid's, so a focused letter, which grows, stays clear of the tabs
-                // above and Up from # can reach them.
-                .padding(.vertical, GridLayout.focusPadding)
             }
         }
         .overlay(alignment: .bottom) {
@@ -130,10 +127,22 @@ struct LibraryGrid<Header: View, Card: View>: View {
             scrollPosition.scrollTo(edge: .top)
         }
         .onChange(of: focusedIndex) { _, index in
+            focusTracking.changes += 1
             guard let index else {
                 // Focus also passes through nil between cards, so it has only left the grid if
-                // the move that took it away was off an edge.
-                focusTracking.hasLeftGrid = focusTracking.lastMoveLeavesGrid
+                // the move that took it away was off an edge, or the alphabet bar has it.
+                focusTracking.hasLeftGrid = focusTracking.hasLeftGrid || focusTracking.lastMoveLeavesGrid
+                if !focusTracking.hasLeftGrid {
+                    // The press can be heard after focus has moved, so that move may not be known
+                    // yet; no card having taken focus a moment later settles it.
+                    let changes = focusTracking.changes
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(150))
+                        if focusTracking.changes == changes {
+                            focusTracking.hasLeftGrid = true
+                        }
+                    }
+                }
                 return
             }
             // Coming back from the header, the alphabet bar or the sidebar, the focus engine picks
@@ -277,6 +286,8 @@ private final class FocusTracking {
     var lastMoveLeavesGrid = false
     /// Focus went off the grid that way and hasn't come back yet.
     var hasLeftGrid = false
+    /// Counts focus changes in the grid, to tell whether focus has moved on since.
+    var changes = 0
 }
 
 /// One card. Kept separate so a page arriving redraws only the cards on screen, not the grid.
@@ -327,5 +338,4 @@ enum GridLayout {
     static let jumpBarSpacing: CGFloat = 40
     static let jumpBarInset: CGFloat = 30
     static let letterSize: CGFloat = 32
-    static let minLetterHeight: CGFloat = 22
 }
