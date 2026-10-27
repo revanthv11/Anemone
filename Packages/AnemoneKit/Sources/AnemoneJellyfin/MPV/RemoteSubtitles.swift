@@ -112,8 +112,8 @@ public extension JellyfinSession {
     }
 
     /// Waits for a downloaded subtitle file to show up among the version's streams: an external
-    /// stream whose path wasn't among `known`. Like Wholphin, asks up to four times, 1.5 s apart,
-    /// and gives up with `nil`.
+    /// stream that wasn't among `known` (see `SubtitleStream.added(to:in:)`). Like Wholphin, asks up
+    /// to four times, 1.5 s apart, and gives up with `nil`.
     func newSubtitleStream(
         of itemID: MediaItem.ID,
         mediaSourceID: String?,
@@ -121,11 +121,10 @@ public extension JellyfinSession {
         attempts: Int = 4,
         interval: Duration = .milliseconds(1500),
     ) async throws -> SubtitleStream? {
-        let knownPaths = Set(known.compactMap(\.path))
         for _ in 0 ..< attempts {
             try await Task.sleep(for: interval)
             let streams = try await subtitleStreams(of: itemID, mediaSourceID: mediaSourceID)
-            if let new = streams.first(where: { $0.isExternal && !knownPaths.contains($0.path ?? "") }) {
+            if let new = SubtitleStream.added(to: known, in: streams).first {
                 return new
             }
         }
@@ -164,6 +163,23 @@ extension RemoteSubtitle {
 }
 
 extension SubtitleStream {
+    /// The external streams in `streams` that aren't among `known`. A stream is told by its path,
+    /// or, as the server can leave the path out, by its title, language and format; one already
+    /// there is never taken for a new one, and of two that look alike, the second is new.
+    static func added(to known: [SubtitleStream], in streams: [SubtitleStream]) -> [SubtitleStream] {
+        var unmatched = known.filter(\.isExternal).map(\.identity)
+        return streams.filter { stream in
+            guard stream.isExternal else { return false }
+            guard let match = unmatched.firstIndex(of: stream.identity) else { return true }
+            unmatched.remove(at: match)
+            return false
+        }
+    }
+
+    private var identity: String {
+        path ?? [title, language ?? "", codec ?? ""].joined(separator: "\u{1F}")
+    }
+
     init?(_ stream: MediaStream) {
         guard let index = stream.index else { return nil }
         self.init(

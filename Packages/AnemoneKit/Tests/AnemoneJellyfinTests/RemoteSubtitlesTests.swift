@@ -118,6 +118,40 @@ struct RemoteSubtitlesTests {
         ))
     }
 
+    /// The server can leave paths out; an external stream that was there before isn't the
+    /// download, even when the download looks just like it.
+    @Test func `an external stream without a path that was there before isn't the new download`() async throws {
+        let calls = Mutex(0)
+        MockServer.register(host: "subs-no-path.test") { request in
+            guard request.url?.path() == "/jf/Items/m1" else { return nil }
+            let call = calls.withLock { count in
+                count += 1
+                return count
+            }
+            let english = #"{"Type":"Subtitle","Codec":"srt","Language":"eng","IsExternal":true,"# +
+                #""DisplayTitle":"English - SRT - External","Index":"#
+            let streams = [english + "3}"] + (call >= 3 ? [english + "4}"] : [])
+            return .json("""
+            {"Id":"m1","Name":"Movie","Type":"Movie","MediaSources":[
+             {"Id":"m1","MediaStreams":[\(streams.joined(separator: ","))]}
+            ]}
+            """)
+        }
+        let session = try session(host: "subs-no-path.test")
+
+        let known = try await session.subtitleStreams(of: "m1", mediaSourceID: "m1")
+        let new = try await session.newSubtitleStream(
+            of: "m1",
+            mediaSourceID: "m1",
+            besides: known,
+            interval: .milliseconds(1),
+        )
+
+        #expect(known.map(\.index) == [3])
+        #expect(new?.index == 4)
+        #expect(calls.withLock(\.self) == 3)
+    }
+
     @Test func `waiting for a download gives up after four tries`() async throws {
         let calls = Mutex(0)
         MockServer.register(host: "subs-slow.test") { _ in
