@@ -63,9 +63,8 @@ jobs:
       - uses: actions/checkout@v7
       - name: Select Xcode
         run: sudo xcode-select -s "$XCODE_PATH"
-      # Only the tests the flag adds; the rest don't depend on it, and the test job runs them.
-      - name: Seerr's package tests
-        run: swift test --package-path Packages/AnemoneKit --traits ANEMONE_SEERR --filter Seerr
+      - name: Package tests with Seerr
+        run: swift test --package-path Packages/AnemoneKit --traits ANEMONE_SEERR
       - name: Build tvOS app with Seerr
         env:
           ANEMONE_SEERR: "1"
