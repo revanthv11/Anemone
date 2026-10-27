@@ -338,7 +338,7 @@
                 }
             }
             if let rating, rating > 0 {
-                parts.append(String(format: spoken ? "Rated %.1f out of 10" : "★ %.1f", rating))
+                parts.append(String(format: spoken ? "Community rating %.1f out of 10" : "★ %.1f", rating))
             }
             if let label = item.availability.label {
                 parts.append(label)

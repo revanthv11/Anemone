@@ -278,35 +278,46 @@ private struct EntryRow: View {
 
     @ViewBuilder
     private var length: some View {
-        if entry.item.kind == .audio, let runtime = entry.item.runtime {
-            Text(runtime.clockText)
-        } else if let runtime = entry.item.runtime?.roundedToMinutes, runtime > .zero {
-            VStack(alignment: .trailing, spacing: 4) {
-                Text(runtime.lengthText)
-                TimelineView(.everyMinute) { context in
-                    runtime.endsAtText(from: context.date)
+        if let runtime = entry.entryLength {
+            if entry.item.kind == .audio {
+                Text(runtime.clockText)
+            } else {
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(runtime.lengthText)
+                    TimelineView(.everyMinute) { context in
+                        runtime.endsAtText(from: context.date)
+                    }
+                    .font(.caption)
+                    .foregroundStyle(theme.secondaryText)
                 }
-                .font(.caption)
-                .foregroundStyle(theme.secondaryText)
             }
         }
     }
 }
 
 private extension ItemDetails {
-    /// What VoiceOver reads for an entry: its place, title and subtitle, and how long it is, in
-    /// words, then whether it's watched or a favourite.
+    /// How long the entry is, as its row shows it: a song to the second, anything else to the
+    /// nearest minute, and nothing when that's no minutes.
+    var entryLength: Duration? {
+        guard let runtime = item.runtime else { return nil }
+        guard item.kind != .audio else { return runtime }
+        let minutes = runtime.roundedToMinutes
+        return minutes > .zero ? minutes : nil
+    }
+
+    /// What VoiceOver reads for an entry: its place, title and subtitle (an episode's in words),
+    /// and how long it is, in words, as the row shows them, then its marks as a card reads them.
     func entryLabel(index: Int) -> Text {
-        var parts = [Text("\(index + 1)"), Text(cardTitle)]
-        if let cardSubtitle {
-            parts.append(Text(cardSubtitle))
+        var parts = [Text("\(index + 1)"), Text(verbatim: cardTitle)]
+        if let subtitle = item.spokenSubtitle ?? cardSubtitle.map(Text.init(verbatim:)) {
+            parts.append(subtitle)
         }
-        if let runtime = item.runtime, runtime > .zero {
-            parts.append(Text(item.kind == .audio ? runtime.spokenPosition : runtime.roundedToMinutes.spokenLength))
+        if let length = entryLength {
+            parts.append(Text(item.kind == .audio ? length.spokenPosition : length.spokenLength))
         }
-        parts += CardMarks(badges: CardBadges(isFavorite: userState.isFavorite, isPlayed: userState.isPlayed))
-            .spokenParts
-        return parts.spokenList ?? Text(cardTitle)
+        let marks = CardMarks(badges: CardBadges(isFavorite: userState.isFavorite, isPlayed: userState.isPlayed))
+        parts += CardSpokenMark.marks(for: marks).map { Text($0.spoken) }
+        return parts.spokenList ?? Text(verbatim: cardTitle)
     }
 }
 

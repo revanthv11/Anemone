@@ -25,13 +25,13 @@ struct ChaptersRow: View {
                     MediaCard(
                         title: name,
                         subtitle: chapter.start.clockText,
+                        spokenSubtitle: Text("starts at \(chapter.start.spokenPosition)"),
                         imageURL: browse.session.imageURL(for: chapter, maxWidth: Int(Self.cardWidth * displayScale)),
                         shape: .thumb,
                         width: Self.cardWidth,
                     )
                 }
                 .buttonStyle(.borderless)
-                .accessibilityLabel(Text("\(name), starts at \(chapter.start.spokenPosition)"))
                 .accessibilityHint("Plays from this chapter")
             }
         }

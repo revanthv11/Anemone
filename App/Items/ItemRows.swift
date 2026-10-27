@@ -80,12 +80,15 @@ struct ItemRow: View {
 }
 
 /// A card for an item on an item page, with Wholphin's watched and favourite marks. VoiceOver
-/// reads its title and subtitle, an episode's in words, then its marks.
+/// reads it as `MediaCard` reads every card: its title, its subtitle (an episode's in words),
+/// then its marks.
 struct ItemCard: View {
     let details: ItemDetails
     let shape: CardShape
     var title: String?
     var subtitle: String?
+    /// What VoiceOver reads for `subtitle` when it's shorthand, like an episode card's "E3".
+    var spokenSubtitle: Text?
 
     @Environment(BrowseModel.self) private var browse
     @Environment(\.displayScale) private var displayScale
@@ -94,6 +97,7 @@ struct ItemCard: View {
         MediaCard(
             title: title ?? details.cardTitle,
             subtitle: subtitle ?? details.cardSubtitle,
+            spokenSubtitle: subtitle == nil ? details.item.spokenSubtitle : spokenSubtitle,
             imageURL: browse.imageURL(details.cardImage(for: shape), width: shape.cardWidth * displayScale),
             shape: shape,
             width: shape.cardWidth,
@@ -101,14 +105,6 @@ struct ItemCard: View {
             badges: details.badges,
             menuItem: CardMenuItem(details),
         )
-        // One element, so the card's button reads this once. With any marks a card menu has
-        // changed since, as the card shows them.
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(details.cardLabel(
-            title: title,
-            subtitle: subtitle,
-            marks: browse.cardMarks.marks(for: details.id, given: details.cardMarks),
-        ))
     }
 }
 

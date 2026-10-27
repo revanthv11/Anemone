@@ -180,13 +180,15 @@ struct SeasonPage: View {
                 Button {
                     playback = browse.playback(of: episode, from: episode.userState.resumePosition)
                 } label: {
-                    ItemCard(details: episode, shape: .thumb, title: episode.item.name, subtitle: episode.numberText)
+                    ItemCard(
+                        details: episode,
+                        shape: .thumb,
+                        title: episode.item.name,
+                        subtitle: episode.numberText,
+                        spokenSubtitle: episode.spokenNumberText,
+                    )
                 }
                 .buttonStyle(.borderless)
-                // The card's own marks, with any a card menu has changed since.
-                .accessibilityLabel(episode.episodeCardLabel(
-                    marks: browse.cardMarks.marks(for: episode.id, given: episode.cardMarks),
-                ))
                 .accessibilityHint("Plays the episode")
                 // While focus is elsewhere on the page, the selected episode stands out.
                 .opacity(focus != nil && !isEpisodeRowFocused && episode.id != selectedEpisodeID ? 0.4 : 1)
@@ -365,6 +367,11 @@ private extension ItemDetails {
     /// What Wholphin puts in an episode card's corner: "E3", or the air date.
     var numberText: String? {
         item.episode?.episodeNumber.map { "E\($0)" } ?? premiereDate?.dayText
+    }
+
+    /// "Episode 3", as VoiceOver reads `numberText`'s "E3"; the air date reads as it's written.
+    var spokenNumberText: Text? {
+        item.episode?.episodeNumber.map { Text("Episode \($0)") }
     }
 }
 

@@ -190,6 +190,7 @@ struct CollectionGrid: View {
                     MediaCard(
                         title: details.cardTitle,
                         subtitle: details.cardSubtitle,
+                        spokenSubtitle: details.item.spokenSubtitle,
                         imageURL: browse.imageURL(details.cardImage(for: options.shape), width: width * displayScale),
                         shape: options.shape,
                         width: width,
@@ -199,8 +200,6 @@ struct CollectionGrid: View {
                     )
                 }
                 .buttonStyle(.borderless)
-                // Read whether or not the grid options show the titles.
-                .accessibilityLabel(details.cardLabel(marks: details.cardMarks))
                 .focused(focus, equals: .card(row: Self.rowID, item: details.id))
                 .accessibilityIdentifier("card.\(Self.rowID).\(details.id)")
             }

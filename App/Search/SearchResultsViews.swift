@@ -59,8 +59,6 @@ private struct SearchResultsRow: View {
                     )
                 }
                 .buttonStyle(.personCard)
-                // The card has no role to read here.
-                .accessibilityLabel(details.item.name)
             } else {
                 NavigationLink(value: details.item) {
                     ItemCard(details: details, shape: kind.cardShape)
