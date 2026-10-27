@@ -268,7 +268,24 @@ Not yet: Wholphin's skip button in its own playback controls for the rest of a s
 
 #### 3d: audio and subtitle choice
 
-Not started. Ported from `StreamChoiceService`, remembered per item and per series, with Audio and Subtitles menus in the player.
+- [x] Wholphin's `StreamChoiceService` in `AnemoneCore/StreamChoice`: the user's pick for the item, else their pick in another episode of the season or series (scored by language, flags, position and channels), else the language and subtitle-mode settings, which fall back to the Jellyfin profile's. Wholphin's own test cases are ported. Language codes match however they're spelled (`fre`, `fra`, `fr`)
+- [x] Tracks are chosen before PlaybackInfo, which is asked for them together with their version; without the version the server ignores them and uses what it last heard for the item
+- [x] Audio and Subtitles menus in the player through `PlayerAccessories`: every audio and subtitle track, Off, and Only forced when the file has forced or signs subtitles. A menu with nothing to choose isn't shown
+- [x] Picks are remembered per item and, for episodes, per season and series (Wholphin also keeps a movie's pick for its parent folder; Anemone doesn't). They're kept in UserDefaults: the latest 200 items and 100 seasons or series per user
+- [x] Audio in a file that plays directly and text subtitles in Jellyfin's HLS switch in the player. Anything else asks the server for another stream and plays on from the same position after ending the play session (`PlaybackController.reload()`), as Wholphin's `changeStreams` does
+- [x] Picture subtitles (PGS, DVD) and, on AVPlayer, ASS and SSA are burned in by the server, so ASS keeps its styling. `MediaTrack.isStyledText` and `isPicture` mark what MPV (Phase 4) can draw itself; `TrackSelection.burnsInStyledSubtitles` turns ASS burn-in off
+- [x] Settings › Playback › Audio and Subtitles: audio and subtitle language from the server's list, when subtitles show, and forgetting picked tracks. Settings › Subtitles has the subtitle rows too
+- [x] Fixed from Wholphin: per-series subtitle choices were looked up as audio ones (`PlaybackViewModel.kt:499-503`), so they never applied
+
+Tested live in the simulator against the fixture server (Jellyfin 12.3): "Anemone Multi Track" started with English AAC and the default English SRT. SDH subtitles switched in the player; French AC3 took a new stream and went on from the same position; German PGS and the styled Spanish ASS showed burned in, ASS with its karaoke styling; playing the film again brought back French audio and the PGS. In "Fixture Show" season 2, Spanish subtitles picked in episode 1 were chosen for episode 2. On the demo server, King Lear (one audio track, no subtitles) played without the menus. Settings › Playback › Audio and Subtitles showed the profile's settings and forgot picked tracks.
+
+What playing showed:
+
+- AVPlayer didn't show HLS subtitles selected before playback got under way, the server's default included, until they were selected again; `TrackSelection` selects them again once playback is under way.
+- Jellyfin's HLS WebVTT subtitles show 10 s late in a remuxed (fMP4) stream. Its subtitle segments map their cues with `X-TIMESTAMP-MAP=MPEGTS:900000` (10 s), but the remuxed video starts at 0. Burned-in subtitles are in time.
+- Burning subtitles in at 40–60 s while the French AC3 audio played failed each of the three times it was tried: after the server restarted the transcode there (copying the AC3), AVPlayer asked for segments near the end and gave up. Burning them in early, or at 50 s with the English AAC, worked.
+
+Not verified live: switching audio in place in a file that plays directly (the fixture's multi-audio files are MKV, so they're remuxed), VobSub, external subtitle files, Settings › Subtitles. Not yet: a fix for the 10 s offset; progress reports keep the stream's track indices after a switch in the player; the system player still shows AVKit's own Audio and Subtitles buttons beside Anemone's.
 
 #### 3e: Anemone player overlay, seeking, chapters, trickplay
 
