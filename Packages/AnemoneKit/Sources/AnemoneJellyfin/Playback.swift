@@ -1,3 +1,4 @@
+import AnemoneCore
 import Foundation
 import Get
 import JellyfinAPI
@@ -35,6 +36,8 @@ public struct PlaybackStream: Hashable, Sendable {
     public let liveStreamID: String?
     public let audioStreamIndex: Int?
     public let subtitleStreamIndex: Int?
+    /// The source's audio and subtitle tracks, with how this stream carries each subtitle.
+    public let tracks: [MediaTrack]
 
     public init(
         itemID: MediaItem.ID,
@@ -45,6 +48,7 @@ public struct PlaybackStream: Hashable, Sendable {
         liveStreamID: String? = nil,
         audioStreamIndex: Int? = nil,
         subtitleStreamIndex: Int? = nil,
+        tracks: [MediaTrack] = [],
     ) {
         self.itemID = itemID
         self.url = url
@@ -54,6 +58,7 @@ public struct PlaybackStream: Hashable, Sendable {
         self.liveStreamID = liveStreamID
         self.audioStreamIndex = audioStreamIndex
         self.subtitleStreamIndex = subtitleStreamIndex
+        self.tracks = tracks
     }
 }
 
@@ -77,16 +82,21 @@ public extension JellyfinSession {
     ///   - allowsDirect: `false` makes the server transcode, which Wholphin falls back to when
     ///     direct play or direct stream fails.
     ///   - mediaSourceID: the version to play; the server's first when `nil`.
+    ///   - audioStreamIndex: the audio to send; the server's choice when `nil`.
+    ///   - subtitleStreamIndex: the subtitles to send, -1 for none; the server's choice when `nil`.
     func playbackStream(
         for itemID: MediaItem.ID,
         profile: DeviceProfile,
         maxBitrate: Int,
         allowsDirect: Bool = true,
         mediaSourceID: String? = nil,
+        audioStreamIndex: Int? = nil,
+        subtitleStreamIndex: Int? = nil,
     ) async throws -> PlaybackStream {
         let request = PlaybackInfoDto(
             allowAudioStreamCopy: allowsDirect,
             allowVideoStreamCopy: allowsDirect,
+            audioStreamIndex: audioStreamIndex,
             deviceProfile: profile,
             enableDirectPlay: allowsDirect,
             enableDirectStream: allowsDirect,
@@ -95,6 +105,7 @@ public extension JellyfinSession {
             isAutoOpenLiveStream: true,
             maxStreamingBitrate: maxBitrate,
             mediaSourceID: mediaSourceID,
+            subtitleStreamIndex: subtitleStreamIndex,
             userID: userID,
         )
         let response = try await send(Paths.getPostedPlaybackInfo(itemID: itemID, request))
@@ -174,6 +185,7 @@ extension PlaybackStream {
             liveStreamID: source.liveStreamID,
             audioStreamIndex: source.defaultAudioStreamIndex,
             subtitleStreamIndex: source.defaultSubtitleStreamIndex,
+            tracks: (source.mediaStreams ?? []).compactMap(MediaTrack.init),
         )
     }
 
