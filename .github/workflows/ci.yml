@@ -15,9 +15,10 @@ env:
   SWIFTFORMAT_VERSION: 0.64.1
 
 jobs:
-  # Linux, so lint doesn't take one of the account's macOS runners.
+  # Linux, so lint doesn't take one of the account's macOS runners. SwiftLint builds its Linux binary on
+  # Ubuntu 24.04, and it needs libraries (libxml2.so.2) that ubuntu-latest, now 26.04, doesn't have.
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       # The SwiftLint zip's other binary, swiftlint-static, is built without SourceKit.
