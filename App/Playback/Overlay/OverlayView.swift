@@ -53,10 +53,9 @@ struct OverlayView: View {
         details?.previews?.chapters ?? []
     }
 
-    /// The entries after the one playing, with their places in the queue.
+    /// The entries after the one playing, with their places in the queue, without intros.
     private var upcoming: [(index: Int, entry: PlaybackQueue.Entry)] {
-        let queue = playback.queue
-        return queue.entries.indices.dropFirst(queue.currentIndex + 1).map { ($0, queue.entries[$0]) }
+        playback.queue.upcoming
     }
 
     var body: some View {
