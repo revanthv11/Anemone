@@ -159,12 +159,15 @@
     private struct DiscoverHeader: View {
         let item: DiscoverItem?
 
+        @Environment(\.theme) private var theme
+
         var body: some View {
             VStack(alignment: .leading, spacing: 8) {
                 if let item {
                     Text(item.title)
                         .font(.title.bold())
                         .lineLimit(1)
+                        .accessibilityAddTraits(.isHeader)
                     Text(item.cardSubtitle)
                         .font(.callout)
                     if let overview = item.overview {
@@ -174,6 +177,7 @@
                     }
                 }
             }
+            .foregroundStyle(theme.onBackground)
             .frame(maxWidth: ItemLayout.textWidth, minHeight: 220, maxHeight: 220, alignment: .topLeading)
             .padding(.top, 40)
         }
@@ -233,6 +237,7 @@
     /// Wholphin's `DiscoverSearchPage`: movies and series on Seerr, searched as the user types.
     struct DiscoverSearchPage: View {
         @Environment(SeerrModel.self) private var seerr: SeerrModel?
+        @Environment(\.theme) private var theme
         @FocusState private var focus: ItemFocus?
         @State private var query = ""
         @State private var results: [DiscoverItem]?
@@ -243,12 +248,12 @@
                 VStack(alignment: .leading) {
                     if let results, results.isEmpty {
                         Text("Nothing found for “\(query)”.")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(theme.secondaryText)
                     } else if let results {
                         DiscoverGrid(entries: results.map { .init(id: $0.id, item: $0) }, focus: $focus)
                     } else if let problem {
                         Text(problem)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(theme.secondaryText)
                     }
                 }
                 .padding(.horizontal, ItemLayout.horizontalInset)

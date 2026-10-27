@@ -14,6 +14,7 @@
             MediaCard(
                 title: item.title,
                 subtitle: subtitle ?? item.cardSubtitle,
+                spokenSubtitle: subtitle == nil ? item.spokenCardSubtitle : nil,
                 imageURL: item.posterURL,
                 shape: .poster,
                 width: CardShape.poster.cardWidth,
@@ -111,6 +112,13 @@
 
         var cardSubtitle: String {
             [year.map(String.init), availability.label].compactMap(\.self).joined(separator: " · ")
+        }
+
+        /// `cardSubtitle` as VoiceOver reads it, with pauses where the card has dots.
+        var spokenCardSubtitle: Text? {
+            [year.map { Text(verbatim: String($0)) }, availability.label.map { Text($0) }]
+                .compactMap(\.self)
+                .spokenList
         }
     }
 

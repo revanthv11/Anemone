@@ -76,6 +76,8 @@ struct CombinedResults: View {
     let results: SearchResults
     let focus: FocusState<ItemFocus?>.Binding
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         switch results.combined?.state {
         case .searching?:
@@ -89,6 +91,8 @@ struct CombinedResults: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Results")
                     .font(.headline)
+                    .foregroundStyle(theme.onBackground)
+                    .accessibilityAddTraits(.isHeader)
                 LazyVGrid(columns: Self.columns, alignment: .leading, spacing: 40) {
                     ForEach(items) { details in
                         NavigationLink(value: details.item) {
@@ -102,6 +106,7 @@ struct CombinedResults: View {
                 }
                 .padding(.vertical, ItemLayout.focusPadding)
             }
+            .accessibilityRow("Results")
             .focusSection()
         case nil:
             EmptyView()
@@ -114,16 +119,19 @@ struct CombinedResults: View {
     )
 }
 
-/// Before anything is typed: recent searches to pick from again, newest first.
+/// Before anything is typed: recent searches to pick from again, newest first. VoiceOver reads
+/// "Recent Searches" as focus moves into them, then each search's term.
 struct RecentSearchesSection: View {
     let terms: [String]
     let pick: (String) -> Void
     let clear: () -> Void
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         if terms.isEmpty {
             Text("Search your libraries for movies, shows, episodes, people and more.")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.secondaryText)
                 .accessibilityIdentifier("search.hint")
         } else {
             // A list down the page, so focus coming from above lands on the newest search, and
@@ -131,10 +139,13 @@ struct RecentSearchesSection: View {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Recent Searches")
                     .font(.headline)
+                    .foregroundStyle(theme.onBackground)
+                    .accessibilityAddTraits(.isHeader)
                 ForEach(Array(terms.enumerated()), id: \.element) { index, term in
                     Button(term, systemImage: "clock.arrow.circlepath") {
                         pick(term)
                     }
+                    .accessibilityHint("Searches for this again")
                     .accessibilityIdentifier("search.recent.\(index)")
                 }
                 Button("Clear Recent Searches", systemImage: "trash", role: .destructive, action: clear)
@@ -142,6 +153,7 @@ struct RecentSearchesSection: View {
                     .padding(.top, 16)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityRow("Recent Searches")
             .focusSection()
         }
     }
@@ -159,18 +171,22 @@ struct NoSearchKinds: View {
     }
 }
 
-/// Wholphin's `SearchResultPlaceholder`: a row's title over what's happening.
+/// Wholphin's `SearchResultPlaceholder`: a row's title over what's happening, read together.
 private struct SearchPlaceholder: View {
     let title: String
     let message: String
+
+    @Environment(\.theme) private var theme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.headline)
+                .foregroundStyle(theme.onBackground)
             Text(message)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.secondaryText)
         }
+        .accessibilityElement(children: .combine)
         .padding(.bottom, 32)
     }
 }
