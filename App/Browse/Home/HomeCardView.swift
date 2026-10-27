@@ -9,6 +9,8 @@ import SwiftUI
 struct HomeCardView: View {
     let card: HomeCard
     let options: HomeRowViewOptions
+    /// Whether the card's long-press menu is offered.
+    var hasMenu = true
 
     @Environment(BrowseModel.self) private var browse
     @Environment(\.displayScale) private var displayScale
@@ -29,7 +31,7 @@ struct HomeCardView: View {
                 progress: card.item.progress,
                 showsCaption: options.showTitles,
                 // A home row holds no watched or favourite state, so the menu offers both ways.
-                menuItem: CardMenuItem(card.item),
+                menuItem: hasMenu ? CardMenuItem(card.item) : nil,
             )
         }
     }

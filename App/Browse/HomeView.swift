@@ -296,11 +296,11 @@ private struct HomeRowView: View {
                     LazyHStack(spacing: CGFloat(row.config.viewOptions.spacing) * HomeCardStyle.spacingPointsPerDp) {
                         ForEach(row.cards) { card in
                             link(to: card) {
-                                HomeCardView(card: card, options: row.config.viewOptions)
+                                HomeCardView(card: card, options: row.config.viewOptions, hasMenu: !isLiveTV)
                             }
                             .buttonStyle(.borderless)
-                            // The long-press menu, for cards that show an item; genres and studios
-                            // have none.
+                            // The long-press menu, for cards that show an item; genres, studios,
+                            // channels and programmes have none.
                             .cardMenu()
                             .focused(focusedCard, equals: CardID(rowID: row.id, itemID: card.id))
                             .accessibilityIdentifier("card.\(row.id).\(card.id)")
@@ -322,10 +322,15 @@ private struct HomeRowView: View {
         .environment(\.cardMenuSource, row.config.kind.menuSource)
     }
 
+    /// Channels and programmes open Live TV's own sheet and player, not an item page.
+    private var isLiveTV: Bool {
+        row.config.kind == .tvChannels || row.config.kind == .tvPrograms
+    }
+
     @ViewBuilder
     private func link(to card: HomeCard, @ViewBuilder label: () -> some View) -> some View {
         switch card.destination {
-        case .item where row.config.kind == .tvChannels || row.config.kind == .tvPrograms:
+        case .item where isLiveTV:
             LiveTVHomeCard(item: card.item, isChannel: row.config.kind == .tvChannels, label: label)
         case .item:
             NavigationLink(value: card.item, label: label)
