@@ -135,10 +135,10 @@ struct MenuTarget {
 /// Puts the card menu in the environment and shows what its entries open.
 private struct ItemContextActionsHost: ViewModifier {
     @Environment(BrowseModel.self) private var browse
-    @State private var actions = ItemContextActions()
+    @StateObject private var owner = ItemContextActionsOwner()
 
     func body(content: Content) -> some View {
-        @Bindable var actions = actions
+        @Bindable var actions = owner.actions
         content
             .environment(\.cardMenu, actions.menu)
             .environment(actions)
@@ -150,6 +150,14 @@ private struct ItemContextActionsHost: ViewModifier {
                 PlaylistPicker(item: item)
             }
     }
+}
+
+/// Builds the actions once for the host. `@State` would build a new model, with its marks store,
+/// each time the modifier is created, and throw all but the first away; `@StateObject` builds
+/// its object only for the first. Nothing is published here: views observe the actions
+/// themselves.
+private final class ItemContextActionsOwner: ObservableObject {
+    let actions = ItemContextActions()
 }
 
 /// A card's menu: Wholphin's entries for what the card knows about its item.
