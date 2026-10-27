@@ -26,21 +26,31 @@ public extension JellyfinSession {
 
     /// Artwork for genre cards, as Wholphin picks it: the backdrop of a random title in each
     /// genre, asked for four genres at a time. Genres with no title that has a backdrop, or
-    /// whose request fails, are left out.
-    func genreBackdrops(for genreIDs: [String], in library: Library) async -> [String: ItemImage] {
-        await withTaskGroup(of: (String, ItemImage?).self) { group in
+    /// whose request fails, are left out. Once the task is cancelled, no more are asked for.
+    func genreBackdrops(for genreIDs: [String], in library: Library) async -> GenreBackdrops {
+        await withTaskGroup(of: GenreBackdropAnswer.self) { group in
             var pending = genreIDs.dropFirst(4)
             for id in genreIDs.prefix(4) {
-                group.addTask { await (id, try? genreBackdrop(id, in: library)) }
+                _ = group.addTaskUnlessCancelled { await genreBackdropAnswer(id, in: library) }
             }
             var images: [String: ItemImage] = [:]
-            for await (id, image) in group {
-                images[id] = image
+            var failed = false
+            for await answer in group {
+                images[answer.genreID] = answer.image
+                failed = failed || answer.failed
                 if let id = pending.popFirst() {
-                    group.addTask { await (id, try? genreBackdrop(id, in: library)) }
+                    _ = group.addTaskUnlessCancelled { await genreBackdropAnswer(id, in: library) }
                 }
             }
-            return images
+            return GenreBackdrops(images: images, isComplete: !failed && pending.isEmpty && !Task.isCancelled)
+        }
+    }
+
+    private func genreBackdropAnswer(_ genreID: String, in library: Library) async -> GenreBackdropAnswer {
+        do {
+            return try await GenreBackdropAnswer(genreID: genreID, image: genreBackdrop(genreID, in: library))
+        } catch {
+            return GenreBackdropAnswer(genreID: genreID, image: nil, failed: true)
         }
     }
 
@@ -59,6 +69,24 @@ public extension JellyfinSession {
         let item = try await send(Paths.getItems(parameters: parameters)).items?.first
         return ItemImage(itemID: item?.id, kind: .backdrop, tag: item?.backdropImageTags?.first)
     }
+}
+
+/// Genre cards' artwork, from `JellyfinSession.genreBackdrops(for:in:)`.
+public struct GenreBackdrops: Hashable, Sendable {
+    /// Each genre's picture. Genres with no title that has a backdrop have none, and neither do
+    /// those whose request failed or was never sent.
+    public let images: [String: ItemImage]
+    /// Whether every genre's request was sent and answered, so the result is worth keeping.
+    /// False when one failed or the task was cancelled part way, as when the tab is left while
+    /// the artwork loads; keeping that would leave those cards plain until it expired.
+    public let isComplete: Bool
+}
+
+/// One genre's request for its artwork: the picture, if there is one, or that it failed.
+private struct GenreBackdropAnswer {
+    let genreID: String
+    let image: ItemImage?
+    var failed = false
 }
 
 private extension [BaseItemDto]? {

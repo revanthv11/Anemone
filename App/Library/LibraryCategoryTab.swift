@@ -132,7 +132,9 @@ struct LibraryCategoryTab: View {
         guard !Task.isCancelled else { return }
         content = .loaded(pager, sortNames: entries.map { $0.sortName ?? $0.item.name })
         if kind == .genres {
-            genreArt = await GenreArtCache.images(for: entries.map(\.id), in: library, session: session)
+            let art = await GenreArtCache.images(for: entries.map(\.id), in: library, session: session)
+            guard !Task.isCancelled else { return }
+            genreArt = art
         }
     }
 }
@@ -160,9 +162,14 @@ private enum GenreArtCache {
         if let cached = entries[key], cached.fetched.timeIntervalSinceNow > -2 * 60 * 60 {
             return cached.images
         }
-        let images = await session.genreBackdrops(for: genreIDs, in: library)
-        entries[key] = (.now, images)
-        return images
+        let backdrops = await session.genreBackdrops(for: genreIDs, in: library)
+        // Only a full set is kept. Wholphin caches only when every request succeeds; one cut
+        // short by leaving the tab, or missing a genre whose request failed, would otherwise
+        // leave those cards plain for two hours.
+        if backdrops.isComplete {
+            entries[key] = (.now, backdrops.images)
+        }
+        return backdrops.images
     }
 }
 

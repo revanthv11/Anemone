@@ -152,10 +152,12 @@ struct LibraryTabsTests {
     @Test func `a genre card shows the backdrop of a random title in it`() async throws {
         let sent = recordCategoryRequests(host: "genre-art.test")
 
-        let images = try await librarySession(host: "genre-art.test")
+        let backdrops = try await librarySession(host: "genre-art.test")
             .genreBackdrops(for: ["g1", "g2", "g3", "g4", "g5", "g6"], in: movies)
 
-        // g2 has no title with a backdrop, and g6's request fails.
+        // g2 has no title with a backdrop, and g6's request fails, so the set isn't kept.
+        let images = backdrops.images
+        #expect(!backdrops.isComplete)
         #expect(images.count == 4)
         #expect(images["g1"] == ItemImage(itemID: "in-g1", kind: .backdrop, tag: "b-g1"))
         #expect(images["g2"] == nil)
@@ -168,6 +170,31 @@ struct LibraryTabsTests {
         #expect(first["imageTypes"] == ["Backdrop"])
         #expect(first["includeItemTypes"] == ["Movie"])
         #expect(first["recursive"] == ["true"])
+    }
+
+    @Test func `genre art is complete when every genre was answered, even with no picture`() async throws {
+        _ = recordCategoryRequests(host: "genre-art-all.test")
+
+        let backdrops = try await librarySession(host: "genre-art-all.test")
+            .genreBackdrops(for: ["g1", "g2", "g3", "g4", "g5"], in: movies)
+
+        #expect(backdrops.isComplete)
+        #expect(backdrops.images.keys.sorted() == ["g1", "g3", "g4", "g5"])
+    }
+
+    @Test func `genre art cut short by leaving the tab is incomplete and asks for no more`() async throws {
+        let sent = recordCategoryRequests(host: "genre-art-left.test")
+        let session = try librarySession(host: "genre-art-left.test")
+        let library = movies
+
+        // The tab's task is cancelled when another tab is chosen.
+        let backdrops = await Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return await session.genreBackdrops(for: ["g1", "g3", "g4", "g5", "g7"], in: library)
+        }.value
+
+        #expect(!backdrops.isComplete)
+        #expect(sent.withLock { $0.isEmpty })
     }
 
     // MARK: Helpers
