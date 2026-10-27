@@ -1,9 +1,10 @@
 import AnemonePlayback
+import AVKit
 import SwiftUI
 
 /// Draws the text subtitles at the playing position (`DrawnSubtitles`) over either player's
-/// video, in the user's subtitle style, as Wholphin's subtitle view draws ExoPlayer's. Over
-/// Anemone's overlay they move up above its controls while those show.
+/// video, in the user's subtitle style, as Wholphin's subtitle view draws ExoPlayer's. They move
+/// up above Anemone's controls, or the system player's transport bar, while those show.
 ///
 /// The style's sizes come out as MPV draws them (`SubtitleStyle.mpvProperties`): a font size of
 /// 24 is about 48 points of text on the 1080-point screen, and an edge size of 4 is an outline of
@@ -13,6 +14,8 @@ struct DrawnSubtitlesView: View {
     /// Anemone's overlay, whose controls the subtitles stay above; `nil` for the system player.
     var overlay: PlayerOverlay?
 
+    @State private var showsTransportBar = false
+
     var body: some View {
         if let subtitles = playback.feature(DrawnSubtitles.self) {
             SubtitleCues(subtitles: subtitles, clearance: clearance)
@@ -20,16 +23,115 @@ struct DrawnSubtitlesView: View {
                     guard subtitles.track != nil else { return }
                     await subtitles.follow()
                 }
+                .background {
+                    if overlay == nil, case let .avPlayer(player) = playback.engine.videoOutput {
+                        TransportBarWatcher(player: player, isVisible: $showsTransportBar)
+                    }
+                }
         }
     }
 
-    /// How far up from the bottom the overlay's controls reach while they show.
+    /// How far up from the bottom the controls reach while they show.
     private var clearance: CGFloat {
-        guard let overlay else { return 0 }
-        if overlay.controlsVisible {
-            return overlay.page == .controls ? 400 : 560
+        guard let overlay else { return showsTransportBar ? 320 : 0 }
+        guard overlay.controlsVisible else { return overlay.showsSeekBar ? 240 : 0 }
+        guard overlay.page == .controls else { return 560 }
+        // The controls are taller with the Chapters or Queue title under them.
+        let chapters = playback.feature(PlaybackDetails.self)?.previews?.chapters ?? []
+        return chapters.isEmpty && playback.queue.upcoming.isEmpty ? 400 : 480
+    }
+}
+
+/// Says when the system player's transport bar shows, so the subtitles can move above it as the
+/// player's own do. AVKit tells only its controller's delegate, which Anemone doesn't otherwise
+/// set: this finds the system player showing `player` and becomes its delegate, unless something
+/// else already is (then the subtitles stay where they are).
+private struct TransportBarWatcher: UIViewRepresentable {
+    let player: AVPlayer
+    @Binding var isVisible: Bool
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(isVisible: $isVisible)
+    }
+
+    func makeUIView(context: Context) -> FinderView {
+        FinderView(player: player, delegate: context.coordinator)
+    }
+
+    func updateUIView(_: FinderView, context: Context) {
+        context.coordinator.isVisible = $isVisible
+    }
+
+    @MainActor
+    final class Coordinator: NSObject, AVPlayerViewControllerDelegate {
+        var isVisible: Binding<Bool>
+
+        init(isVisible: Binding<Bool>) {
+            self.isVisible = isVisible
         }
-        return overlay.showsSeekBar ? 240 : 0
+
+        func playerViewController(
+            _: AVPlayerViewController,
+            willTransitionToVisibilityOfTransportBar visible: Bool,
+            with coordinator: any AVPlayerViewControllerAnimationCoordinator,
+        ) {
+            let isVisible = isVisible
+            coordinator.addCoordinatedAnimations({ isVisible.wrappedValue = visible }, completion: nil)
+        }
+    }
+
+    /// Looks for the player's controller among the view controllers shown, once it's in a window.
+    final class FinderView: UIView {
+        private let player: AVPlayer
+        private weak var delegate: Coordinator?
+        private var isAttached = false
+
+        init(player: AVPlayer, delegate: Coordinator) {
+            self.player = player
+            self.delegate = delegate
+            super.init(frame: .zero)
+            isUserInteractionEnabled = false
+        }
+
+        @available(*, unavailable)
+        required init?(coder _: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            attach()
+        }
+
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            attach()
+        }
+
+        private func attach() {
+            guard !isAttached, let root = window?.rootViewController,
+                  let controller = Self.controller(showing: player, from: root)
+            else { return }
+            isAttached = true
+            if controller.delegate == nil {
+                controller.delegate = delegate
+            }
+        }
+
+        private static func controller(
+            showing player: AVPlayer,
+            from controller: UIViewController,
+        ) -> AVPlayerViewController? {
+            if let playerController = controller as? AVPlayerViewController, playerController.player === player {
+                return playerController
+            }
+            for child in controller.children {
+                if let found = Self.controller(showing: player, from: child) {
+                    return found
+                }
+            }
+            return controller.presentedViewController.flatMap { Self.controller(showing: player, from: $0) }
+        }
     }
 }
 
