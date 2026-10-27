@@ -9,11 +9,6 @@ import Get
 ///
 /// jellyfin-sdk-swift 3.3.0 knows nothing of the plugin, so the requests are built by hand.
 public extension JellyfinSession {
-    /// Whether the server has the plugin. Any failure counts as no, as in Wholphin.
-    func isServerPluginInstalled() async -> Bool {
-        await (try? serverPluginProbe()) ?? false
-    }
-
     /// Whether the server has the plugin: no when it answers with an error status. Throws when it
     /// doesn't answer at all, such as with no network, so the answer can be asked for again.
     func serverPluginProbe() async throws -> Bool {

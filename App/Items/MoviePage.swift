@@ -6,7 +6,7 @@ import SwiftUI
 /// Wholphin's movie page (`MovieDetails`): title or logo, details, overview and actions, then
 /// the cast and crew and similar items. Videos and other types without a page of their own use
 /// it too, and so do episodes outside a season, which get Wholphin's `EpisodeDetails` header
-/// and no rows.
+/// and only their chapters below it.
 struct MoviePage: View {
     @Binding var item: ItemDetails
 
@@ -25,7 +25,11 @@ struct MoviePage: View {
                 VStack(alignment: .leading, spacing: ItemLayout.sectionSpacing) {
                     header
                     buttons
-                    if !isEpisode {
+                    if isEpisode {
+                        // Wholphin's episode page has no rows, but its chapters show here as they
+                        // do for episodes on the season page.
+                        ChaptersRow(chapters: extras.chapters, focus: $focus, memory: memory, play: play(from:))
+                    } else {
                         rows
                     }
                 }

@@ -1,3 +1,4 @@
+import AnemoneCore
 import Foundation
 import JellyfinAPI
 
@@ -159,6 +160,15 @@ private extension Library.Kind {
         case .folders, .mixed: [.movie, .series, .episode, .video]
         case .liveTV, .books, .trailers, .other: []
         }
+    }
+}
+
+public extension HomeRowConfig {
+    /// Whether this is Home's favourites row for items of `kind`, which a favourite added or
+    /// removed from a card's menu changes.
+    func showsFavorites(of kind: MediaItem.Kind) -> Bool {
+        guard case let .favorite(itemKind) = self.kind, let name = kind.itemKind?.rawValue else { return false }
+        return itemKind == name
     }
 }
 

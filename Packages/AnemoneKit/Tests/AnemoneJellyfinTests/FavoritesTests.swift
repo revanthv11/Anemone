@@ -1,3 +1,4 @@
+import AnemoneCore
 import AnemoneJellyfin
 import Foundation
 import Synchronization
@@ -124,5 +125,16 @@ struct FavoritesTests {
         #expect(removed.sections.map(\.kind) == [.musicAlbum])
         #expect(removed.failedKinds == [.series])
         #expect(changed.sections.last?.items.map(\.id) == ["a1", "a2"])
+    }
+
+    @Test func `home's favourites row for a type is the one a menu's favourite change touches`() {
+        let movies = HomeRowConfig(.favorite(itemKind: "Movie"))
+        let collections = HomeRowConfig(.favorite(itemKind: "BoxSet"))
+
+        #expect(movies.showsFavorites(of: .movie))
+        #expect(!movies.showsFavorites(of: .series))
+        #expect(collections.showsFavorites(of: .collection))
+        #expect(!HomeRowConfig(.continueWatching).showsFavorites(of: .movie))
+        #expect(!HomeRowConfig(.favorite(itemKind: "Folder")).showsFavorites(of: .folder))
     }
 }

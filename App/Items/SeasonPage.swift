@@ -223,8 +223,12 @@ struct SeasonPage: View {
                 VersionPicker(itemID: episode.id)
             }
         }
-        .frame(minHeight: 80)
+        // As wide as the page, so Down from any episode, not just those above the buttons, lands
+        // here rather than skipping to the chapters below. Coming in from the episodes or the
+        // chapters lands on Play, not on whichever button is nearest.
+        .frame(maxWidth: .infinity, minHeight: 80, alignment: .leading)
         .focusSection()
+        .defaultFocus($focus, .action(.play), priority: .userInitiated)
     }
 
     @ViewBuilder

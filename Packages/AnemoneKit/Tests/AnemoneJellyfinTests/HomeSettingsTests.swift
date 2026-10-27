@@ -83,7 +83,7 @@ struct HomeSettingsTests {
         let fromMissing = try await missing.session().serverPluginHomePageSettings()
         #expect(fromEmpty == nil)
         #expect(fromMissing == nil)
-        #expect(try await missing.session().isServerPluginInstalled() == false)
+        #expect(try await missing.session().serverPluginProbe() == false)
         await #expect(throws: (any Error).self) {
             try await broken.session().serverPluginHomePageSettings()
         }

@@ -44,14 +44,62 @@ public struct CardMenu {
     /// The menu's buttons for an item, given the marks the card's caller passed.
     let content: @MainActor (CardMenuItem, CardMarks) -> AnyView
     public let marks: CardMarksStore
+    /// Which card to focus again once what its menu opened, such as the player, has closed.
+    public let focusReturn: CardFocusReturn
 
+    @MainActor
     public init(
         marks: CardMarksStore,
         @ViewBuilder content: @escaping @MainActor (CardMenuItem, CardMarks) -> some View,
     ) {
         self.marks = marks
+        focusReturn = CardFocusReturn()
         self.content = { AnyView(content($0, $1)) }
     }
+}
+
+/// Puts focus back on the card whose menu opened something that covers the app, like the player.
+/// What a menu opens shows over the whole app, so when it closes tvOS doesn't know the card and
+/// moves focus to the page's first control, unlike when the page's own Play button opened it.
+@MainActor
+@Observable
+public final class CardFocusReturn {
+    /// The card that last took focus, which is the one whose menu is open: tvOS opens a context
+    /// menu only on the focused view. Give it to `returnFocus(to:)` once what the menu opened
+    /// has closed.
+    @ObservationIgnored public private(set) var menuCard: CardFocusToken?
+    /// The card asked to take focus again, until it does or another card takes focus first.
+    private(set) var requested: CardFocusToken?
+
+    public init() {}
+
+    /// Moves focus back to the card, if it's still there.
+    public func returnFocus(to card: CardFocusToken) {
+        requested = card
+    }
+
+    /// A card took focus. Any other card asked for is no longer wanted: focus has moved on, or
+    /// that card is gone.
+    func noteFocused(_ card: CardFocusToken) {
+        menuCard = card
+        if requested != card {
+            requested = nil
+        }
+    }
+
+    /// The card asked for has focus again.
+    func noteReturned(_ card: CardFocusToken) {
+        if requested == card {
+            requested = nil
+        }
+    }
+}
+
+/// One card's place in `CardFocusReturn`, for as long as the card is shown.
+public struct CardFocusToken: Hashable, Sendable {
+    private let id = UUID()
+
+    init() {}
 }
 
 public extension EnvironmentValues {
@@ -88,6 +136,8 @@ struct CardMenuRequestKey: PreferenceKey {
 private struct CardMenuHost: ViewModifier {
     @Environment(\.cardMenu) private var menu
     @State private var request: CardMenuRequest?
+    @State private var token = CardFocusToken()
+    @FocusState private var isFocused: Bool
 
     func body(content: Content) -> some View {
         content
@@ -99,6 +149,17 @@ private struct CardMenuHost: ViewModifier {
                 if let menu, let request {
                     menu.content(request.item, request.marks)
                 }
+            }
+            .focused($isFocused)
+            .onChange(of: isFocused) { _, isFocused in
+                if isFocused {
+                    menu?.focusReturn.noteFocused(token)
+                }
+            }
+            .onChange(of: menu?.focusReturn.requested) { _, requested in
+                guard requested == token else { return }
+                isFocused = true
+                menu?.focusReturn.noteReturned(token)
             }
     }
 }
