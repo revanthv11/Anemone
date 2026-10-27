@@ -123,9 +123,13 @@ public enum TrackChoiceReason: Hashable, Sendable {
 public struct TrackChoiceResult: Hashable, Sendable {
     public let track: MediaTrack?
     public let reason: TrackChoiceReason
+    /// Whether these are the subtitles "Only forced" stands for, picked for the item or kept
+    /// for its season or series, so another audio track finds them again.
+    public let isOnlyForced: Bool
 
-    public init(_ track: MediaTrack?, _ reason: TrackChoiceReason) {
+    public init(_ track: MediaTrack?, _ reason: TrackChoiceReason, isOnlyForced: Bool = false) {
         self.track = track
         self.reason = reason
+        self.isOnlyForced = isOnlyForced
     }
 }

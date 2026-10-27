@@ -47,7 +47,8 @@ public enum StreamChoice {
         case .off:
             return TrackChoiceResult(nil, .item)
         case .onlyForced:
-            return TrackChoiceResult(forcedTrack(candidates, preferences.subtitleLanguage, audioLanguage), .item)
+            let forced = forcedTrack(candidates, preferences.subtitleLanguage, audioLanguage)
+            return TrackChoiceResult(forced, .item, isOnlyForced: true)
         case let .track(index):
             if let track = candidates.first(where: { $0.index == index }) {
                 return TrackChoiceResult(track, .item)
@@ -83,7 +84,7 @@ public enum StreamChoice {
                 return TrackChoiceResult(nil, choice.reason)
             case .onlyForced:
                 if let forced = forcedTrack(candidates, preferences.subtitleLanguage, audioLanguage) {
-                    return TrackChoiceResult(forced, choice.reason)
+                    return TrackChoiceResult(forced, choice.reason, isOnlyForced: true)
                 }
             case .activated:
                 if let best = score(candidates, for: choice)?.first {

@@ -48,6 +48,20 @@ struct TrackChoiceStoreTests {
         #expect(store.seriesChoices(.audio, seriesID: nil, seasonID: nil).isEmpty)
     }
 
+    @Test func `an episode's choice is saved with its season's and series' at once`() {
+        let store = TrackChoiceStore(userID: "u1", defaults: defaults)
+        let item = ItemTrackChoice(itemID: "e1", mediaSourceID: "e1", subtitle: .onlyForced)
+        let season = SeriesTrackChoice(parentID: "s2", parent: .season, kind: .subtitle, activation: .onlyForced)
+        let series = SeriesTrackChoice(parentID: "show", parent: .series, kind: .subtitle, activation: .onlyForced)
+        store.save(SeriesTrackChoice(parentID: "show", parent: .series, kind: .subtitle, activation: .disabled))
+
+        store.save(item, series: [season, series])
+
+        let stored = TrackChoiceStore(userID: "u1", defaults: defaults)
+        #expect(stored.itemChoice(for: "e1") == item)
+        #expect(stored.seriesChoices(.subtitle, seriesID: "show", seasonID: "s2") == [season, series])
+    }
+
     @Test func `only the most recent choices are kept`() {
         let store = TrackChoiceStore(userID: "u1", defaults: defaults)
         for number in 0 ... TrackChoiceStore.itemLimit {
