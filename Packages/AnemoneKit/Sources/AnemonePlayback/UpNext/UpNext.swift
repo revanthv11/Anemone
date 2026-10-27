@@ -4,8 +4,8 @@ import Foundation
 /// Up Next and pass-out protection, ported from Wholphin's `PlaybackViewModel` and
 /// `PlaybackPage`. When an entry with another after it ends, a card offers the next one and
 /// counts down to playing it; Cancel closes the player. With "During the credits", the card comes
-/// when the credits start instead, and Cancel keeps them playing until the card comes back at the
-/// end, as in Wholphin.
+/// when `SegmentSkipping` finds the outro instead, and Cancel keeps the credits playing until the
+/// card comes back at the end, as in Wholphin.
 ///
 /// Pass-out protection: once `passOutCount` entries have played on their own with no press on
 /// the remote, the card asks "Still watching?" instead, and playback stops when nobody answers.
@@ -55,7 +55,9 @@ public final class UpNext: PlaybackFeature {
         case .started:
             noteSkipped(in: controller)
         case let .position(progress):
-            if let start = settings.testCreditsStart, progress.position >= start {
+            // Segment skipping hears each event first, so it already knows the segment playing.
+            let isInOutro = controller.feature(SegmentSkipping.self)?.current?.kind == .outro
+            if isInOutro || settings.testCreditsStart.map({ progress.position >= $0 }) == true {
                 creditsStarted()
             }
         case .resumed:

@@ -186,6 +186,33 @@ struct UpNextTests {
         #expect(playback.hasEnded)
     }
 
+    @Test func `during the credits, the outro segment brings Up Next`() async throws {
+        let outro = MediaSegment(id: "o1", kind: .outro, start: .seconds(20), end: .seconds(100))
+        let segments = SegmentSkipping(load: { _ in [outro] }) { _ in .ignore }
+        let (playback, _) = try player(countdown: .seconds(100), timing: .duringCredits, others: [segments])
+        await play(playback)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(playback.accessories.card == nil)
+
+        engine.currentTime = .seconds(21)
+
+        #expect(await eventually { playback.accessories.card?.id == UpNext.upNextCard })
+        #expect(segments.current == outro)
+    }
+
+    @Test func `at the end of playback, the outro segment doesn't bring Up Next`() async throws {
+        let outro = MediaSegment(id: "o1", kind: .outro, start: .seconds(20), end: .seconds(100))
+        let segments = SegmentSkipping(load: { _ in [outro] }) { _ in .ignore }
+        let (playback, _) = try player(timing: .endOfPlayback, others: [segments])
+        await play(playback)
+
+        engine.currentTime = .seconds(21)
+        _ = await eventually { segments.current == outro }
+        try await Task.sleep(for: .milliseconds(50))
+
+        #expect(playback.accessories.card == nil)
+    }
+
     @Test func `the test credits start brings Up Next at that position`() async throws {
         let (playback, _) = try player(countdown: .seconds(100), testCreditsStart: .seconds(20))
         await play(playback)
