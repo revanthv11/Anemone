@@ -1,6 +1,6 @@
 # Wholphin upstream changes: 52c26bc to cecfdae
 
-A review of what [Wholphin](https://github.com/damontecres/Wholphin) changed after Anemone's parity baseline, mapped to Anemone's roadmap streams. It is the "Tracking upstream" step from [PLAN.md](../PLAN.md). Nothing here changes code, and the baseline in `NOTICE.md` has not moved.
+A review of what [Wholphin](https://github.com/damontecres/Wholphin) changed after Anemone's parity baseline, mapped to Anemone's roadmap streams. It is the "Tracking upstream" step from [PLAN.md](../PLAN.md). Nothing here changes code. It is kept as it was written, before the ports; the baseline in `NOTICE.md` has since moved (see Status).
 
 | | |
 |---|---|
@@ -10,6 +10,20 @@ A review of what [Wholphin](https://github.com/damontecres/Wholphin) changed aft
 | Dates | All five commits are from 2026-10-26 (authors' local dates) |
 | Size | 5 commits, a straight line with no merges, 4 authors; 19 files changed, +797 / -162 (324 of the added lines are new test files) |
 | Reviewed | 2026-10-26, by reading every patch in full |
+
+## Status
+
+The baseline in `NOTICE.md` and PLAN.md is now `cecfdae`. Of the five commits:
+
+| Sha | Outcome |
+|---|---|
+| `f66746c` | Ported by S1 (PR #29, Phase 5d): the plugin's Seerr settings, signed in to first and kept in memory only. The three quirks listed under it were not copied. |
+| `90a2d6d` | Ported by M1 (PR #24, Phase 5b): album cards show the album artist and year. |
+| `de67bcc` | Skipped: it only changes the VLC external player, and external players are under "Not ported". |
+| `962a14d` | Skipped: it adds a Fire OS permission for the Android MediaSession, which tvOS has no counterpart for. |
+| `cecfdae` | Skipped: it only fixes the test added in `de67bcc`. |
+
+The sections below are the review as written.
 
 ## In short
 

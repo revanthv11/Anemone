@@ -10,7 +10,7 @@ Anemone is a modified version of [Wholphin](https://github.com/damontecres/Wholp
 
 Anemone is a Swift rewrite for tvOS. Behaviour, data models, and logic are ported from Wholphin; the Kotlin source is not included.
 
-**Parity baseline:** [`damontecres/Wholphin@52c26bc`](https://github.com/damontecres/Wholphin/commit/52c26bc0fcb46c11b2023d2e475bd7b17fc7939a) (2026-10-25). Upstream changes after this commit have not been reviewed for porting, except those listed in `docs/upstream/`. The companion plugin client (`ServerPlugin.swift`) follows Wholphin's `ServerPluginApi` at `cecfdae`.
+**Parity baseline:** [`damontecres/Wholphin@cecfdae`](https://github.com/damontecres/Wholphin/commit/cecfdaeba94560ed547288fe2cba0324ec9a9b24) (2026-10-26). Upstream changes after this commit have not been reviewed for porting. The baseline was [`damontecres/Wholphin@52c26bc`](https://github.com/damontecres/Wholphin/commit/52c26bc0fcb46c11b2023d2e475bd7b17fc7939a) (2026-10-25) until the commits between the two were reviewed in `docs/upstream/wholphin-52c26bc-to-cecfdae.md`: two were ported and the rest skipped. The companion plugin client (`ServerPlugin.swift`) follows Wholphin's `ServerPluginApi` at `cecfdae`.
 
 Some of Wholphin's device profile code is adapted from the official [jellyfin-androidtv](https://github.com/jellyfin/jellyfin-androidtv) client (GPL-2.0). Any of it that is ported keeps that attribution.
 
