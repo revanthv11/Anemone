@@ -50,6 +50,8 @@ public final class PlaybackController: Identifiable {
     @ObservationIgnored private let positionInterval: Duration
     /// What's loaded in the engine.
     @ObservationIgnored private var stream: PlaybackStream?
+    /// Whether the last load allowed direct play, which `reload()` keeps.
+    @ObservationIgnored private var allowsDirect = true
     /// Whether the loaded stream's play session is open, so features hear `stopped` once.
     @ObservationIgnored private var isSessionOpen = false
     /// The last session's `stopped`, which a later stop waits for.
@@ -68,17 +70,18 @@ public final class PlaybackController: Identifiable {
         // AVPlayer for everything until the MPV engine (Phase 4) chooses per item.
         let engine = AVPlayerEngine()
         let profile = engine.deviceProfile
-        self.init(
-            request: request,
-            engine: engine,
-            features: Self.features(for: session),
-        ) { itemID, allowsDirect, mediaSourceID in
-            try await session.playbackStream(
+        let features = Self.features(for: session)
+        let tracks = features.lazy.compactMap { $0 as? TrackSelection }.first
+        self.init(request: request, engine: engine, features: features) { itemID, allowsDirect, mediaSourceID in
+            let choice = await tracks?.request(for: itemID, mediaSourceID: mediaSourceID)
+            return try await session.playbackStream(
                 for: itemID,
-                profile: profile,
+                profile: choice?.profile(from: profile) ?? profile,
                 maxBitrate: AVPlayerProfile.defaultMaxBitrate,
                 allowsDirect: allowsDirect,
-                mediaSourceID: mediaSourceID,
+                mediaSourceID: mediaSourceID ?? choice?.mediaSourceID,
+                audioStreamIndex: choice?.audioIndex,
+                subtitleStreamIndex: choice?.subtitleStreamIndex,
             )
         }
     }
@@ -144,6 +147,22 @@ public final class PlaybackController: Identifiable {
         play(entryAt: queue.currentIndex + 1)
     }
 
+    /// Asks the server for the current entry again and plays it on from where it is, after
+    /// ending its play session: for audio or subtitles the stream doesn't carry, as Wholphin's
+    /// `changeStreams` does.
+    public func reload() {
+        guard !isStopped, stream != nil else { return }
+        let position = currentPosition
+        stopWatching()
+        engine.pause()
+        state = .loading
+        let attempt = beginLoad()
+        Task {
+            await endSession(at: position)
+            await load(allowsDirect: allowsDirect, from: position, as: attempt)
+        }
+    }
+
     /// Closes the player, as at the end of the queue; for features such as pass-out protection.
     /// Features hear nothing more about where playback is, and the session ends as the player
     /// closes.
@@ -179,6 +198,7 @@ public final class PlaybackController: Identifiable {
     private func load(allowsDirect: Bool, from position: Duration?, as attempt: Int) async {
         guard !isStopped else { return }
         let entry = queue.current
+        self.allowsDirect = allowsDirect
         do {
             let stream = try await loadStream(entry.itemID, allowsDirect, stream?.mediaSourceID)
             guard !isStopped, attempt == loads else { return }
