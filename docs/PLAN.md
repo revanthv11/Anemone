@@ -326,7 +326,20 @@ Not started. Live TV libraries open `App/LiveTV`, which shows a placeholder unti
 
 #### 5b: music, music Now Playing, synced lyrics
 
-Not started. Music libraries open `App/Music`, which shows the library grid until then.
+- [x] Music libraries get Wholphin's tabs (`CollectionFolderMusic`): Recommended (Recently Released, Recently Added, Top Rated and Suggestions rows of albums), Albums, Artists (every artist, from `/Artists`), Genres (each with one of its albums' covers, opening its albums) and Songs. A tab shows as soon as it's focused. The grids page in 100 at a time with Wholphin's music sorts, kept per list on the device; Albums, Songs and a genre's albums have Play and Shuffle for all of them. Album cards show the album artist and year (upstream `90a2d6d`)
+- [x] Album page (`AlbumDetailsPage`): cover, artist, title, details, genres and overview; Play, Shuffle, Instant Mix, favourite, the album artist's page, and Now Playing while music plays; the songs, marked when playing or queued, naming their artists on albums by several; More Like This. Selecting a song plays it and the songs after it, as Wholphin queues them. A song opened from anywhere (the Songs tab, Search, a playlist) opens its album's page with the song focused
+- [x] Artist page (`ArtistDetailsPage`): Popular Songs, then rows of Albums, Appears On and More Like This
+- [x] A long press on a song: Play, Play Next, Add to Queue, Go to Album and Go to each artist; Play/Pause on a song card in the Songs tab plays it
+- [x] `MusicPlayer` (Wholphin's `MusicService`): a queue with ExoPlayer's shuffle and repeat (off, all, one; Previous restarts a song after 3 s), Play Next, Add to Queue, move and remove. A library, artist or genre pages in as it plays, up to 1,000 songs; shuffled, it's a random draw from the server. Each song plays through a `PlaybackController` of its own with an AVPlayer engine and progress reports, from the universal audio endpoint: MP3, AAC, ALAC, FLAC, WAV and AIFF as they are, anything else as MP3, and a song that won't play as it is gets another try as MP3
+- [x] Music plays on after leaving Now Playing and with the app in the background (the `audio` background mode); it stops when a video starts (the `MusicStopping` playback feature) and when the profile's session ends, as Wholphin stops it on leaving for the user list. Now Playing and the remote's play, pause, next, previous and scrubbing go through `MPNowPlayingInfoCenter` and `MPRemoteCommandCenter`
+- [x] Now Playing page (`NowPlayingPage`): cover, title, album and artists; lyrics from `/Audio/{id}/Lyrics` beside them, synced ones with the line being sung highlighted and kept in the middle, and a selected line jumping there; progress; Stop, Previous, Back 10 s, Play/Pause, Forward 30 s, Next, Shuffle, Repeat and options; the queue in play order as an Up Next row, where a song plays when selected and moves, plays next or goes on a long press; the first artist's backdrop behind. Play/Pause on the remote works anywhere on the page; Back from the lyrics or the queue goes to the buttons first, then leaves the page
+- [x] Wholphin's Now Playing options (show cover, lyrics, backdrop) and its experimental "Use AC3 for surround sound audio", in Now Playing's options
+
+Fixed while porting: the missing `&&` in `MusicService.kt:305-306` sent every song that wasn't AC3 to the AC3 transcode when the setting was on; now only songs with more than two channels go. Wholphin's AC3 transcode comes in Matroska, which AVPlayer can't play, so Anemone's comes as fragmented MP4 over HLS.
+
+Wholphin's queue is a list that grows over the page when focused; here it's a row along the bottom, as Apple TV's own Up Next is, so the lyrics keep their own scrolling. Starting music from a page opens Now Playing, since tvOS has no drawer to show what's playing.
+
+Not yet: a Now Playing entry in the sidebar while music plays (Wholphin's drawer has one); Play and Shuffle on audio playlists, which wait for the playlist page's buttons (3b); filters, view options, the alphabet bar and row memory on music pages; music video and extras rows; Add to Playlist and delete in the song menu; remembering the tab; keeping Suggestions for 12 hours; Wholphin's visualizer; and the server's remote-control commands over the WebSocket.
 
 #### 5c: photos slideshow, theme music, cinema-mode intros
 
