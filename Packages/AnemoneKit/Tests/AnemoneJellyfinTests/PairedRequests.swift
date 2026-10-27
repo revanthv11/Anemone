@@ -30,6 +30,13 @@ final class PairedRequests: URLProtocol {
 
     private static let hosts = Hosts()
 
+    /// The thread that started loading the request, and the run loop modes it was in: a held
+    /// request is answered there, as `URLProtocol` asks, though its answer comes from the other
+    /// request's thread or the 5 s wait. Set before the request is held, so whoever answers it
+    /// sees them.
+    private var loader: Thread?
+    private var loaderModes: [String] = [RunLoop.Mode.default.rawValue]
+
     static func register(
         host: String,
         isPaired: @escaping @Sendable (SentRequest) -> Bool,
@@ -58,6 +65,10 @@ final class PairedRequests: URLProtocol {
     }
 
     override func startLoading() {
+        loader = Thread.current
+        if let mode = RunLoop.current.currentMode, mode != .default {
+            loaderModes.append(mode.rawValue)
+        }
         guard let host = request.url?.host(),
               let isPaired = Self.hosts.withLock({ $0[host]?.isPaired })
         else { return }
@@ -72,7 +83,7 @@ final class PairedRequests: URLProtocol {
             return other
         }
         guard let held else {
-            // Only the lock's state and the loading system's client are touched from there.
+            // Only the lock's state and the loading thread are touched from there.
             nonisolated(unsafe) let waiting = self
             DispatchQueue.global().asyncAfter(deadline: .now() + 5) {
                 let isHeld = Self.hosts.withLock { hosts in
@@ -81,18 +92,25 @@ final class PairedRequests: URLProtocol {
                     return true
                 }
                 if isHeld {
-                    waiting.answer()
+                    waiting.answerWhereLoading()
                 }
             }
             return
         }
-        held.answer()
+        held.answerWhereLoading()
         answer()
     }
 
     override func stopLoading() {}
 
-    private func answer() {
+    /// Answers on the thread that started loading the request, from any other.
+    private func answerWhereLoading() {
+        guard let loader else { return }
+        perform(#selector(answer), on: loader, with: nil, waitUntilDone: false, modes: loaderModes)
+    }
+
+    /// Answers on the thread that started loading the request.
+    @objc private func answer() {
         guard let url = request.url,
               let host = url.host(),
               let handler = Self.hosts.withLock({ $0[host]?.reply }),
