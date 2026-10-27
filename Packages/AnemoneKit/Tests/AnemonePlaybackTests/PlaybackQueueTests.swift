@@ -30,6 +30,17 @@ struct PlaybackQueueTests {
         #expect(Set(queue.entries.map(\.itemID)) == Set((1 ... 10).map { "e\($0)" }))
     }
 
+    @Test func `entries can be added after the queue starts`() {
+        var queue = PlaybackQueue(.item("e1"))
+        #expect(queue.skippedCount == 0)
+
+        queue.append([.item("e2"), .item("e3")])
+
+        #expect(queue.entries.map(\.itemID) == ["e1", "e2", "e3"])
+        #expect(queue.current.itemID == "e1")
+        #expect(queue.next?.itemID == "e2")
+    }
+
     @Test func `showing an accessory again replaces it`() {
         let accessories = PlayerAccessories()
 

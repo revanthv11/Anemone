@@ -1,7 +1,7 @@
 import AnemoneJellyfin
 
-/// What a player plays, in order, and where it is. For now every queue holds one item; Play and
-/// Shuffle on series, seasons, collections and playlists fill it with more (Phase 3b).
+/// What a player plays, in order, and where it is: one item, an episode and those after it, or
+/// what Play and Shuffle find in a series, season, collection or playlist.
 public struct PlaybackQueue: Sendable {
     public struct Entry: Hashable, Sendable {
         public var itemID: MediaItem.ID
@@ -20,6 +20,9 @@ public struct PlaybackQueue: Sendable {
     public private(set) var entries: [Entry]
     /// The entry playing, or about to. `PlaybackController` moves it.
     public internal(set) var currentIndex: Int
+    /// How many items the queue was built without because they can't play here, such as music
+    /// in a playlist of videos, so the player can say so.
+    public var skippedCount = 0
 
     /// A queue of `entry` alone.
     public init(_ entry: Entry) {
@@ -41,6 +44,11 @@ public struct PlaybackQueue: Sendable {
     /// The entry after the current one, if there is one.
     public var next: Entry? {
         entries.indices.contains(currentIndex + 1) ? entries[currentIndex + 1] : nil
+    }
+
+    /// Adds entries at the end, such as the episodes after the one playing once they've loaded.
+    public mutating func append(_ more: [Entry]) {
+        entries += more
     }
 
     /// Puts the entries in a random order, to play from the first.
