@@ -105,6 +105,9 @@ public final class SegmentSkipping: PlaybackFeature {
         loading?.cancel()
         handled = []
         segments = []
+        // Whatever the entry before was in, and its button, went with it.
+        enter(nil)
+        withdrawOffer()
         let load = load
         loading = Task { [weak self] in
             // Without segments, playback goes on as usual.
@@ -120,8 +123,13 @@ public final class SegmentSkipping: PlaybackFeature {
         let number = controller?.entryNumber
         enter(segment)
         // Up Next can move on to the next entry as the credits start (with no countdown): this
-        // entry's button, or its skip, would only land on the next one as it loads.
-        guard controller?.entryNumber == number else { return }
+        // entry's button, or its skip, would only land on the next one as it loads. Its segment
+        // and any button still up go with it, rather than lasting until the next entry's events.
+        guard controller?.entryNumber == number else {
+            enter(nil)
+            withdrawOffer()
+            return
+        }
         guard let segment else {
             withdrawOffer()
             return
