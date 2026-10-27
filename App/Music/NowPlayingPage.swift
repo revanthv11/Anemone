@@ -203,7 +203,7 @@ struct NowPlayingPage: View {
                 .playPause,
                 player.isPlaying ? "pause.fill" : "play.fill",
                 player.isPlaying ? "Pause" : "Play",
-                value: player.isPlaying ? "Playing" : "Paused",
+                value: player.isPlaying ? Text("Playing") : Text("Paused"),
             ) {
                 player.togglePlayPause()
             }
@@ -219,7 +219,7 @@ struct NowPlayingPage: View {
                 .shuffle,
                 "shuffle",
                 "Shuffle",
-                value: player.queue.isShuffled ? "On" : "Off",
+                value: player.queue.isShuffled ? Text("On") : Text("Off"),
                 isOn: player.queue.isShuffled,
             ) {
                 player.toggleShuffle()
@@ -244,11 +244,11 @@ struct NowPlayingPage: View {
         player.queue.repeatMode == .one ? "repeat.1" : "repeat"
     }
 
-    private var repeatDescription: String {
+    private var repeatDescription: Text {
         switch player.queue.repeatMode {
-        case .off: "Off"
-        case .all: "All"
-        case .one: "One"
+        case .off: Text("Off")
+        case .all: Text("All")
+        case .one: Text("One")
         }
     }
 
@@ -257,8 +257,8 @@ struct NowPlayingPage: View {
     private func control(
         _ control: Control,
         _ systemImage: String,
-        _ title: String,
-        value: String? = nil,
+        _ title: LocalizedStringKey,
+        value: Text? = nil,
         isOn: Bool = false,
         action: @escaping () -> Void,
     ) -> some View {
@@ -268,7 +268,7 @@ struct NowPlayingPage: View {
         .buttonBorderShape(.circle)
         .focused($focus, equals: .control(control))
         .accessibilityLabel(title)
-        .accessibilityValue(value ?? "")
+        .accessibilityValue(value ?? Text(verbatim: ""))
         .accessibilityIdentifier("nowPlaying.\(control)")
     }
 

@@ -37,8 +37,8 @@ struct LyricsView: View {
                         .focused(focus, equals: .lyric(index))
                         .id(index)
                         // A gap between verses reads as one, rather than as nothing.
-                        .accessibilityLabel(line.text.isEmpty ? "Instrumental" : line.text)
-                        .accessibilityHint(line.start == nil ? "" : "Plays from this line")
+                        .accessibilityLabel(line.text.isEmpty ? Text("Instrumental") : Text(verbatim: line.text))
+                        .accessibilityHint(line.start == nil ? Text(verbatim: "") : Text("Plays from this line"))
                         .accessibilityIdentifier("nowPlaying.lyric.\(index)")
                         // The line being sung.
                         .accessibilityAddTraits(index == current ? .isSelected : [])
@@ -203,7 +203,7 @@ struct UpNextRow: View {
         .id(entry.id)
         .focused(focus, equals: .entry(entry.id))
         // The card reads the song, its album and artists; the one playing says so.
-        .accessibilityValue(isCurrent ? "Playing" : "")
+        .accessibilityValue(isCurrent ? Text("Playing") : Text(verbatim: ""))
         .accessibilityIdentifier("nowPlaying.queue.\(index)")
         .accessibilityAddTraits(isCurrent ? .isSelected : [])
     }
