@@ -12,6 +12,9 @@ struct LibraryTab: View {
     var body: some View {
         NavigationStack(path: $stack.path) {
             LibraryRoot(library: library, path: $stack.path)
+                // The stack's root, which `itemPages(in:)` doesn't reach. Card menus open the
+                // series' or season's page on it.
+                .environment(\.pageStack, stack)
                 .itemPages(in: stack)
         }
     }
@@ -41,15 +44,24 @@ struct LibraryRoot: View {
 /// Collections or Studios, Genres) along the top, as `CollectionFolderMovie` and
 /// `CollectionFolderTv` lay them out; other libraries show their grid alone. With "Remember
 /// selected tab" on, each library opens on the tab last chosen there.
+///
+/// Each tab is kept once opened, while the page is, as Wholphin keeps a view model per tab: going
+/// back to one finds it as it was left, without loading it again, scrolled and with focus where
+/// it was.
 struct LibraryScreen: View {
     let library: Library
     @Binding var path: NavigationPath
 
     @Environment(BrowseModel.self) private var browse
+    @Environment(\.pageStack) private var stack
     @AppStorage(Preferences.rememberSelectedTab) private var remembersTab: Bool
     @State private var section: LibrarySection?
+    /// The tabs opened so far, in the order they were opened.
+    @State private var openedSections: [LibrarySection] = []
     /// Wholphin tucks the tabs away while focus is past the first row, giving the grid the room.
     @State private var tabsHidden = false
+    /// The tab with focus, so a page can send focus up to the tabs.
+    @FocusState private var focusedTab: LibrarySection?
     /// Where tvOS put the top of the page on screen; see `tabRowPadding`.
     @State private var pageTop: CGFloat?
 
@@ -58,13 +70,22 @@ struct LibraryScreen: View {
         let current = section ?? startingSection
         VStack(alignment: .leading, spacing: 0) {
             if sections.count > 1, !tabsHidden {
-                LibraryTabRow(sections: sections, selection: selection(current))
+                LibraryTabRow(sections: sections, selection: selection(current), focus: $focusedTab)
                     .padding(.horizontal, GridLayout.horizontalInset)
                     .padding(.top, tabRowPadding)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
-            tab(current)
-                .id(current)
+            ZStack(alignment: .topLeading) {
+                ForEach(shownSections(current: current), id: \.self) { opened in
+                    let isShowing = opened == current
+                    // The others stay, hidden, and out of reach of focus and VoiceOver.
+                    tab(opened)
+                        .opacity(isShowing ? 1 : 0)
+                        .disabled(!isShowing)
+                        .accessibilityHidden(!isShowing)
+                        .zIndex(isShowing ? 1 : 0)
+                }
+            }
         }
         // Each tab fills the page under the tabs, whatever its content's own size.
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -72,10 +93,15 @@ struct LibraryScreen: View {
         .animation(.easeInOut(duration: 0.2), value: tabsHidden)
         .navigationDestination(for: LibraryCategoryPage.self) { page in
             LibraryItemsPage(library: page.library, scope: page.scope, title: page.title, path: $path)
+                // tvOS doesn't pass the stack's environment on to the pages pushed on it.
+                .environment(\.pageStack, stack)
         }
         .onAppear {
             if section == nil {
                 section = startingSection
+            }
+            if let section, !openedSections.contains(section) {
+                openedSections.append(section)
             }
         }
     }
@@ -87,11 +113,14 @@ struct LibraryScreen: View {
                 tabsHidden = isPastFirstRow
             }
         }
+        // Up from the top of the alphabet bar finds nothing above it on its own: tvOS goes to the
+        // sidebar's title instead, or nowhere while the tabs are tucked away.
+        let onExitTop: (() -> Void)? = library.sections.count > 1 ? { focusTabs(on: section) } : nil
         switch section {
         case .recommended:
             LibraryRecommendedTab(library: library, path: $path, onPastFirstRow: onPastFirstRow)
         case .library:
-            LibraryItemsPage(library: library, path: $path, onPastFirstRow: onPastFirstRow)
+            LibraryItemsPage(library: library, path: $path, onPastFirstRow: onPastFirstRow, onExitTop: onExitTop)
         case .collections:
             LibraryItemsPage(
                 library: library,
@@ -99,11 +128,33 @@ struct LibraryScreen: View {
                 title: "Collections",
                 path: $path,
                 onPastFirstRow: onPastFirstRow,
+                onExitTop: onExitTop,
             )
         case .genres:
-            LibraryCategoryTab(library: library, kind: .genres, path: $path, onPastFirstRow: onPastFirstRow)
+            LibraryCategoryTab(
+                library: library,
+                kind: .genres,
+                path: $path,
+                onPastFirstRow: onPastFirstRow,
+                onExitTop: onExitTop,
+            )
         case .studios:
-            LibraryCategoryTab(library: library, kind: .studios, path: $path, onPastFirstRow: onPastFirstRow)
+            LibraryCategoryTab(
+                library: library,
+                kind: .studios,
+                path: $path,
+                onPastFirstRow: onPastFirstRow,
+                onExitTop: onExitTop,
+            )
+        }
+    }
+
+    /// Brings the tabs back and moves focus to the one showing.
+    private func focusTabs(on section: LibrarySection) {
+        tabsHidden = false
+        // The row may only now be coming back; focus it once it's there.
+        Task { @MainActor in
+            focusedTab = section
         }
     }
 
@@ -116,18 +167,26 @@ struct LibraryScreen: View {
         return LibraryTabLayout.topPadding + max(LibraryTabLayout.lowerPageTop - top, 0)
     }
 
+    /// The tabs to keep: those opened so far, and the one showing.
+    private func shownSections(current: LibrarySection) -> [LibrarySection] {
+        openedSections.contains(current) ? openedSections : openedSections + [current]
+    }
+
     private var startingSection: LibrarySection {
         library.startingSection(
             remembered: remembersTab ? browse.libraryPreferences.rememberedSection(for: library) : nil,
         )
     }
 
-    /// Choosing a tab shows it from the top, and remembers it when that's switched on, as
+    /// Choosing a tab shows it as it was left, and remembers it when that's switched on, as
     /// Wholphin's `TabViewModel` does.
     private func selection(_ current: LibrarySection) -> Binding<LibrarySection> {
         Binding { current } set: { chosen in
             guard chosen != current else { return }
             section = chosen
+            if !openedSections.contains(chosen) {
+                openedSections.append(chosen)
+            }
             tabsHidden = false
             if remembersTab {
                 browse.libraryPreferences.rememberSection(chosen, for: library)

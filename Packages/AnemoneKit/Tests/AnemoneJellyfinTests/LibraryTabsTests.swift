@@ -1,6 +1,5 @@
 import AnemoneJellyfin
 import Foundation
-import Synchronization
 import Testing
 
 /// Wholphin's other library tabs: Collections, Genres and Studios, the pages they open, the
@@ -36,12 +35,12 @@ struct LibraryTabsTests {
         let page = try await librarySession(host: "collections.test")
             .libraryItems(LibraryQuery(library: movies, scope: .collections), startIndex: 0, limit: 50)
 
-        let query = try #require(sent.withLock { $0.first }?.query)
-        #expect(query["parentId"] == ["lib-movies"])
-        #expect(query["includeItemTypes"] == ["BoxSet"])
-        #expect(query["recursive"] == ["true"])
+        let query = try #require(sent.requests.first?.query)
+        #expect(query["parentId"] == "lib-movies")
+        #expect(query["includeItemTypes"] == "BoxSet")
+        #expect(query["recursive"] == "true")
         // Still sorted the way the library's own grid is.
-        #expect(query["sortBy"] == ["SortName", "ProductionYear"])
+        #expect(query["sortBy"] == "SortName,ProductionYear")
         #expect(page.items.map(\.item.name) == ["Item 0", "Item 1"])
     }
 
@@ -55,13 +54,13 @@ struct LibraryTabsTests {
         _ = try await librarySession(host: "genre-page.test")
             .libraryItems(LibraryQuery(library: shows, scope: .studio("s1")), startIndex: 0, limit: 1)
 
-        let queries = sent.withLock { $0.map(\.query) }
-        #expect(queries[0]["genreIds"] == ["g1"])
-        #expect(queries[0]["includeItemTypes"] == ["Movie"])
-        #expect(queries[0]["recursive"] == ["true"])
-        #expect(queries[0]["isPlayed"] == ["false"])
-        #expect(queries[1]["studioIds"] == ["s1"])
-        #expect(queries[1]["includeItemTypes"] == ["Series"])
+        let queries = sent.requests.map(\.query)
+        #expect(queries[0]["genreIds"] == "g1")
+        #expect(queries[0]["includeItemTypes"] == "Movie")
+        #expect(queries[0]["recursive"] == "true")
+        #expect(queries[0]["isPlayed"] == "false")
+        #expect(queries[1]["studioIds"] == "s1")
+        #expect(queries[1]["includeItemTypes"] == "Series")
         #expect(queries[1]["genreIds"] == nil)
     }
 
@@ -72,9 +71,9 @@ struct LibraryTabsTests {
             .position(of: "D", in: LibraryQuery(library: movies, scope: .genre("g1")), count: 30)
 
         #expect(position == 12)
-        let query = try #require(sent.withLock { $0.first }?.query)
-        #expect(query["genreIds"] == ["g1"])
-        #expect(query["nameLessThan"] == ["d"])
+        let query = try #require(sent.requests.first?.query)
+        #expect(query["genreIds"] == "g1")
+        #expect(query["nameLessThan"] == "d")
     }
 
     @Test func `entries carry what the list layout and details header show`() async throws {
@@ -139,14 +138,14 @@ struct LibraryTabsTests {
         #expect(studios.map(\.item.name) == ["AMC", "HBO"])
         #expect(studios[0].item.thumbImage == ItemImage(itemID: "st1", kind: .thumb, tag: "t1"))
         #expect(studios[1].item.thumbImage == nil)
-        let queries = sent.withLock { $0 }
+        let queries = sent.requests
         let genreQuery = try #require(queries.first { $0.path == "/Genres" }?.query)
-        #expect(genreQuery["parentId"] == ["lib-movies"])
-        #expect(genreQuery["includeItemTypes"] == ["Movie"])
-        #expect(genreQuery["sortBy"] == ["SortName"])
+        #expect(genreQuery["parentId"] == "lib-movies")
+        #expect(genreQuery["includeItemTypes"] == "Movie")
+        #expect(genreQuery["sortBy"] == "SortName")
         let studioQuery = try #require(queries.first { $0.path == "/Studios" }?.query)
-        #expect(studioQuery["parentId"] == ["lib-shows"])
-        #expect(studioQuery["includeItemTypes"] == ["Series"])
+        #expect(studioQuery["parentId"] == "lib-shows")
+        #expect(studioQuery["includeItemTypes"] == "Series")
     }
 
     @Test func `a genre card shows the backdrop of a random title in it`() async throws {
@@ -162,14 +161,14 @@ struct LibraryTabsTests {
         #expect(images["g1"] == ItemImage(itemID: "in-g1", kind: .backdrop, tag: "b-g1"))
         #expect(images["g2"] == nil)
         #expect(images["g6"] == nil)
-        let queries = sent.withLock { $0.filter { $0.path == "/Items" }.map(\.query) }
+        let queries = sent.requests.filter { $0.path == "/Items" }.map(\.query)
         #expect(queries.count == 6)
-        let first = try #require(queries.first { $0["genreIds"] == ["g1"] })
-        #expect(first["sortBy"] == ["Random"])
-        #expect(first["limit"] == ["1"])
-        #expect(first["imageTypes"] == ["Backdrop"])
-        #expect(first["includeItemTypes"] == ["Movie"])
-        #expect(first["recursive"] == ["true"])
+        let first = try #require(queries.first { $0["genreIds"] == "g1" })
+        #expect(first["sortBy"] == "Random")
+        #expect(first["limit"] == "1")
+        #expect(first["imageTypes"] == "Backdrop")
+        #expect(first["includeItemTypes"] == "Movie")
+        #expect(first["recursive"] == "true")
     }
 
     @Test func `genre art is complete when every genre was answered, even with no picture`() async throws {
@@ -188,22 +187,33 @@ struct LibraryTabsTests {
         let library = movies
 
         // The tab's task is cancelled when another tab is chosen.
-        let backdrops = await Task {
+        let backdrops = try await Task {
             withUnsafeCurrentTask { $0?.cancel() }
-            return await session.genreBackdrops(for: ["g1", "g3", "g4", "g5", "g7"], in: library)
+            return try await session.genreBackdrops(for: ["g1", "g3", "g4", "g5", "g7"], in: library)
         }.value
 
         #expect(!backdrops.isComplete)
-        #expect(sent.withLock { $0.isEmpty })
+        #expect(sent.requests.isEmpty)
+    }
+
+    @Test func `a revoked token while loading genre art reaches the page`() async throws {
+        MockServer.register(host: "genre-art-401.test") { request in
+            request.url?.queryValues["genreIds"] == "g3" ? .unauthorized : .json(#"{"Items":[]}"#)
+        }
+
+        await #expect(throws: SessionError.signedOut) {
+            try await librarySession(host: "genre-art-401.test")
+                .genreBackdrops(for: ["g1", "g2", "g3", "g4", "g5"], in: movies)
+        }
     }
 
     // MARK: Helpers
 
     /// Answers `/Items` with two items and `total` as the count, recording each request.
-    private func recordRequests(host: String, total: Int = 2) -> RequestLog {
-        let sent = RequestLog()
+    private func recordRequests(host: String, total: Int = 2) -> Recorder {
+        let sent = Recorder()
         MockServer.register(host: host) { request in
-            sent.withLock { $0.append(SeenRequest(request)) }
+            sent.record(request)
             return .json(#"""
             {"Items":[
               {"Id":"i0","Name":"Item 0","SortName":"item 0","Type":"BoxSet"},
@@ -216,11 +226,10 @@ struct LibraryTabsTests {
 
     /// Answers `/Genres`, `/Studios`, and `/Items` for one genre's random title: `g2` has none,
     /// and `g6` fails.
-    private func recordCategoryRequests(host: String) -> RequestLog {
-        let sent = RequestLog()
+    private func recordCategoryRequests(host: String) -> Recorder {
+        let sent = Recorder()
         MockServer.register(host: host) { request in
-            let seen = SeenRequest(request)
-            sent.withLock { $0.append(seen) }
+            let seen = sent.record(request)
             switch seen.path {
             case "/Genres":
                 return .json(#"""
@@ -233,7 +242,7 @@ struct LibraryTabsTests {
                           {"Id":"st2","Name":"HBO","SortName":"hbo","Type":"Studio"}]}
                 """#)
             case "/Items":
-                let genre = seen.query["genreIds"]?.first ?? ""
+                let genre = seen.query["genreIds"] ?? ""
                 switch genre {
                 case "g2": return .json(#"{"Items":[]}"#)
                 case "g6": return nil

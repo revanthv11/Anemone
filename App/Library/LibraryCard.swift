@@ -3,6 +3,7 @@ import AnemoneUI
 import SwiftUI
 
 /// Cards for a library's titles: posters, thumbs or squares in the grid, or rows in a list.
+/// Grid cards open the app's long-press card menu.
 struct LibraryCard: View {
     let entry: LibraryEntry?
     let options: GridViewOptions
@@ -22,11 +23,19 @@ struct LibraryCard: View {
                 progress: item?.progress,
                 badges: entry?.details?.badges ?? CardBadges(),
                 showsCaption: options.showTitles,
+                menuItem: menuItem,
             )
         case .list, .denseList:
             LibraryListRow(entry: entry, isDense: options.layout == .denseList)
                 .frame(width: width)
         }
+    }
+
+    /// The entry's details when it has them, so the menu knows whether it's watched or a
+    /// favourite; none while its page loads.
+    private var menuItem: CardMenuItem? {
+        guard let entry else { return nil }
+        return entry.details.map { CardMenuItem($0) } ?? CardMenuItem(entry.item)
     }
 }
 
@@ -41,7 +50,9 @@ extension LibraryGrid where Card == LibraryCard {
         onSelect: @escaping (MediaItem) -> Void,
         onFocus: @escaping (Int) -> Void = { _ in },
         onPastFirstRow: @escaping (Bool) -> Void = { _ in },
-        emptyMessage: String = "Nothing to show.",
+        onExitTop: (() -> Void)? = nil,
+        emptyMessage: String? = nil,
+        hearsPageButtons: Bool = false,
         @ViewBuilder header: () -> Header,
     ) {
         self.init(
@@ -52,7 +63,9 @@ extension LibraryGrid where Card == LibraryCard {
             onSelect: onSelect,
             onFocus: onFocus,
             onPastFirstRow: onPastFirstRow,
+            onExitTop: onExitTop,
             emptyMessage: emptyMessage,
+            hearsPageButtons: hearsPageButtons,
             card: { entry, width, pixelWidth in
                 LibraryCard(
                     entry: entry,

@@ -16,6 +16,8 @@ struct LibraryCategoryTab: View {
     let kind: Kind
     @Binding var path: NavigationPath
     var onPastFirstRow: (Bool) -> Void = { _ in }
+    /// Called as focus goes up past the top of the alphabet bar, for the page's tabs.
+    var onExitTop: (() -> Void)?
 
     @Environment(BrowseModel.self) private var browse
     @State private var content = Content.loading
@@ -60,7 +62,9 @@ struct LibraryCategoryTab: View {
             position: { letter in LibraryJump.position(of: letter, in: sortNames) },
             onSelect: open,
             onPastFirstRow: onPastFirstRow,
+            onExitTop: onExitTop,
             emptyMessage: "There are no \(noun) in \(library.name).",
+            hearsPageButtons: true,
             card: { entry, width, pixelWidth in
                 CategoryCard(
                     id: entry?.id,
@@ -132,9 +136,15 @@ struct LibraryCategoryTab: View {
         guard !Task.isCancelled else { return }
         content = .loaded(pager, sortNames: entries.map { $0.sortName ?? $0.item.name })
         if kind == .genres {
-            let art = await GenreArtCache.images(for: entries.map(\.id), in: library, session: session)
-            guard !Task.isCancelled else { return }
-            genreArt = art
+            do {
+                let art = try await GenreArtCache.images(for: entries.map(\.id), in: library, session: session)
+                guard !Task.isCancelled else { return }
+                genreArt = art
+            } catch {
+                // Only a revoked token gets here; other failures leave their cards plain.
+                browse.noteSignedOut()
+                content = .signedOut
+            }
         }
     }
 }
@@ -153,16 +163,17 @@ struct LibraryCategoryPage: Hashable {
 private enum GenreArtCache {
     private static var entries: [String: (fetched: Date, images: [String: ItemImage])] = [:]
 
+    /// - Throws: `SessionError.signedOut`, from any genre's request.
     static func images(
         for genreIDs: [String],
         in library: Library,
         session: JellyfinSession,
-    ) async -> [String: ItemImage] {
+    ) async throws -> [String: ItemImage] {
         let key = "\(session.serverURL.absoluteString)|\(session.userID)|\(library.id)"
         if let cached = entries[key], cached.fetched.timeIntervalSinceNow > -2 * 60 * 60 {
             return cached.images
         }
-        let backdrops = await session.genreBackdrops(for: genreIDs, in: library)
+        let backdrops = try await session.genreBackdrops(for: genreIDs, in: library)
         // Only a full set is kept. Wholphin caches only when every request succeeds; one cut
         // short by leaving the tab, or missing a genre whose request failed, would otherwise
         // leave those cards plain for two hours.

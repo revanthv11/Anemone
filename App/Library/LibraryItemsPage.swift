@@ -13,6 +13,8 @@ struct LibraryItemsPage: View {
     @Binding var path: NavigationPath
     /// Called as focus moves on from the grid's first row and back to it, for the page's tabs.
     var onPastFirstRow: (Bool) -> Void = { _ in }
+    /// Called as focus goes up past the top of the alphabet bar, for the page's tabs.
+    var onExitTop: (() -> Void)?
 
     @Environment(BrowseModel.self) private var browse
     @State private var settings: LibraryDisplaySettings?
@@ -106,10 +108,7 @@ struct LibraryItemsPage: View {
             pager: pager,
             options: options,
             showsJumpBar: sort.field == .name && pager.count > 0,
-            position: { letter in
-                guard let query else { return 0 }
-                return try await browse.session.position(of: letter, in: query, count: pager.count)
-            },
+            position: { try await position(of: $0, count: pager.count) },
             imageURL: { item, shape, pixels in
                 browse.imageURL(item.image(for: shape), width: CGFloat(pixels))
             },
@@ -122,7 +121,9 @@ struct LibraryItemsPage: View {
             // The details stay put over the grid or beside the list, so the tabs above them do too,
             // rather than leaving the details under the sidebar's title.
             onPastFirstRow: options.showsDetails ? { _ in } : onPastFirstRow,
+            onExitTop: onExitTop,
             emptyMessage: emptyMessage,
+            hearsPageButtons: true,
             header: {
                 if withHeader {
                     gridHeader(pager)
@@ -153,6 +154,12 @@ struct LibraryItemsPage: View {
                 focus.note(pager.item(at: 0))
             }
         }
+    }
+
+    /// Where the letter's titles start in the grid, for the alphabet bar.
+    private func position(of letter: Character, count: Int) async throws -> Int {
+        guard let query else { return 0 }
+        return try await browse.session.position(of: letter, in: query, count: count)
     }
 
     private func gridHeader(_ pager: LibraryPager) -> some View {

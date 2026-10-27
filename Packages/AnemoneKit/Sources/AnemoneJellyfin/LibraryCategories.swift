@@ -18,6 +18,8 @@ public extension JellyfinSession {
     /// The studios and networks behind the library's titles, A to Z, for a TV library's Studios
     /// tab. Each has its own thumb image when the server has one.
     func libraryStudios(in library: Library) async throws -> [LibraryEntry] {
+        // 3.3.0's parameters have no sort, so this relies on the server's default order, which is
+        // by sort name; the tab's alphabet bar assumes A to Z.
         var parameters = Paths.GetStudiosParameters(parentID: library.id, userID: userID)
         parameters.includeItemTypes = library.gridItemTypes
         parameters.fields = [.sortName]
@@ -27,28 +29,34 @@ public extension JellyfinSession {
     /// Artwork for genre cards, as Wholphin picks it: the backdrop of a random title in each
     /// genre, asked for four genres at a time. Genres with no title that has a backdrop, or
     /// whose request fails, are left out. Once the task is cancelled, no more are asked for.
-    func genreBackdrops(for genreIDs: [String], in library: Library) async -> GenreBackdrops {
-        await withTaskGroup(of: GenreBackdropAnswer.self) { group in
+    ///
+    /// - Throws: `SessionError.signedOut` from any genre's request, which stops the rest.
+    func genreBackdrops(for genreIDs: [String], in library: Library) async throws -> GenreBackdrops {
+        try await withThrowingTaskGroup(of: GenreBackdropAnswer.self) { group in
             var pending = genreIDs.dropFirst(4)
             for id in genreIDs.prefix(4) {
-                _ = group.addTaskUnlessCancelled { await genreBackdropAnswer(id, in: library) }
+                _ = group.addTaskUnlessCancelled { try await genreBackdropAnswer(id, in: library) }
             }
             var images: [String: ItemImage] = [:]
             var failed = false
-            for await answer in group {
+            for try await answer in group {
                 images[answer.genreID] = answer.image
                 failed = failed || answer.failed
                 if let id = pending.popFirst() {
-                    _ = group.addTaskUnlessCancelled { await genreBackdropAnswer(id, in: library) }
+                    _ = group.addTaskUnlessCancelled { try await genreBackdropAnswer(id, in: library) }
                 }
             }
             return GenreBackdrops(images: images, isComplete: !failed && pending.isEmpty && !Task.isCancelled)
         }
     }
 
-    private func genreBackdropAnswer(_ genreID: String, in library: Library) async -> GenreBackdropAnswer {
+    /// One genre's artwork, or that its request failed. A revoked token is thrown instead, so it
+    /// reaches the page rather than only leaving the cards plain.
+    private func genreBackdropAnswer(_ genreID: String, in library: Library) async throws -> GenreBackdropAnswer {
         do {
             return try await GenreBackdropAnswer(genreID: genreID, image: genreBackdrop(genreID, in: library))
+        } catch SessionError.signedOut {
+            throw SessionError.signedOut
         } catch {
             return GenreBackdropAnswer(genreID: genreID, image: nil, failed: true)
         }

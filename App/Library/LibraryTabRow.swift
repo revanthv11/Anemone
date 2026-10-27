@@ -6,8 +6,8 @@ import SwiftUI
 struct LibraryTabRow: View {
     let sections: [LibrarySection]
     @Binding var selection: LibrarySection
-
-    @FocusState private var focused: LibrarySection?
+    /// The page's, so it can send focus up to the tabs.
+    let focus: FocusState<LibrarySection?>.Binding
 
     var body: some View {
         HStack(spacing: 16) {
@@ -16,13 +16,16 @@ struct LibraryTabRow: View {
                     selection = section
                 }
                 .buttonStyle(TabButtonStyle(isSelected: section == selection))
-                .focused($focused, equals: section)
+                .focused(focus, equals: section)
                 .accessibilityIdentifier("library.tab.\(section.rawValue)")
                 .accessibilityAddTraits(section == selection ? .isSelected : [])
             }
         }
+        // Across the page, so Up reaches the tabs from the header's buttons on the right too, not
+        // only from those under the tabs.
+        .frame(maxWidth: .infinity, alignment: .leading)
         .focusSection()
-        .defaultFocus($focused, selection, priority: .userInitiated)
+        .defaultFocus(focus, selection, priority: .userInitiated)
     }
 }
 

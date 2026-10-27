@@ -149,7 +149,7 @@ private extension RecommendedRow {
 }
 
 /// One row of posters. Wholphin draws these rows with its home page's default style: posters,
-/// with episodes showing their series' poster.
+/// with episodes showing their series' poster. A long press opens the card menu.
 private struct RecommendedRowView: View {
     let row: RecommendedRow
     let focusedCard: FocusState<CardID?>.Binding
@@ -178,9 +178,13 @@ private struct RecommendedRowView: View {
                                 shape: .poster,
                                 width: RecommendedLayout.cardWidth,
                                 progress: item.progress,
+                                menuItem: CardMenuItem(item),
                             )
                         }
                         .buttonStyle(.borderless)
+                        // Wholphin's card menu, without the entries that take a card out of
+                        // Continue Watching or Next Up, as its Recommended rows leave them out.
+                        .cardMenu()
                         .focused(focusedCard, equals: CardID(row: row.kind, item: item.id))
                         .accessibilityIdentifier("card.recommended.\(row.kind.rawValue).\(item.id)")
                     }

@@ -3,8 +3,9 @@ import AnemoneUI
 import SwiftUI
 
 /// A library's items as a grid that pages in ahead of focus, with Wholphin's alphabet bar,
-/// position footer, Back to jump to the top, and paging with the remote's page buttons. The same
-/// grid draws the list layouts, one title per row, and the Genres and Studios tabs.
+/// position footer, Back to jump to the top, the card menu on a long press, and (when asked for)
+/// paging with the remote's page buttons. The same grid draws the list layouts, one title per
+/// row, and the Genres and Studios tabs.
 ///
 /// One `LazyVGrid` in a vertical `ScrollView`, with no focus section of its own; see
 /// docs/spikes/home-focus.md.
@@ -20,8 +21,14 @@ struct LibraryGrid<Header: View, Card: View>: View {
     /// Called as focus moves on from the first row (`true`) or back to it (`false`), so the
     /// page can tuck its tabs away as Wholphin does.
     let onPastFirstRow: (Bool) -> Void
-    /// Shown under the header when the grid is empty.
-    let emptyMessage: String
+    /// Called as focus goes up past the alphabet bar's top letter, for the page to bring back its
+    /// tabs and move focus to them. `nil` on a page without tabs.
+    let onExitTop: (() -> Void)?
+    /// Shown under the header when the grid is empty; with none, an empty grid shows nothing.
+    let emptyMessage: String?
+    /// Whether the remote's page buttons page through the grid. It's opt-in, since hearing them
+    /// takes a gesture recognizer on the window.
+    let hearsPageButtons: Bool
     /// Draws an entry, or its placeholder while its page loads, at a width in points and pixels.
     let card: (_ entry: LibraryEntry?, _ width: CGFloat, _ pixelWidth: Int) -> Card
     let header: Header
@@ -42,7 +49,9 @@ struct LibraryGrid<Header: View, Card: View>: View {
         onSelect: @escaping (MediaItem) -> Void,
         onFocus: @escaping (Int) -> Void = { _ in },
         onPastFirstRow: @escaping (Bool) -> Void = { _ in },
-        emptyMessage: String = "Nothing to show.",
+        onExitTop: (() -> Void)? = nil,
+        emptyMessage: String? = nil,
+        hearsPageButtons: Bool = false,
         @ViewBuilder card: @escaping (_ entry: LibraryEntry?, _ width: CGFloat, _ pixelWidth: Int) -> Card,
         @ViewBuilder header: () -> Header,
     ) {
@@ -53,7 +62,9 @@ struct LibraryGrid<Header: View, Card: View>: View {
         self.onSelect = onSelect
         self.onFocus = onFocus
         self.onPastFirstRow = onPastFirstRow
+        self.onExitTop = onExitTop
         self.emptyMessage = emptyMessage
+        self.hearsPageButtons = hearsPageButtons
         self.card = card
         self.header = header()
     }
@@ -65,13 +76,13 @@ struct LibraryGrid<Header: View, Card: View>: View {
                     header
                         .focusSection()
                         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { measured.headerHeight = $0 }
-                    if pager.count > 0 {
-                        grid
-                    } else {
+                    if let emptyMessage, pager.count == 0 {
                         Text(emptyMessage)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity)
                             .padding(.top, 80)
+                    } else {
+                        grid
                     }
                 }
                 .padding(.leading, GridLayout.horizontalInset)
@@ -83,13 +94,21 @@ struct LibraryGrid<Header: View, Card: View>: View {
             .scrollPosition($scrollPosition)
             .onGeometryChange(for: CGSize.self) { $0.size } action: { scrollSize = $0 }
             if showsJumpBar {
-                JumpBar(current: currentLetter) {
-                    // Known for certain here, unlike moves to the header or the sidebar.
-                    focusTracking.hasLeftGrid = true
-                } onSelect: { letter in
-                    jump(to: letter)
-                }
+                JumpBar(
+                    current: currentLetter,
+                    onFocus: {
+                        // Known for certain here, unlike moves to the header or the sidebar.
+                        focusTracking.hasLeftGrid = true
+                    },
+                    onLeaveTop: onExitTop,
+                    onSelect: { letter in
+                        jump(to: letter)
+                    },
+                )
                 .padding(.trailing, GridLayout.jumpBarInset)
+                // Like the grid's, so a focused letter, which grows, stays clear of the tabs
+                // above and Up from # can reach them.
+                .padding(.vertical, GridLayout.focusPadding)
             }
         }
         .overlay(alignment: .bottom) {
@@ -98,8 +117,10 @@ struct LibraryGrid<Header: View, Card: View>: View {
             }
         }
         .background {
-            RemotePageButtons { forward in
-                page(forward: forward)
+            if hearsPageButtons {
+                RemotePageButtons { forward in
+                    page(forward: forward)
+                }
             }
         }
         .onExitCommand(perform: backToTop)
@@ -287,81 +308,12 @@ private struct GridCell<Card: View>: View {
                 button.buttonStyle(.borderless)
             }
         }
+        // On the button, which has focus; a card that gives no menu item gets no menu.
+        .cardMenu()
         .accessibilityLabel(entry?.item.displayTitle ?? "Loading")
         .accessibilityIdentifier("grid.card.\(index)")
         .task {
             await pager.prefetch(around: index)
-        }
-    }
-}
-
-/// Wholphin's alphabet bar: a column of letters down the right edge. Entering it focuses the
-/// current letter.
-private struct JumpBar: View {
-    let current: Character
-    let onFocus: () -> Void
-    let onSelect: (Character) -> Void
-
-    @FocusState private var focusedLetter: Character?
-
-    var body: some View {
-        VStack(spacing: 2) {
-            ForEach(LibraryJump.letters, id: \.self) { letter in
-                Button {
-                    onSelect(letter)
-                } label: {
-                    Text(String(letter))
-                }
-                .buttonStyle(LetterButtonStyle(isCurrent: letter == current))
-                .focused($focusedLetter, equals: letter)
-                .accessibilityIdentifier("grid.letter.\(letter)")
-            }
-        }
-        .focusSection()
-        .defaultFocus($focusedLetter, current, priority: .userInitiated)
-        .onChange(of: focusedLetter) { _, letter in
-            if letter != nil {
-                onFocus()
-            }
-        }
-    }
-}
-
-private struct LetterButtonStyle: ButtonStyle {
-    let isCurrent: Bool
-
-    func makeBody(configuration: Configuration) -> some View {
-        LetterLabel(label: configuration.label, isCurrent: isCurrent, isPressed: configuration.isPressed)
-    }
-}
-
-private struct LetterLabel: View {
-    let label: ButtonStyleConfiguration.Label
-    let isCurrent: Bool
-    let isPressed: Bool
-
-    @Environment(\.isFocused) private var isFocused
-
-    var body: some View {
-        label
-            .font(.system(size: 20, weight: isCurrent ? .bold : .medium))
-            .foregroundStyle(foreground)
-            .frame(width: GridLayout.letterSize, height: GridLayout.letterSize)
-            .background {
-                Circle()
-                    .fill(isFocused ? AnyShapeStyle(.white) : AnyShapeStyle(.clear))
-            }
-            .scaleEffect(isFocused ? (isPressed ? 1.1 : 1.3) : 1)
-            .animation(.easeOut(duration: 0.15), value: isFocused)
-    }
-
-    private var foreground: AnyShapeStyle {
-        if isFocused {
-            AnyShapeStyle(.black)
-        } else if isCurrent {
-            AnyShapeStyle(.tint)
-        } else {
-            AnyShapeStyle(.secondary)
         }
     }
 }
@@ -375,4 +327,5 @@ enum GridLayout {
     static let jumpBarSpacing: CGFloat = 40
     static let jumpBarInset: CGFloat = 30
     static let letterSize: CGFloat = 32
+    static let minLetterHeight: CGFloat = 22
 }
