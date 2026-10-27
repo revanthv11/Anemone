@@ -38,6 +38,9 @@ public struct ShapedArtwork: View {
         }
         .frame(width: width, height: width / shape.aspectRatio)
         .clipShape(.rect(cornerRadius: cornerRadius))
+        // Decoration: the card or page around it names what it shows, and the placeholder's
+        // symbol would otherwise be read by its own name.
+        .accessibilityHidden(true)
     }
 
     private var placeholderSymbol: String {
