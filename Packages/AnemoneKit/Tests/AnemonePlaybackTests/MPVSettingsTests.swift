@@ -70,7 +70,7 @@ struct MPVSettingsTests {
         #expect(Preferences.subtitleStyle.value(in: defaults) == SubtitleStyle())
     }
 
-    @Test func `HDR video gets the HDR style only when there is one`() {
+    @Test func `only HDR video gets the HDR style, when there is one`() {
         var hdr = SubtitleStyle()
         hdr.fontColor = .lightGray
 
@@ -79,7 +79,7 @@ struct MPVSettingsTests {
         #expect(SubtitleStyles(standard: SubtitleStyle(), hdr: hdr).style(forHDR: false) == SubtitleStyle())
     }
 
-    @Test func `MPV direct-plays MKV with DTS and TrueHD, and ASS and PGS inside the file`() throws {
+    @Test func `on MPV, MKV with DTS and TrueHD, and ASS and PGS inside the file, plays directly`() throws {
         let profile = MPVProfile.deviceProfile(maxBitrate: 20_000_000)
         let direct = try #require(profile.directPlayProfiles?.first)
         let subtitles = Set((profile.subtitleProfiles ?? []).map { "\($0.format ?? "") \($0.method?.rawValue ?? "")" })
@@ -95,6 +95,9 @@ struct MPVSettingsTests {
             "pgssub Encode",
             "srt External",
         ]))
+        // libmpv reads no TTML, in the file or beside it, so the server sends it as a file of
+        // its own, which MPV fetches as SRT. Before, it was listed for Embed.
+        #expect(!subtitles.contains { $0.hasPrefix("ttml ") })
         #expect(profile.maxStreamingBitrate == 20_000_000)
         #expect(profile.transcodingProfiles?.first?.container == "ts")
     }

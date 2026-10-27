@@ -37,7 +37,7 @@ struct DrawnSubtitleSwitchingTests {
         #expect(try !TrackSwitching.switchesInPlace(to: track(4), in: stream))
     }
 
-    @Test func `MPV's tracks include the files, so it switches among them and nothing is drawn`() throws {
+    @Test func `on MPV, the tracks include the files, so it switches among them and nothing is drawn`() throws {
         // What MPV lists once it has added the files beside the stream, in the server's order.
         let options = (1 ... 4).map {
             PlayerTrack(id: $0, kind: .subtitle, title: "Subtitle \($0)", language: "en", isSelected: $0 == 1)
