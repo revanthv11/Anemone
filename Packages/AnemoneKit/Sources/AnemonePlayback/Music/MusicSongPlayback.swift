@@ -60,6 +60,7 @@ extension MusicPlayer {
             }
             guard request == requests, !page.items.isEmpty else { return }
             queue.append(page.items)
+            queueChanged()
             loaded += page.items.count
         }
     }
@@ -210,6 +211,12 @@ extension MusicPlayer {
             try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
             try? AVAudioSession.sharedInstance().setActive(true)
         #endif
+    }
+
+    /// Now Playing shows the song's new place and whether there's a next at once, rather than
+    /// at the song's next position event, which never comes at the end of the queue.
+    func queueChanged() {
+        nowPlaying?.musicQueueChanged()
     }
 
     // MARK: What the song's controller says

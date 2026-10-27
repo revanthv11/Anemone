@@ -154,6 +154,11 @@ public final class MusicPlayer {
         status == .playing || status == .loading
     }
 
+    /// Whether a seek is on its way to the song's engine, which tells the old time meanwhile.
+    var isSeeking: Bool {
+        !seeksUnderWay.isEmpty
+    }
+
     // MARK: Starting a queue
 
     /// Replaces the queue with `songs` and plays the first, or a random one when `shuffled`, as
@@ -208,57 +213,6 @@ public final class MusicPlayer {
             }
             throw error
         }
-    }
-
-    // MARK: Changing the queue
-
-    /// Wholphin's "Play next".
-    public func playNext(_ songs: [MusicItem]) {
-        guard hasQueue else {
-            play(songs)
-            return
-        }
-        queue.insertNext(songs)
-    }
-
-    /// Wholphin's "Add to queue". Starts playing when nothing was queued.
-    public func addToQueue(_ songs: [MusicItem]) {
-        guard hasQueue else {
-            play(songs)
-            return
-        }
-        queue.append(songs)
-    }
-
-    /// Plays the queue's entry at `index`, as selecting a song in Wholphin's queue does.
-    public func playEntry(at index: Int) {
-        guard queue.entries.indices.contains(index) else { return }
-        queue.move(to: index)
-        playCurrent()
-    }
-
-    public func moveEntry(from source: Int, to destination: Int) {
-        queue.moveEntry(from: source, to: destination)
-    }
-
-    /// Removes an entry; removing the one playing plays the next, or loads it paused when the
-    /// music was paused, as ExoPlayer's `removeMediaItem` keeps it.
-    public func removeEntry(at index: Int) {
-        guard queue.remove(at: index) else { return }
-        if queue.isEmpty {
-            stop()
-        } else if status != .ended {
-            playCurrent(paused: status == .paused)
-        }
-    }
-
-    public func toggleShuffle() {
-        queue.setShuffled(!queue.isShuffled)
-    }
-
-    /// Off, all, one, off, as Wholphin's repeat button cycles.
-    public func cycleRepeatMode() {
-        queue.repeatMode = queue.repeatMode.next
     }
 
     // MARK: Transport
@@ -324,6 +278,7 @@ public final class MusicPlayer {
         guard let controller else { return }
         let clamped = max(.zero, duration.map { min(target, $0) } ?? target)
         position = clamped
+        nowPlaying?.show(position: clamped)
         seeks += 1
         let seek = seeks
         seeksUnderWay.insert(seek)
@@ -360,6 +315,68 @@ public final class MusicPlayer {
         if let old {
             Task { await old.stop() }
         }
+    }
+}
+
+/// Changing the queue.
+public extension MusicPlayer {
+    /// Wholphin's "Play next".
+    func playNext(_ songs: [MusicItem]) {
+        guard hasQueue else {
+            play(songs)
+            return
+        }
+        queue.insertNext(songs)
+        queueChanged()
+    }
+
+    /// Wholphin's "Add to queue". Starts playing when nothing was queued.
+    func addToQueue(_ songs: [MusicItem]) {
+        guard hasQueue else {
+            play(songs)
+            return
+        }
+        queue.append(songs)
+        queueChanged()
+    }
+
+    /// Plays the queue's entry at `index`, as selecting a song in Wholphin's queue does.
+    func playEntry(at index: Int) {
+        guard queue.entries.indices.contains(index) else { return }
+        queue.move(to: index)
+        playCurrent()
+    }
+
+    func moveEntry(from source: Int, to destination: Int) {
+        queue.moveEntry(from: source, to: destination)
+        queueChanged()
+    }
+
+    /// Removes an entry; removing the one playing plays the next, or loads it paused when the
+    /// music was paused, as ExoPlayer's `removeMediaItem` keeps it.
+    func removeEntry(at index: Int) {
+        guard queue.remove(at: index) else {
+            queueChanged()
+            return
+        }
+        if queue.isEmpty {
+            stop()
+        } else if status != .ended {
+            playCurrent(paused: status == .paused)
+        } else {
+            queueChanged()
+        }
+    }
+
+    func toggleShuffle() {
+        queue.setShuffled(!queue.isShuffled)
+        queueChanged()
+    }
+
+    /// Off, all, one, off, as Wholphin's repeat button cycles.
+    func cycleRepeatMode() {
+        queue.repeatMode = queue.repeatMode.next
+        queueChanged()
     }
 }
 

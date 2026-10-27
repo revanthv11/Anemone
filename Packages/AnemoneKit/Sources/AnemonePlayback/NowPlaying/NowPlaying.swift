@@ -151,18 +151,40 @@ public final class NowPlaying: PlaybackFeature {
     }
 
     /// For music, the song stopped as the player moves on to the next, whose `loaded` takes over,
-    /// or as it waits at the end of its queue: Now Playing and the remote's commands stay, so Play
-    /// can start the queue again. Otherwise it's cleared.
+    /// as a new queue loads, or as the player waits at the end of its queue: Now Playing and the
+    /// remote's commands stay, so the last song shows until the next one does and Play can start
+    /// the queue again. The player's `stop()` clears them. Otherwise it's cleared.
     private func stopped() {
-        if isMusic, music?.hasQueue == true {
+        if isMusic, let music, music.status != .idle {
             return
         }
         stopPublishing()
     }
 
-    private func handleCommands(in controller: PlaybackController) {
-        let commands = music.map(Self.commands(for:)) ?? Self.commands(for: controller.queue)
-        guard commands != handledCommands else { return }
+    /// For music: the player's queue changed (songs added, moved or removed, shuffle or repeat),
+    /// so the song's place and Next follow at once, also at the end of the queue, where no song's
+    /// events come to update them.
+    func musicQueueChanged() {
+        guard var info, let music, let index = music.queue.currentIndex else { return }
+        info.queueIndex = index
+        info.queueCount = music.queue.entries.count
+        publish(info)
+        handleCommands(in: controller)
+    }
+
+    /// Shows `position` at once, rather than at the next position event, as for a seek.
+    func show(position: Duration) {
+        guard var info else { return }
+        info.position = position
+        publish(info)
+    }
+
+    /// Music's commands follow the player's queue; a video's, the controller's.
+    private func handleCommands(in controller: PlaybackController?) {
+        let queue = controller?.queue
+        guard let commands = music.map(Self.commands(for:)) ?? queue.map(Self.commands(for:)),
+              commands != handledCommands
+        else { return }
         handledCommands = commands
         slot.handle(commands, skipIntervals: (Self.skipForward, Self.skipBackward), by: self) { [weak self] in
             self?.perform($0) ?? false
@@ -208,7 +230,9 @@ public final class NowPlaying: PlaybackFeature {
     private func update(position: Duration, isPlaying: Bool) {
         guard var info, let controller else { return }
         let engine = controller.engine
-        info.position = position
+        // While a song's seek is on its way, its engine still tells the old time: the target
+        // shows meanwhile, as on the Now Playing page.
+        info.position = music.flatMap { $0.isSeeking ? $0.position : nil } ?? position
         info.isPlaying = isPlaying
         info.duration = engine.duration ?? info.duration
         info.rate = engine.rate
@@ -268,11 +292,10 @@ public final class NowPlaying: PlaybackFeature {
         case .togglePlayPause:
             player.togglePlayPause()
         case let .skip(offset):
+            // The player shows where it's going here at once.
             player.skip(by: offset)
-            show(position: player.position)
         case let .seek(position):
             player.seek(to: position)
-            show(position: player.position)
         case .next:
             guard player.queue.nextIndex(automatic: false) != nil else { return false }
             player.next()
@@ -302,12 +325,6 @@ public final class NowPlaying: PlaybackFeature {
         Task {
             _ = await engine.seek(to: target)
         }
-    }
-
-    private func show(position: Duration) {
-        guard var info else { return }
-        info.position = position
-        publish(info)
     }
 }
 

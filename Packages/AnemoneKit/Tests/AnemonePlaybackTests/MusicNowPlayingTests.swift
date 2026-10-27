@@ -104,6 +104,126 @@ extension MusicPlayerTests {
         #expect(center.published.count == cleared)
     }
 
+    @Test func `a new queue leaves the last song in Now Playing until its first song shows`() async throws {
+        let center = FakeCenter()
+        let player = player(nowPlaying: NowPlaying.Slot(center: center))
+        player.play(album("a"))
+        await startSong(1, in: player)
+        let gate = LoadGate()
+        library.gate = gate
+        library.songs = album("x", "y")
+
+        let starting = Task { try await player.play(.album("al2")) }
+
+        // The last song's session has ended, and the new queue is still being fetched.
+        #expect(await eventually { gate.isReached })
+        #expect(await eventually { log.events.contains { $0.hasPrefix("stopped") } })
+        #expect(!center.published.contains { $0 == nil })
+        #expect(center.shown?.metadata.title == "Song a")
+        #expect(center.isHandling)
+
+        gate.open()
+        try await starting.value
+        await startSong(2, in: player)
+        #expect(center.shown?.metadata.title == "Song x")
+        #expect(center.shown?.queueCount == 2)
+        #expect(!center.published.contains { $0 == nil })
+        player.stop()
+        #expect(center.published.last == .some(nil))
+    }
+
+    @Test func `a new queue that can't be fetched clears Now Playing`() async {
+        let center = FakeCenter()
+        let player = player(nowPlaying: NowPlaying.Slot(center: center))
+        player.play(album("a"))
+        await startSong(1, in: player)
+        library.failsFrom = 0
+
+        await #expect(throws: PlaybackError.self) { try await player.play(.album("al2")) }
+
+        #expect(player.status == .idle)
+        #expect(center.published.last == .some(nil))
+        #expect(!center.isHandling)
+    }
+
+    @Test func `at the end of the queue, Next and the queue's place follow changes to the queue`() async {
+        let center = FakeCenter()
+        let player = player(nowPlaying: NowPlaying.Slot(center: center))
+        player.play(album("a", "b", "c"))
+        await startSong(1, in: player)
+        player.playEntry(at: 2)
+        await startSong(2, in: player)
+        engine?.send(.ended)
+        #expect(await eventually { player.status == .ended })
+        #expect(await eventually { log.events.count { $0.hasPrefix("stopped") } == 2 })
+        #expect(!center.commands.contains(.nextTrack))
+
+        // No song plays to update Now Playing, so each change shows at once.
+        player.cycleRepeatMode()
+        #expect(center.commands.contains(.nextTrack))
+        player.cycleRepeatMode()
+        #expect(!center.commands.contains(.nextTrack))
+        player.cycleRepeatMode()
+
+        player.addToQueue(album("d"))
+        #expect(center.shown?.queueCount == 4)
+        #expect(center.commands.contains(.nextTrack))
+        player.removeEntry(at: 3)
+        #expect(center.shown?.queueCount == 3)
+        #expect(!center.commands.contains(.nextTrack))
+
+        // Shuffled, a move keeps the song's own place for when shuffle is off again.
+        player.toggleShuffle()
+        player.moveEntry(from: 2, to: 0)
+        #expect(center.shown?.queueIndex == 0)
+        #expect(center.commands.contains(.nextTrack))
+        player.toggleShuffle()
+        #expect(center.shown?.queueIndex == 2)
+        #expect(!center.commands.contains(.nextTrack))
+        #expect(center.shown?.metadata.title == "Song c")
+        player.stop()
+    }
+
+    @Test func `the system shows a seek's position while the engine gets there`() async {
+        let gate = LoadGate()
+        let center = FakeCenter()
+        var made: [SeekHoldingEngine] = []
+        let player = MusicPlayer(
+            nowPlaying: NowPlaying.Slot(center: center),
+            stopTimeout: .milliseconds(200),
+            tickInterval: .milliseconds(5),
+            makeEngine: {
+                let engine = SeekHoldingEngine(gate: gate)
+                made.append(engine)
+                return engine
+            },
+            makeFeatures: { [] },
+            loadSongs: library.load,
+            loadStream: streams.load,
+        )
+        player.play(album("a"))
+        _ = await eventually { made.count == 1 && made.last?.base.loads.isEmpty == false }
+        made.last?.base.send(.ready)
+        #expect(await eventually { player.status == .playing })
+        made.last?.base.currentTime = .seconds(10)
+
+        // From the Now Playing page, not the remote: the system shows it at once too.
+        let beforeSeek = center.published.count
+        player.seek(to: .seconds(42))
+        #expect(center.shown?.position == .seconds(42))
+        #expect(await eventually { gate.isReached })
+
+        // The song's events tell the engine's old time until the seek lands.
+        player.pause()
+        #expect(await eventually { center.shown?.isPlaying == false })
+        #expect(center.shown?.position == .seconds(42))
+        #expect(center.published.dropFirst(beforeSeek).allSatisfy { $0?.position == .seconds(42) })
+
+        gate.open()
+        #expect(await eventually { !player.isSeeking })
+        player.stop()
+    }
+
     @Test func `a song the server can't send shows in Now Playing, not the one before`() async {
         let center = FakeCenter()
         let player = player(nowPlaying: NowPlaying.Slot(center: center))
