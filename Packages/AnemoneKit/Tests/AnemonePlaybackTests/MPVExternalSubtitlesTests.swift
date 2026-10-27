@@ -1,3 +1,4 @@
+import AnemoneCore
 import AnemoneJellyfin
 @testable import AnemonePlayback
 import Foundation
@@ -67,34 +68,46 @@ struct MPVExternalSubtitlesTests {
         #expect(client.commands.last == ["sub-add", "https://jf.test/sub.srt", "select", "English", "eng"])
     }
 
-    @Test func `while MPV plays, the server's subtitle files beside the video are added`() async throws {
-        let host = "external-subs.test"
-        StubServer.answer(host: host) { request in
-            guard request.url?.path() == "/jf/Items/a" else { return nil }
-            return #"{"Id":"a","Name":"A","Type":"Movie","MediaSources":[{"Id":"src-a","MediaStreams":["# +
-                #"{"Index":0,"Type":"Video"},{"Index":2,"Type":"Subtitle","Codec":"ass"},"# +
-                #"{"Index":3,"Type":"Subtitle","Codec":"subrip","Language":"eng","IsExternal":true,"# +
-                #""DisplayTitle":"English - SUBRIP - External"},"# +
-                #"{"Index":4,"Type":"Subtitle","Codec":"pgssub","IsExternal":true}]}]}"#
-        }
+    @Test func `while MPV plays, the subtitles the server delivers beside the stream are added`() async throws {
         let client = FakeMPVClient()
         let engine = MPVPlayerEngine.testing(client)
+        let tracks = [
+            MediaTrack(index: 2, kind: .subtitle, codec: "ass", delivery: .embedded),
+            MediaTrack(
+                index: 3,
+                kind: .subtitle,
+                language: "eng",
+                displayTitle: "English - SUBRIP - External",
+                codec: "subrip",
+                isExternal: true,
+                delivery: .external,
+            ),
+            MediaTrack(index: 4, kind: .subtitle, codec: "pgssub", isText: false, delivery: .burnedIn),
+        ]
         let controller = try PlaybackController(
             request: PlaybackRequest(.item("a")),
             engine: engine,
-            features: [MPVExternalSubtitles(session: StubServer.session(host: host))],
-            loadStream: FakeStreams().load,
-        )
+            features: [MPVExternalSubtitles(session: StubServer.session(host: "external-subs.test"))],
+        ) { request in
+            PlaybackStream(
+                itemID: request.itemID,
+                url: URL(filePath: "/a.mkv"),
+                method: .directPlay,
+                mediaSourceID: "src-a",
+                subtitleStreamIndex: 3,
+                tracks: tracks,
+            )
+        }
 
         await controller.start()
+        #expect(!client.commands.contains { $0.first == "sub-add" })
         engine.start(client.entries[0])
 
-        #expect(await eventually { client.commands.last?.first == "sub-add" })
         let added = client.commands.filter { $0.first == "sub-add" }
         #expect(added.count == 1)
         #expect(added.first?[1].contains("/jf/Videos/a/src-a/Subtitles/3/Stream.subrip") == true)
         #expect(added.first?[1].contains("ApiKey=tok") == true)
-        #expect(added.first.map { Array($0[2...]) } == ["auto", "English - SUBRIP - External", "eng"])
+        #expect(added.first.map { Array($0[2...]) } == ["select", "English - SUBRIP - External", "eng"])
         await controller.stop()
     }
 

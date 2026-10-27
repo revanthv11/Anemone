@@ -1,7 +1,9 @@
+import AnemoneCore
 import Foundation
+import JellyfinAPI
 
-/// A subtitle file beside an item's video, such as one downloaded on an earlier play, for a
-/// player that fetches subtitles itself, as MPV does.
+/// Subtitles the server sends beside a stream as a file of their own, for a player that fetches
+/// them itself, as MPV does.
 public struct ExternalSubtitle: Hashable, Sendable {
     public var url: URL
     public var title: String
@@ -19,24 +21,30 @@ public struct ExternalSubtitle: Hashable, Sendable {
 }
 
 public extension JellyfinSession {
-    /// The subtitle files beside the video of `stream`'s version that are in one of `formats`
-    /// (codecs such as `subrip` or `ass`), with where a player fetches each: what PlaybackInfo
-    /// delivers as External for a profile that lists those formats so. Read from `/Items/{id}`,
-    /// with each file's URL built as PlaybackInfo's `DeliveryUrl` is, since `PlaybackStream`
-    /// doesn't carry the source's streams. A live stream has none.
-    func externalSubtitles(for stream: PlaybackStream, formats: Set<String>) async throws -> [ExternalSubtitle] {
-        guard stream.liveStreamID == nil else { return [] }
+    /// The subtitles PlaybackInfo delivers as External with `stream`: files beside the video,
+    /// ones downloaded on an earlier play among them, and in a transcode, text subtitles from the
+    /// file, which the stream can't carry. Each comes with where a player fetches it, built as
+    /// PlaybackInfo's `DeliveryUrl` is, since `PlaybackStream` keeps the delivery but not the URL:
+    /// in its own format when the player's profile lists it in `formats`, else as SRT, which the
+    /// server converts to.
+    func externalSubtitles(of stream: PlaybackStream, formats: Set<String>) -> [ExternalSubtitle] {
         let mediaSourceID = stream.mediaSourceID ?? stream.itemID
-        let subtitles = try await subtitleStreams(of: stream.itemID, mediaSourceID: mediaSourceID)
-        return subtitles.compactMap { subtitle in
-            guard subtitle.isExternal, let codec = subtitle.codec, formats.contains(codec.lowercased()),
-                  let url = subtitleURL(for: subtitle, of: stream.itemID, mediaSourceID: mediaSourceID)
-            else { return nil }
+        return stream.tracks.of(.subtitle).compactMap { track in
+            guard track.delivery == .external else { return nil }
+            let codec = track.codec?.lowercased()
+            let format = codec.flatMap { formats.contains($0) ? $0 : nil } ?? "srt"
+            let request = Paths.getSubtitle(
+                routeItemID: stream.itemID,
+                routeMediaSourceID: mediaSourceID,
+                routeIndex: track.index,
+                routeFormat: format,
+            )
+            guard let url = client.url(with: request, queryAPIKey: true) else { return nil }
             return ExternalSubtitle(
                 url: url,
-                title: subtitle.title,
-                language: subtitle.language,
-                isDefault: subtitle.index == stream.subtitleStreamIndex,
+                title: track.displayTitle ?? track.title ?? track.language ?? "Subtitles \(track.index)",
+                language: track.language,
+                isDefault: track.index == stream.subtitleStreamIndex,
             )
         }
     }

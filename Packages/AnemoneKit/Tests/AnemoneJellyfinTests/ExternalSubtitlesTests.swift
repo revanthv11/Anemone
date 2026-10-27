@@ -1,9 +1,11 @@
+import AnemoneCore
 import AnemoneJellyfin
 import Foundation
-import Synchronization
+import JellyfinAPI
 import Testing
 
-/// The subtitle files beside an item's video, as a player that fetches them itself gets them.
+/// The subtitles PlaybackInfo delivers as External, as a player that fetches them itself gets
+/// them.
 struct ExternalSubtitlesTests {
     private func session(host: String) throws -> JellyfinSession {
         try JellyfinSession(
@@ -15,68 +17,53 @@ struct ExternalSubtitlesTests {
         )
     }
 
-    private func stream(subtitleStreamIndex: Int? = nil, liveStreamID: String? = nil) throws -> PlaybackStream {
-        try PlaybackStream(
-            itemID: "m1",
-            url: #require(URL(string: "https://jf.test/Videos/m1/stream")),
-            method: .directPlay,
-            mediaSourceID: "src1",
-            liveStreamID: liveStreamID,
-            subtitleStreamIndex: subtitleStreamIndex,
-        )
-    }
-
-    @Test func `the version's external files in the formats asked for come with their URLs`() async throws {
-        let sent = Recorder()
+    @Test func `the streams PlaybackInfo delivers as External come with URLs like its DeliveryUrl`() async throws {
         MockServer.register(host: "external-subs.test") { request in
-            guard request.url?.path() == "/jf/Items/m1" else { return nil }
-            sent.last.withLock { $0 = SentRequest(request) }
+            guard request.url?.path() == "/jf/Items/m1/PlaybackInfo" else { return nil }
             return .json("""
-            {"Id":"m1","Name":"Movie","Type":"Movie","MediaSources":[
-             {"Id":"other","MediaStreams":[
-              {"Index":5,"Type":"Subtitle","Codec":"srt","IsExternal":true,"DisplayTitle":"Other version"}]},
-             {"Id":"src1","MediaStreams":[
+            {"PlaySessionId":"ps1","MediaSources":[{"Id":"src1","SupportsDirectPlay":true,
+             "DefaultSubtitleStreamIndex":4,"MediaStreams":[
               {"Index":0,"Type":"Video","Codec":"h264"},
-              {"Index":2,"Type":"Subtitle","Codec":"subrip","Language":"spa","DisplayTitle":"Embedded"},
+              {"Index":2,"Type":"Subtitle","Codec":"subrip","Language":"spa","DisplayTitle":"Embedded",
+               "IsTextSubtitleStream":true,"DeliveryMethod":"Embed"},
               {"Index":3,"Type":"Subtitle","Codec":"subrip","Language":"eng","IsExternal":true,
-               "DisplayTitle":"English - SUBRIP - External"},
+               "IsTextSubtitleStream":true,"DisplayTitle":"English - SUBRIP - External","DeliveryMethod":"External",
+               "DeliveryUrl":"/Videos/m1/src1/Subtitles/3/0/Stream.subrip?ApiKey=tok"},
               {"Index":4,"Type":"Subtitle","Codec":"ass","Language":"fre","IsExternal":true,
-               "DisplayTitle":"French - ASS - External"},
-              {"Index":6,"Type":"Subtitle","Codec":"pgssub","IsExternal":true,"DisplayTitle":"Pictures"}
-             ]}
-            ]}
+               "IsTextSubtitleStream":true,"DisplayTitle":"French - ASS - External","DeliveryMethod":"External",
+               "DeliveryUrl":"/Videos/m1/src1/Subtitles/4/0/Stream.ass?ApiKey=tok"},
+              {"Index":5,"Type":"Subtitle","Codec":"mov_text","IsExternal":true,"IsTextSubtitleStream":true,
+               "DisplayTitle":"Converted","DeliveryMethod":"External",
+               "DeliveryUrl":"/Videos/m1/src1/Subtitles/5/0/Stream.vtt?ApiKey=tok"},
+              {"Index":6,"Type":"Subtitle","Codec":"pgssub","IsExternal":true,"IsTextSubtitleStream":false,
+               "DisplayTitle":"Pictures","DeliveryMethod":"Encode"}
+             ]}]}
             """)
         }
+        let session = try session(host: "external-subs.test")
+        let stream = try await session.playbackStream(for: "m1", profile: DeviceProfile(name: "MPV"), maxBitrate: 1000)
 
-        let subtitles = try await session(host: "external-subs.test").externalSubtitles(
-            for: stream(subtitleStreamIndex: 4),
-            formats: ["subrip", "ass"],
-        )
+        let subtitles = session.externalSubtitles(of: stream, formats: ["subrip", "ass"])
 
-        #expect(try #require(sent.request).method == "GET")
-        #expect(subtitles.map(\.title) == ["English - SUBRIP - External", "French - ASS - External"])
-        #expect(subtitles.map(\.language) == ["eng", "fre"])
-        #expect(subtitles.map(\.isDefault) == [false, true])
+        #expect(subtitles.map(\.title) == ["English - SUBRIP - External", "French - ASS - External", "Converted"])
+        #expect(subtitles.map(\.language) == ["eng", "fre", nil])
+        #expect(subtitles.map(\.isDefault) == [false, true, false])
         #expect(subtitles.map { $0.url.path() } == [
             "/jf/Videos/m1/src1/Subtitles/3/Stream.subrip",
             "/jf/Videos/m1/src1/Subtitles/4/Stream.ass",
+            "/jf/Videos/m1/src1/Subtitles/5/Stream.srt",
         ])
         #expect(subtitles.allSatisfy { $0.url.queryValues["ApiKey"] == "tok" })
     }
 
-    @Test func `a live stream has none, without asking the server`() async throws {
-        let calls = Mutex(0)
-        MockServer.register(host: "external-subs-live.test") { _ in
-            calls.withLock { $0 += 1 }
-            return nil
-        }
-
-        let subtitles = try await session(host: "external-subs-live.test").externalSubtitles(
-            for: stream(liveStreamID: "live-1"),
-            formats: ["subrip"],
+    @Test func `a stream without External subtitles has none`() throws {
+        let stream = try PlaybackStream(
+            itemID: "m1",
+            url: #require(URL(string: "https://jf.test/Videos/m1/stream")),
+            method: .directPlay,
+            tracks: [MediaTrack(index: 2, kind: .subtitle, codec: "subrip", delivery: .embedded)],
         )
 
-        #expect(subtitles.isEmpty)
-        #expect(calls.withLock(\.self) == 0)
+        #expect(try session(host: "external-subs-none.test").externalSubtitles(of: stream, formats: ["subrip"]).isEmpty)
     }
 }
