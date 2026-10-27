@@ -137,9 +137,8 @@
                     requestButton(details, connection: connection)
                         .focused($focus, equals: .action(.play))
                 case .pending, .processing:
-                    ActionButton(title: details.item.availability.label ?? "Requested", systemImage: "clock") {}
+                    requestedButton(details, connection: connection)
                         .focused($focus, equals: .action(.play))
-                        .accessibilityIdentifier("action.requested")
                 case .partiallyAvailable, .available:
                     goToButton(details)
                         .focused($focus, equals: .action(.play))
@@ -173,6 +172,22 @@
             }
             .disabled(!canRequest)
             .accessibilityIdentifier("action.request")
+        }
+
+        /// Requested, while the title is pending or on its way. On a series it opens the seasons
+        /// again, as Wholphin's `DiscoverSeriesDetails` passes `pendingOnClick = requestOnClick`,
+        /// so the user can ask for more seasons or change the ones still pending. A movie has
+        /// nothing more to ask for, so there it only says where the request stands.
+        private func requestedButton(_ details: DiscoverDetails, connection: SeerrConnection) -> some View {
+            let canRequestMore = details.item.kind == .series
+                && (connection.canRequestSeries || connection.canRequest4KSeries)
+            return ActionButton(title: details.item.availability.label ?? "Requested", systemImage: "clock") {
+                if canRequestMore {
+                    request(details, connection: connection)
+                }
+            }
+            .accessibilityHint(canRequestMore ? "Choose seasons to request" : "")
+            .accessibilityIdentifier("action.requested")
         }
 
         @ViewBuilder
