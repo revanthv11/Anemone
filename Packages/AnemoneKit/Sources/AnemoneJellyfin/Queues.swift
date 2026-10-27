@@ -141,10 +141,13 @@ public extension JellyfinSession {
         parameters.enableTotalRecordCount = true
         parameters.fields = Self.queueFields
         parameters.enableUserData = true
-        let found = try await send(Paths.getItems(parameters: parameters))
+        // The videos and the count of everything don't wait for each other.
+        let request = Paths.getItems(parameters: parameters)
+        async let asked = send(request)
+        async let counted = collectionCount(id: id, filter: filter)
+        let (found, everything) = try await (asked, counted)
         let videos = found.items.available
         let videoCount = found.totalRecordCount ?? videos.count
-        let everything = try await collectionCount(id: id, filter: filter)
         return PlayableItems(
             items: videos,
             skippedCount: max(0, everything - videoCount),
@@ -189,8 +192,11 @@ extension JellyfinSession {
     /// A collection's queue in the order its page lists `page`, item by item: a video where it's
     /// listed; a series' or season's episodes where it is, in order whichever way the page is
     /// sorted; and what's in a collection inside it where that collection is, in its own order.
-    /// Each item plays once, at its first place. Up to `queueLimit` videos, and when there are
-    /// more, the server counts what's left out.
+    /// Each item plays once, at its first place. Up to `queueLimit` videos.
+    ///
+    /// When there are more, or the walk left something out, the server counts what's left out,
+    /// as for Shuffle, so both count alike: each song of an album, say, rather than the album.
+    /// A collection too deep inside to go into counts as left out too, with what's in it.
     func collectionQueue(
         following page: [ItemDetails],
         of id: MediaItem.ID,
@@ -198,16 +204,24 @@ extension JellyfinSession {
     ) async throws -> PlayableItems {
         var walk = CollectionWalk(collection: id)
         try await add(page, to: &walk, filter: filter, depth: 0)
-        guard walk.isFull else {
-            return PlayableItems(items: walk.items, skippedCount: walk.skipped)
+        let queued = walk.items.count
+        if walk.isFull {
+            // Neither count waits for the other.
+            async let videos = collectionCount(id: id, filter: filter, kinds: PlayableItems.videoItemTypes)
+            async let everything = collectionCount(id: id, filter: filter)
+            let (videoCount, allCount) = try await (videos, everything)
+            return PlayableItems(
+                items: walk.items,
+                skippedCount: max(0, allCount - videoCount),
+                overLimitCount: max(0, videoCount - queued),
+            )
         }
-        let videoCount = try await collectionCount(id: id, filter: filter, kinds: PlayableItems.videoItemTypes)
-        let everything = try await collectionCount(id: id, filter: filter)
-        return PlayableItems(
-            items: walk.items,
-            skippedCount: max(0, everything - videoCount),
-            overLimitCount: max(0, videoCount - walk.items.count),
-        )
+        guard walk.leftOutCount > 0 else {
+            return PlayableItems(items: walk.items)
+        }
+        // Everything there is that isn't queued, since all the videos it could reach are.
+        let allCount = try await collectionCount(id: id, filter: filter)
+        return PlayableItems(items: walk.items, skippedCount: max(walk.leftOutCount, allCount - queued))
     }
 
     private func add(
@@ -221,28 +235,53 @@ extension JellyfinSession {
             switch details.item.kind {
             case .series, .season:
                 guard walk.enter(details.id) else { continue }
-                let found = try await episodes(in: details.id, filter: filter, limit: walk.room)
-                walk.add(found)
+                try await addEpisodes(in: details.id, to: &walk, filter: filter)
             case .collection, .folder:
                 // Never round and round, should collections hold each other.
-                guard depth < Self.collectionDepth, walk.enter(details.id) else { continue }
+                guard !walk.hasSeen(details.id) else { continue }
+                guard depth < Self.collectionDepth else {
+                    walk.leaveOut(details.id)
+                    continue
+                }
+                _ = walk.enter(details.id)
                 let inside = try await collectionItems(id: details.id, sort: LibrarySort(.default), filter: filter)
                 try await add(inside, to: &walk, filter: filter, depth: depth + 1)
             case let kind where PlayableItems.videoKinds.contains(kind):
                 walk.add([details])
             default:
-                walk.skipped += 1
+                walk.leaveOut(details.id)
             }
         }
     }
 
+    /// A series' or season's episodes, as many as fit, asked for again from where the last
+    /// answer ended while there's room: episodes already queued, such as one the page lists on
+    /// its own, don't take the place of the ones after them.
+    private func addEpisodes(
+        in containerID: MediaItem.ID,
+        to walk: inout CollectionWalk,
+        filter: LibraryFilter,
+    ) async throws {
+        var start = 0
+        while !walk.isFull {
+            let limit = walk.room
+            let page = try await episodes(in: containerID, filter: filter, from: start, limit: limit)
+            walk.add(page.episodes)
+            // Fewer than asked for: those were the last.
+            guard page.sentCount == limit else { return }
+            start += limit
+        }
+    }
+
     /// A series' or season's episodes in order, the Specials season's first, with the page's
-    /// filters, as Wholphin's Play All filters what's inside a collection.
+    /// filters, as Wholphin's Play All filters what's inside a collection; and how many the
+    /// server sent, before any are left out.
     private func episodes(
         in containerID: MediaItem.ID,
         filter: LibraryFilter,
+        from start: Int,
         limit: Int,
-    ) async throws -> [ItemDetails] {
+    ) async throws -> (episodes: [ItemDetails], sentCount: Int) {
         var parameters = Paths.GetItemsParameters(userID: userID)
         filter.apply(to: &parameters)
         parameters.parentID = containerID
@@ -252,10 +291,12 @@ extension JellyfinSession {
         parameters.excludeLocationTypes = [.virtual]
         parameters.sortBy = [.parentIndexNumber, .indexNumber, .sortName]
         parameters.sortOrder = [.ascending, .ascending, .ascending]
+        parameters.startIndex = start > 0 ? start : nil
         parameters.limit = limit
         parameters.fields = Self.queueFields
         parameters.enableUserData = true
-        return try await send(Paths.getItems(parameters: parameters)).items.available
+        let items = try await send(Paths.getItems(parameters: parameters)).items
+        return (items.available, items?.count ?? 0)
     }
 
     /// How many items, or items of `kinds`, are in a collection and what's inside it, as the
@@ -292,10 +333,11 @@ extension JellyfinSession {
 /// What a walk through a collection's page has queued so far.
 private struct CollectionWalk {
     private(set) var items: [ItemDetails] = []
-    /// Items listed that aren't videos, such as music.
-    var skipped = 0
     /// What's been queued or gone into, so each counts once.
     private var seen: Set<MediaItem.ID>
+    /// What the walk can't queue: items listed that aren't videos, such as music or an album,
+    /// and collections too deep inside to go into.
+    private var leftOut: Set<MediaItem.ID> = []
 
     /// A walk through `collection`'s page, which it never goes into again from inside.
     init(collection: MediaItem.ID) {
@@ -311,9 +353,23 @@ private struct CollectionWalk {
         room <= 0
     }
 
+    /// How many items it left out, each once, not counting a collection gone into after all
+    /// from a place less deep.
+    var leftOutCount: Int {
+        leftOut.subtracting(seen).count
+    }
+
+    func hasSeen(_ id: MediaItem.ID) -> Bool {
+        seen.contains(id)
+    }
+
     /// Whether a series, season or collection is new to the walk, to go into.
     mutating func enter(_ id: MediaItem.ID) -> Bool {
         seen.insert(id).inserted
+    }
+
+    mutating func leaveOut(_ id: MediaItem.ID) {
+        leftOut.insert(id)
     }
 
     mutating func add(_ videos: [ItemDetails]) {
