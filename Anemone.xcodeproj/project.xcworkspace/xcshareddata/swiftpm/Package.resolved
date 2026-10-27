@@ -1,5 +1,5 @@
 {
-  "originHash" : "f136967a5f8e9c6c7b5457d9c0deeb32930c3388c5d1680dd13df1ede2e8d68c",
+  "originHash" : "9e904ab8c19d2748564801cbbd839c9315ef79c95ca623581c52eb170a3aec82",
   "pins" : [
     {
       "identity" : "get",
@@ -17,6 +17,15 @@
       "state" : {
         "revision" : "8ce10a167ad0b4145b2bc005acf8bebcfe6ebe46",
         "version" : "3.3.0"
+      }
+    },
+    {
+      "identity" : "mpvkit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/mpvkit/MPVKit",
+      "state" : {
+        "revision" : "98c3453e252922e3136422da3fbb2e341ed9edc8",
+        "version" : "1.1.0-n9.0.2"
       }
     },
     {
@@ -42,8 +51,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-collections.git",
       "state" : {
-        "revision" : "844289ac455816e193f1dbbe014f3c4dbe429410",
-        "version" : "1.7.4"
+        "revision" : "f96b909e1a9e469620bc5037c1e24e00153f376f",
+        "version" : "1.7.5"
       }
     },
     {

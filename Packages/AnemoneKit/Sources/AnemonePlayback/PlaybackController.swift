@@ -70,10 +70,9 @@ public final class PlaybackController: Identifiable {
 
     /// A player for `request` on `session`'s server, with the features every player gets.
     public convenience init(session: JellyfinSession, request: PlaybackRequest) {
-        // AVPlayer for everything until the MPV engine (Phase 4) chooses per item.
         self.init(
             request: request,
-            engine: AVPlayerEngine(),
+            engine: PlayerChoice.engine(for: session),
             features: Self.features(for: session),
         ) { request in
             try await session.playbackStream(for: request, maxBitrate: AVPlayerProfile.maxBitrate)
@@ -197,11 +196,15 @@ public final class PlaybackController: Identifiable {
     func load(allowsDirect: Bool, from position: Duration?, as attempt: Int) async {
         guard !isStopped else { return }
         let entry = queue.current
-        reloading.allowsDirect = allowsDirect
+        // A new entry may need the other engine, as with "Prefer MPV"; a retry keeps it.
+        if stream == nil, let engine = engine as? any PerEntryEngine {
+            await engine.prepare(for: entry)
+            guard !isStopped, attempt == loads else { return }
+        }
+        reloading.asks(allowsDirect: allowsDirect)
         var request = StreamRequest(itemID: entry.itemID, allowsDirect: allowsDirect, profile: engine.deviceProfile)
         // The version a retry or a reload keeps.
         request.mediaSourceID = stream?.mediaSourceID
-        reloading.asksAgain = false
         for feature in features {
             await feature.prepare(&request)
         }
@@ -230,11 +233,10 @@ public final class PlaybackController: Identifiable {
 
     private func play(_ stream: PlaybackStream, _ entry: PlaybackQueue.Entry, from position: Duration?) async {
         self.stream = stream
-        reloading.isAsking = false
         status = .paused
         isUnderWay = false
         wasPaused = false
-        reloading.pendingStart = position ?? .zero
+        reloading.answered(startingAt: position ?? .zero)
         let events = engine.load(stream.url, from: position, metadata: entry.metadata)
         isSessionOpen = true
         await publish(reloading.hasReloaded ? .reloaded(stream) : .loaded(stream, entry))
@@ -308,7 +310,6 @@ public final class PlaybackController: Identifiable {
         }
     }
 
-    /// Where playback is: until the loaded stream is ready, where it's to start.
     var currentPosition: Duration {
         reloading.pendingStart ?? engine.currentTime
     }

@@ -17,6 +17,8 @@ public extension PlaybackController {
             SkipBackOnResume(),
             PlaybackLifecycle(),
             DisplayCriteriaMatching(),
+            PlaybackSpeedMenu(),
+            MPVSubtitleMenus(session: session),
         ]
     }
 }

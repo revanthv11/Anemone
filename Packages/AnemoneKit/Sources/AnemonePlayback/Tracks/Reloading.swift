@@ -23,6 +23,19 @@ struct Reloading {
         staysPaused = false
     }
 
+    /// A request for a stream is about to be prepared, so picks from now on are in it.
+    mutating func asks(allowsDirect: Bool) {
+        self.allowsDirect = allowsDirect
+        asksAgain = false
+    }
+
+    /// The server answered with a stream that's loading, to start at `position`, which is where
+    /// playback is until the engine is ready there.
+    mutating func answered(startingAt position: Duration) {
+        isAsking = false
+        pendingStart = position
+    }
+
     /// Whether a reload starts now. While the server is asked for a stream it doesn't: the
     /// request asks for what's chosen by the time it goes out, or is asked again afterwards.
     mutating func starts() -> Bool {
