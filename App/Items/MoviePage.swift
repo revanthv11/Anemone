@@ -17,6 +17,7 @@ struct MoviePage: View {
     @State private var alert: ItemAlert?
     @State private var playback: PlaybackRequest?
     @State private var extras = ItemExtras()
+    @State private var playsSong = false
 
     var body: some View {
         ScrollViewReader { scroller in
@@ -52,6 +53,7 @@ struct MoviePage: View {
             await reload()
         }
         .itemExtras($extras, of: item.id)
+        .songPlayback(item, isRequested: $playsSong)
         .task(id: item.id) {
             guard !isEpisode, similar.isEmpty else { return }
             let session = browse.session
@@ -142,7 +144,7 @@ struct MoviePage: View {
 
     private func play(from position: Duration?) {
         if item.item.kind == .audio {
-            alert = .musicUnavailable
+            playsSong = true
         } else {
             playback = browse.playback(of: item, from: position)
         }
