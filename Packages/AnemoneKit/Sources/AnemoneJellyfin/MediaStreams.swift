@@ -30,9 +30,10 @@ public struct ItemTracks: Hashable, Sendable {
     }
 
     /// The version that plays: the one asked for, else the server's first, as PlaybackInfo
-    /// picks it.
+    /// picks it. IDs match whatever their case, as `MediaVersions` matches a picked version.
     public func source(_ id: String?) -> Source? {
-        sources.first { $0.id == id } ?? (id == nil ? sources.first : nil)
+        guard let id else { return sources.first { $0.id == nil } ?? sources.first }
+        return sources.first { $0.id?.caseInsensitiveCompare(id) == .orderedSame }
     }
 }
 

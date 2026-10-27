@@ -205,6 +205,7 @@ public final class TrackSelection: PlaybackFeature {
         guard let entry, entry.stream == stream else { return }
         if stream.method == .directPlay, let audio = entry.audio {
             let options = await engine.tracks(.audio)
+            guard !Task.isCancelled, self.entry?.stream == stream else { return }
             if let option = TrackSwitching.playerTrack(for: audio, in: stream, options: options), !option.isSelected {
                 await engine.select(option, .audio)
             }

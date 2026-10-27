@@ -52,6 +52,7 @@ struct MediaStreamsTests {
         #expect(tracks.sources.map(\.id) == ["src1", "src2"])
         #expect(tracks.source(nil)?.id == "src1")
         #expect(tracks.source("src2")?.tracks == [])
+        #expect(tracks.source("SRC2")?.id == "src2")
         #expect(tracks.source("gone") == nil)
         let source = try #require(tracks.source("src1"))
         #expect(source.tracks.map(\.index) == [1, 2, 3, 4, 5])
