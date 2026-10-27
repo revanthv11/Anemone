@@ -45,51 +45,6 @@ jobs:
             exit 1
           fi
 
-  # TEMPORARY, removed before merging: the old macOS lint job, to compare its output with Linux's.
-  lint-macos:
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@v7
-      - name: Install SwiftLint and SwiftFormat
-        run: |
-          curl -sSfLo swiftlint.zip "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/portable_swiftlint.zip"
-          curl -sSfLo swiftformat.zip "https://github.com/nicklockwood/SwiftFormat/releases/download/${SWIFTFORMAT_VERSION}/swiftformat.zip"
-          unzip -q swiftlint.zip -d "$RUNNER_TEMP/swiftlint"
-          unzip -q swiftformat.zip -d "$RUNNER_TEMP/swiftformat"
-          rm swiftlint.zip swiftformat.zip
-          echo "$RUNNER_TEMP/swiftlint" >> "$GITHUB_PATH"
-          echo "$RUNNER_TEMP/swiftformat" >> "$GITHUB_PATH"
-      - name: SwiftFormat
-        run: swiftformat --lint .
-      - name: SwiftLint
-        run: swiftlint lint --strict
-
-  # TEMPORARY, removed before merging: the Linux job without SourceKit and without the violations,
-  # to check that the SourceKit guard fails it.
-  lint-no-sourcekit:
-    runs-on: ubuntu-latest
-    env:
-      SWIFTLINT_DISABLE_SOURCEKIT: "1"
-    steps:
-      - uses: actions/checkout@v7
-      - name: Remove the deliberate violations
-        run: rm Packages/AnemoneKit/Sources/AnemoneCore/LintCheck.swift
-      - name: Install SwiftLint
-        run: |
-          curl -sSfLo swiftlint.zip "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/swiftlint_linux_amd64.zip"
-          unzip -q swiftlint.zip swiftlint -d "$RUNNER_TEMP/swiftlint"
-          chmod +x "$RUNNER_TEMP/swiftlint/swiftlint"
-          rm swiftlint.zip
-          echo "$RUNNER_TEMP/swiftlint" >> "$GITHUB_PATH"
-      - name: SwiftLint
-        shell: bash
-        run: |
-          swiftlint lint --strict 2>&1 | tee "$RUNNER_TEMP/swiftlint.log"
-          if grep -E "requires SourceKit|SourceKit-based rules will be skipped" "$RUNNER_TEMP/swiftlint.log"; then
-            echo "::error::SwiftLint skipped the rules that need SourceKit."
-            exit 1
-          fi
-
   test:
     runs-on: macos-26
     steps:
