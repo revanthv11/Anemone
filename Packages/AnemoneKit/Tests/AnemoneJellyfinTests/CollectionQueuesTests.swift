@@ -38,9 +38,9 @@ struct CollectionQueuesTests {
         #expect(found.skippedCount == 1)
         #expect(found.overLimitCount == 0)
         // Only the page's own request: nothing asked for everything in it at once.
-        let page = try #require(recorder.requests.only)
-        #expect(page.query["sortBy"] == "Default")
-        #expect(page.query["recursive"] != "true")
+        let request = try #require(recorder.requests.only)
+        #expect(request.query["sortBy"] == "Default")
+        #expect(request.query["recursive"] != "true")
     }
 
     @Test func `a series plays its episodes where the page lists it, in order however it's sorted`() async throws {
