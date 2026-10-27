@@ -24,14 +24,13 @@ Remote trailers open the YouTube app; Anemone itself doesn't contact YouTube. Th
 
 | File | Says |
 |---|---|
-| `App/PrivacyInfo.xcprivacy` | No tracking, no tracking domains, no collected data. Required-reason APIs: UserDefaults (`CA92.1`, the app's own settings) and file timestamps (`C617.1`, Nuke's artwork disk cache reading the access dates of its files in the app's container to evict the oldest). |
-| `TopShelf/PrivacyInfo.xcprivacy` | No tracking, no collected data, no required-reason APIs yet. |
+| `App/PrivacyInfo.xcprivacy` | No tracking, no tracking domains, no collected data. Required-reason APIs: UserDefaults (`CA92.1`, the app's own settings, and `1C8F.1`, the settings it leaves for the Top Shelf in the App Group) and file timestamps (`C617.1`, Nuke's artwork disk cache reading the access dates of its files in the app's container to evict the oldest). |
+| `TopShelf/PrivacyInfo.xcprivacy` | No tracking, no collected data. Required-reason APIs: UserDefaults (`1C8F.1`, reading the App Group's settings). |
 
 Both sit in synchronized folders, so Xcode copies them into the app and the extension without a project change.
 
 Update them when code starts using another [required-reason API](https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api):
 
-- **App Group UserDefaults** (Top Shelf sharing settings with the app, Phase 5e): add reason `1C8F.1` to the UserDefaults entry of whichever target reads or writes the shared suite, and add the UserDefaults entry to the extension's manifest.
 - **System boot time** (`ProcessInfo.systemUptime`, `mach_absolute_time()`), **disk space** or **active keyboards**: add the category with the reason that fits.
 - **A new dependency**: if it ships its own `PrivacyInfo.xcprivacy` (swift-nio does), Xcode includes it; if it doesn't and uses a required-reason API, declare that use in the app's manifest.
 

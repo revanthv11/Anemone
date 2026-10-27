@@ -40,7 +40,8 @@ final class AppModel {
     /// temporary failure can't replace the saved accounts with an empty list.
     private let isStorageUnavailable: Bool
 
-    init(repository: AccountRepository = AccountRepository(store: KeychainStore(service: "com.revanthv11.anemone"))) {
+    /// The default store is the Keychain item shared with the Top Shelf (`SharedStorage`).
+    init(repository: AccountRepository = AccountRepository(store: SharedStorage.appKeychain())) {
         self.repository = repository
         #if DEBUG
             // UI tests start from a clean slate with `-resetAccounts YES`.
