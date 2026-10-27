@@ -9,9 +9,11 @@ import Foundation
 /// it move up and `count` goes down, so no place waits for an item that will never come. Pages
 /// not loaded yet are taken to be full.
 ///
-/// Items deleted from the app close up the same way (`remove(where:)`), and since the loader's
-/// list has lost them too, the pages after them are asked for that much earlier
-/// (`startIndex(ofPage:)`), so none of the items that moved up is skipped.
+/// Items deleted from the app close up the same way (`remove(where:)`). When the loader's list
+/// has lost them too, as the server's lists do, the pages after them are asked for that much
+/// earlier (`startIndex(ofPage:)`), so none of the items that moved up is skipped. A list that
+/// keeps their places, such as a random grid's order (`ShuffledPages`), is asked for the same
+/// pages as before, so none of the items is shown twice.
 struct PagedItems<Item> {
     let pageSize: Int
     /// How many items the first page counted, which the loader's pages are counted in.
@@ -23,6 +25,8 @@ struct PagedItems<Item> {
     private var starts: [Int] = []
     /// How many items `remove(where:)` took out of each loaded page.
     private var removed: [Int: Int] = [:]
+    /// Whether the loader's list keeps the places of the items `remove(where:)` takes out.
+    private var keepsRemovedPlaces = false
 
     init(pageSize: Int) {
         self.pageSize = pageSize
@@ -34,8 +38,12 @@ struct PagedItems<Item> {
     }
 
     /// Starts again from the first page and the count it gave.
-    mutating func start(_ first: [Item], counted: Int) {
+    ///
+    /// - Parameter keepsRemovedPlaces: whether the loader's list keeps the places of items
+    ///   deleted from it, rather than closing up around them as the server's lists do.
+    mutating func start(_ first: [Item], counted: Int, keepsRemovedPlaces: Bool = false) {
         self.counted = counted
+        self.keepsRemovedPlaces = keepsRemovedPlaces
         pages = [0: first]
         removed = [:]
         layOut()
@@ -87,9 +95,10 @@ struct PagedItems<Item> {
     }
 
     /// Where the loader's list has `page` now: its place in the list the first page counted, less
-    /// the items removed from the pages before it, which the list no longer has either.
+    /// the items removed from the pages before it, unless the list keeps their places.
     func startIndex(ofPage page: Int) -> Int {
-        page * pageSize - removed.reduce(0) { $1.key < page ? $0 + $1.value : $0 }
+        guard !keepsRemovedPlaces else { return page * pageSize }
+        return page * pageSize - removed.reduce(0) { $1.key < page ? $0 + $1.value : $0 }
     }
 
     /// Takes the matching items out of the pages loaded so far, as when they were deleted, and

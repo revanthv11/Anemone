@@ -184,10 +184,17 @@ public struct LibraryPage: Sendable {
     public let items: [LibraryEntry]
     /// How many items match the query in all. Only asked for with the first page.
     public let totalCount: Int?
+    /// Whether the list the pages come from keeps the place of an item deleted from it, as a
+    /// random grid's order does, which is held in the app (`ShuffledPages`): the pages after the
+    /// item stay where they were, and the one holding it comes back short. The server's own lists
+    /// close up instead, so `LibraryPager` asks for the pages after a deleted item that much
+    /// earlier. Read from the first page.
+    public let keepsDeletedPlaces: Bool
 
-    public init(items: [LibraryEntry], totalCount: Int?) {
+    public init(items: [LibraryEntry], totalCount: Int?, keepsDeletedPlaces: Bool = false) {
         self.items = items
         self.totalCount = totalCount
+        self.keepsDeletedPlaces = keepsDeletedPlaces
     }
 }
 
