@@ -8,10 +8,13 @@ import Testing
 /// overlay learns from the controller.
 @MainActor
 struct PlayerOverlayTests {
-    private let engine = FakeEngine()
+    let engine = FakeEngine()
     private let previewRequests = PreviewRequests()
 
-    private func controller(_ entries: [PlaybackQueue.Entry] = [.item("m1")]) throws -> PlaybackController {
+    func controller(
+        _ entries: [PlaybackQueue.Entry] = [.item("m1")],
+        features: [any PlaybackFeature] = [],
+    ) throws -> PlaybackController {
         let requests = previewRequests
         let details = PlaybackDetails { itemID, mediaSourceID in
             requests.list.withLock { $0.append("\(itemID) \(mediaSourceID ?? "-")") }
@@ -20,13 +23,17 @@ struct PlayerOverlayTests {
         return try PlaybackController(
             request: PlaybackRequest(queue: #require(PlaybackQueue(entries: entries))),
             engine: engine,
-            features: [details],
+            features: features + [details],
             positionInterval: .milliseconds(10),
             loadStream: FakeStreams().load,
         )
     }
 
-    private func overlay(_ playback: PlaybackController, hideDelay: Duration = .seconds(60)) -> PlayerOverlay {
+    func overlay(
+        _ playback: PlaybackController,
+        hideDelay: Duration = .seconds(60),
+        skipBehavior: @escaping @MainActor (MediaSegment.Kind) -> SkipSegmentBehavior = { _ in .ask },
+    ) -> PlayerOverlay {
         PlayerOverlay(
             controller: playback,
             seeker: Seeker(
@@ -37,18 +44,19 @@ struct PlayerOverlayTests {
             ),
             hideDelay: hideDelay,
             seekBarLinger: .milliseconds(20),
+            skipBehavior: skipBehavior,
         )
     }
 
     /// Starts `playback` and lets the engine get it under way.
-    private func play(_ playback: PlaybackController) async throws {
+    func play(_ playback: PlaybackController) async throws {
         await playback.start()
         engine.send(.ready)
         let details = try #require(playback.feature(PlaybackDetails.self))
         #expect(await eventually { !details.isPaused })
     }
 
-    private func tap(_ button: PlayerOverlay.Button, on overlay: PlayerOverlay) -> PlayerOverlay.Outcome {
+    func tap(_ button: PlayerOverlay.Button, on overlay: PlayerOverlay) -> PlayerOverlay.Outcome {
         _ = overlay.pressBegan(button)
         return overlay.pressEnded(button)
     }
