@@ -240,6 +240,20 @@ struct MusicPlayerTests {
         #expect(!player.hasQueue)
     }
 
+    @Test func `music stops before a video's Now Playing takes the remote`() throws {
+        let session = try JellyfinSession(
+            serverURL: #require(URL(string: "https://music.test/jf")),
+            userID: "u1",
+            accessToken: "tok",
+            identity: ClientIdentity(deviceName: "Test TV", deviceID: "device-1", appVersion: "0.1.0"),
+        )
+        let features = PlaybackController.features(for: session)
+
+        let stopping = try #require(features.firstIndex { $0 is MusicStopping })
+        let nowPlaying = try #require(features.firstIndex { $0 is NowPlaying })
+        #expect(stopping < nowPlaying)
+    }
+
     @Test func `the remote hears about each song and status`() async {
         let remote = RecordingRemote()
         let player = player(remote: remote)
