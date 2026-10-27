@@ -9,6 +9,8 @@ struct PlaybackSettingsPage: View {
                 SegmentSettingsPage()
             }
             .accessibilityIdentifier("settings.skipSegments")
+            NavigationLink("Player Controls", destination: PlayerControlsSettingsPage.init)
+                .accessibilityIdentifier("settings.playback.playerControls")
         }
         .navigationTitle("Playback")
     }
