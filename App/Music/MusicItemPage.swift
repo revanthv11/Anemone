@@ -2,8 +2,10 @@ import AnemoneJellyfin
 import AnemonePlayback
 import SwiftUI
 
-/// The page for an album, artist or song, as Wholphin's `DestinationContent` picks it: a song
-/// opens its album's page with the song focused, or the item page when it has no album.
+/// The page for an album, artist or song. Albums and artists get the pages Wholphin's
+/// `DestinationContent` picks. A song opens its album's page with the song focused, as Wholphin's
+/// `BaseItem.destination()` sends it there; one with no album gets the item page, which is
+/// Anemone's choice: Wholphin gives it a `SongDetailsPage`.
 struct MusicItemPage: View {
     @Binding var details: ItemDetails
 
