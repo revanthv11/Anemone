@@ -275,6 +275,8 @@ public final class TrackSelection: PlaybackFeature {
         if wanted?.id != options.first(where: \.isSelected)?.id {
             await engine.select(wanted, .subtitle)
         }
+        // So the debug panel's list of the engine's tracks follows a switch in the stream.
+        controller.feature(PlaybackDetails.self)?.tracksSwitched()
     }
 
     /// AVPlayer showed no HLS subtitles that were selected before playback got under way, the

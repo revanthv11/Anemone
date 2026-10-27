@@ -179,7 +179,7 @@ struct RemoteSubtitlesTests {
         #expect(url.queryValues["ApiKey"] == "tok")
     }
 
-    @Test func `HDR, Dolby Vision and 4K are read from the version's video`() async throws {
+    @Test func `a version's video says whether it's HDR, Dolby Vision or 4K`() async throws {
         MockServer.register(host: "item-video.test") { request in
             guard request.url?.path() == "/jf/Items/m1" else { return nil }
             return .json("""

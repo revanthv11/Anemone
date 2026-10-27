@@ -1,11 +1,6 @@
-import AnemoneCore
 import AnemoneJellyfin
 import Foundation
 import os
-#if os(tvOS) || os(iOS)
-    import AVFoundation
-    import UIKit
-#endif
 
 /// Now Playing: the title, artwork and position the system shows for what's playing, and the
 /// remote's commands (play, pause, skips, scrubbing, and next and previous when the queue has
@@ -38,21 +33,21 @@ public final class NowPlaying: PlaybackFeature {
     /// What this feature publishes; `nil` while the system player publishes instead.
     public private(set) var info: NowPlayingInfo?
 
-    private let slot: Slot
-    private let loadArtwork: ArtworkLoader
+    let slot: Slot
+    let loadArtwork: ArtworkLoader
     /// For music: the player whose songs this shows.
-    private let isMusic: Bool
-    private weak var music: MusicPlayer?
+    let isMusic: Bool
+    private(set) weak var music: MusicPlayer?
     /// The controller that loaded last. A song's controller that the next song replaced can still
     /// be closing; what it says is dropped.
-    private weak var controller: PlaybackController?
+    private(set) weak var controller: PlaybackController?
     /// The artwork loaded, or loading, kept for a retry as a transcode (and for the next song
     /// when it's on the same album).
-    private var artworkURL: URL?
-    private var artwork: NowPlayingArtwork?
-    private var artworkTask: Task<Void, Never>?
+    var artworkURL: URL?
+    var artwork: NowPlayingArtwork?
+    var artworkTask: Task<Void, Never>?
     /// The commands handed to the remote, so they're handed over again only when they change.
-    private var handledCommands: Set<RemoteCommand>?
+    var handledCommands: Set<RemoteCommand>?
 
     private static let log = Logger(subsystem: "com.revanthv11.anemone", category: "Playback")
 
@@ -179,45 +174,6 @@ public final class NowPlaying: PlaybackFeature {
         publish(info)
     }
 
-    /// Music's commands follow the player's queue; a video's, the controller's.
-    private func handleCommands(in controller: PlaybackController?) {
-        let queue = controller?.queue
-        guard let commands = music.map(Self.commands(for:)) ?? queue.map(Self.commands(for:)),
-              commands != handledCommands
-        else { return }
-        handledCommands = commands
-        slot.handle(commands, skipIntervals: (Self.skipForward, Self.skipBackward), by: self) { [weak self] in
-            self?.perform($0) ?? false
-        }
-    }
-
-    /// Next only when there's an entry after this one; Previous whenever the queue has several,
-    /// since on the first entry it goes back to the start. Intros don't count, but Next during
-    /// one moves on to what it leads into.
-    static func commands(for queue: PlaybackQueue) -> Set<RemoteCommand> {
-        var commands: Set<RemoteCommand> = [
-            .play, .pause, .togglePlayPause, .skipForward, .skipBackward, .changePosition,
-        ]
-        if queue.countWithoutIntros > 1 {
-            commands.insert(.previousTrack)
-        }
-        if queue.next != nil {
-            commands.insert(.nextTrack)
-        }
-        return commands
-    }
-
-    /// For music, Next when the queue has a song after this one (or starts again); Previous always,
-    /// since it goes back to the start of the song. No skips, so the system offers the track
-    /// buttons, as it did before music moved onto this feature.
-    static func commands(for player: MusicPlayer) -> Set<RemoteCommand> {
-        var commands: Set<RemoteCommand> = [.play, .pause, .togglePlayPause, .changePosition, .previousTrack]
-        if player.queue.nextIndex(automatic: false) != nil {
-            commands.insert(.nextTrack)
-        }
-        return commands
-    }
-
     /// The entry's place in its queue, not counting intros (Phase 5c): the music player's for a
     /// song.
     private func queuePlace(in controller: PlaybackController) -> (index: Int, count: Int) {
@@ -245,153 +201,9 @@ public final class NowPlaying: PlaybackFeature {
         publish(info)
     }
 
-    private func publish(_ info: NowPlayingInfo) {
+    func publish(_ info: NowPlayingInfo) {
         guard info != self.info else { return }
         self.info = info
         slot.publish(info, by: self)
-    }
-
-    /// What the remote asked for; `false` when it can't be done.
-    private func perform(_ request: RemoteRequest) -> Bool {
-        if isMusic {
-            return music.map { perform(request, on: $0) } ?? false
-        }
-        guard let info, let controller else { return false }
-        // Someone's there, so pass-out protection starts counting again.
-        controller.feature(UpNext.self)?.noteRemoteInput()
-        let engine = controller.engine
-        switch request {
-        case .play:
-            engine.play()
-        case .pause:
-            engine.pause()
-        case .togglePlayPause:
-            return perform(info.isPlaying ? .pause : .play)
-        case let .skip(offset):
-            seek(to: engine.currentTime + offset)
-        case let .seek(position):
-            seek(to: position)
-        case .next:
-            guard controller.queue.next != nil else { return false }
-            // The queue moves on through the controller, as Up Next does (Phase 3b).
-            controller.playNext()
-        case .previous:
-            playPrevious(in: controller)
-        }
-        return true
-    }
-
-    /// Everything goes to the music player, which keeps the queue, and knows whether a song still
-    /// loading should start once it's ready (`SongEngine`).
-    private func perform(_ request: RemoteRequest, on player: MusicPlayer) -> Bool {
-        switch request {
-        case .play:
-            player.resume()
-        case .pause:
-            player.pause()
-        case .togglePlayPause:
-            player.togglePlayPause()
-        case let .skip(offset):
-            // The player shows where it's going here at once.
-            player.skip(by: offset)
-        case let .seek(position):
-            player.seek(to: position)
-        case .next:
-            guard player.queue.nextIndex(automatic: false) != nil else { return false }
-            player.next()
-        case .previous:
-            player.previous()
-        }
-        return true
-    }
-
-    /// The entry before, passing over intros.
-    private func playPrevious(in controller: PlaybackController) {
-        if controller.engine.currentTime < Self.previousEntryWindow, let index = controller.queue.previousIndex {
-            controller.play(entryAt: index)
-        } else {
-            seek(to: .zero)
-        }
-    }
-
-    /// Within the video, and shown at once rather than at the next position event.
-    private func seek(to position: Duration) {
-        guard let engine = controller?.engine else { return }
-        var target = max(position, .zero)
-        if let duration = engine.duration {
-            target = min(target, duration)
-        }
-        show(position: target)
-        Task {
-            _ = await engine.seek(to: target)
-        }
-    }
-}
-
-/// The artwork.
-private extension NowPlaying {
-    func loadArtwork(from url: URL?) {
-        artworkTask?.cancel()
-        artworkURL = url
-        artwork = nil
-        guard let url else { return }
-        let load = loadArtwork
-        artworkTask = Task { [weak self] in
-            let data = await load(url)
-            guard !Task.isCancelled, let self, let data else { return }
-            let loaded = NowPlayingArtwork(url: url, data: data)
-            artwork = loaded
-            if var info {
-                info.artwork = loaded
-                publish(info)
-            } else {
-                showInSystemPlayer()
-            }
-        }
-    }
-
-    /// AVKit's info panel and Now Playing read the artwork from the item's metadata, as they read
-    /// its title, so for AVPlayer it goes there too.
-    func showInSystemPlayer() {
-        #if os(tvOS) || os(iOS)
-            guard let artwork = artwork?.data,
-                  let item = (controller?.engine as? AVPlayerEngine)?.player.currentItem
-            else { return }
-            let metadata = AVMutableMetadataItem()
-            metadata.identifier = .commonIdentifierArtwork
-            metadata.extendedLanguageTag = "und"
-            if artwork.starts(with: [0x89, 0x50, 0x4E, 0x47]) {
-                metadata.value = artwork as NSData
-                metadata.dataType = kCMMetadataBaseDataType_PNG as String
-            } else if artwork.starts(with: [0xFF, 0xD8]) {
-                metadata.value = artwork as NSData
-                metadata.dataType = kCMMetadataBaseDataType_JPEG as String
-            } else if let png = UIImage(data: artwork)?.pngData() {
-                // Such as WebP, which the metadata can't hold.
-                metadata.value = png as NSData
-                metadata.dataType = kCMMetadataBaseDataType_PNG as String
-            } else {
-                return
-            }
-            item.externalMetadata = item.externalMetadata.filter { $0.identifier != .commonIdentifierArtwork }
-                + [metadata]
-        #endif
-    }
-
-    /// `nil` when the server has no such image.
-    nonisolated static func download(_ url: URL) async -> Data? {
-        guard let (data, response) = try? await URLSession.shared.data(from: url),
-              (response as? HTTPURLResponse)?.statusCode == 200
-        else { return nil }
-        return data
-    }
-}
-
-extension PlayerEngine {
-    /// Whether AVKit's system player shows this engine's video, as `PlayerScreen` chooses: for
-    /// AVPlayer, unless Settings › Playback › Player Controls asks for Anemone's overlay.
-    var showsInSystemPlayer: Bool {
-        guard case .avPlayer = videoOutput else { return false }
-        return Preferences.playerControls.value() == .system
     }
 }

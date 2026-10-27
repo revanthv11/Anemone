@@ -80,6 +80,9 @@ final class FakeMPVClient: MPVClient {
         var title: String?
         var lang: String?
         var selected = false
+        var codec: String?
+        /// Added beside the file with `sub-add`.
+        var external = false
     }
 
     private(set) var tracks: [Track] = []
@@ -94,6 +97,8 @@ final class FakeMPVClient: MPVClient {
             properties["track-list/\(index)/title"] = track.title
             properties["track-list/\(index)/lang"] = track.lang
             properties["track-list/\(index)/selected"] = track.selected ? "yes" : "no"
+            properties["track-list/\(index)/codec"] = track.codec
+            properties["track-list/\(index)/external"] = track.external ? "yes" : "no"
         }
     }
 
@@ -110,7 +115,7 @@ final class FakeMPVClient: MPVClient {
         let id = (tracks.filter { $0.type == "sub" }.map(\.id).max() ?? 0) + 1
         let title = arguments.count > 3 ? arguments[3] : nil
         let lang = arguments.count > 4 ? arguments[4] : nil
-        tracks.append(Track(type: "sub", id: id, title: title, lang: lang, selected: selects))
+        tracks.append(Track(type: "sub", id: id, title: title, lang: lang, selected: selects, external: true))
         list(tracks)
     }
 }

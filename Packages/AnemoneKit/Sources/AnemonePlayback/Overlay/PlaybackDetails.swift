@@ -18,6 +18,10 @@ public final class PlaybackDetails: PlaybackFeature {
     public private(set) var entry: PlaybackQueue.Entry?
     /// `nil` until loaded; empty when the item has neither, or the server couldn't say.
     public private(set) var previews: SeekPreviews?
+    /// Counts the streams loaded and the tracks switched in the one playing, without another
+    /// stream (`TrackSelection`), so a view listing the engine's tracks, such as the debug
+    /// panel, reads them again after each.
+    public private(set) var trackChanges = 0
 
     @ObservationIgnored private let loadPreviews: PreviewLoader
     @ObservationIgnored private var wantsPreviews = false
@@ -42,6 +46,7 @@ public final class PlaybackDetails: PlaybackFeature {
             self.stream = stream
             self.entry = entry
             isPaused = true
+            trackChanges += 1
             if !isSameVideo {
                 previews = nil
                 previewsTask?.cancel()
@@ -53,6 +58,7 @@ public final class PlaybackDetails: PlaybackFeature {
             // previews stay.
             self.stream = stream
             isPaused = true
+            trackChanges += 1
         case .started, .resumed:
             isPaused = false
         case let .position(progress):
@@ -62,6 +68,11 @@ public final class PlaybackDetails: PlaybackFeature {
         case .failed, .stopped:
             break
         }
+    }
+
+    /// The engine switched tracks in the stream playing, as `TrackSelection` has it do.
+    func tracksSwitched() {
+        trackChanges += 1
     }
 
     /// Fetches the chapters and trickplay for what's playing, and for each entry after it.

@@ -223,6 +223,24 @@ struct SegmentSkippingTests {
         #expect(playback.accessories.actions.isEmpty)
     }
 
+    @Test func `another entry starts with no segment playing and no button`() async throws {
+        settings.behaviors[.intro] = .ask
+        let (playback, skipping) = try controller([.item("e1"), .item("e2")])
+        await play(playback, skipping)
+        engine.currentTime = .seconds(12)
+        #expect(await eventually { skipping.offered == Self.intro })
+
+        // The next entry's stream loads before the first one's `stopped` reaches the feature.
+        playback.play(entryAt: 1)
+        let next = PlaybackStream(itemID: "e2", url: URL(filePath: "/e2"), method: .directPlay)
+        await skipping.handle(.loaded(next, playback.queue.current), in: playback)
+
+        #expect(skipping.current == nil)
+        #expect(skipping.offered == nil)
+        #expect(playback.accessories.actions.isEmpty)
+        await playback.stop()
+    }
+
     @Test func `wholphin's defaults ask about intros, outros and ads, and play recaps and previews`() {
         let defaults = MediaSegment.Kind.allCases.map { Preferences.skipBehavior(for: $0).defaultValue }
 

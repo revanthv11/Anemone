@@ -44,14 +44,16 @@ public enum MPVProfile {
     }
 
     /// libmpv shows text subtitles, ASS with its styling, and picture subtitles itself, inside
-    /// the file or beside it. Picture subtitles in a transcode are burned in.
+    /// the file or beside it. Picture subtitles in a transcode are burned in. Not TTML, which
+    /// Wholphin's ExoPlayer profile lists: libmpv's FFmpeg can't read it in the file or beside
+    /// it, so the server sends it as a file of its own, which MPV fetches as SRT
+    /// (`MPVExternalSubtitles`).
     static let subtitleProfiles: [SubtitleProfile] = {
         let methods: [(String, [SubtitleDeliveryMethod])] = [
             ("vtt", [.embed, .external, .hls]),
             ("webvtt", [.embed, .external, .hls]),
             ("srt", [.embed, .external]),
             ("subrip", [.embed, .external]),
-            ("ttml", [.embed, .external]),
             ("dvbsub", [.embed, .encode]),
             ("dvdsub", [.embed, .encode]),
             ("idx", [.embed, .encode]),

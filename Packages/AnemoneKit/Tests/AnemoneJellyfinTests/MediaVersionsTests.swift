@@ -39,11 +39,11 @@ struct MediaVersionsTests {
          {"Id":"bare"}]}
         """))
 
-        let versions = try await session(host: "versions.test").mediaVersions(of: "m1")
+        // As an item page's item carries them.
+        let versions = try await session(host: "versions.test").itemDetails(id: "m1").versions
 
         let request = try #require(sent.request)
         #expect(request.method == "GET")
-        #expect(request.query["userId"] == "u1")
         #expect(versions.map(\.id) == ["s4k", "s1080", "bare"])
         #expect(versions.map(\.name) == ["2160p", "Film - 1080p", "bare"])
         let uhd = try #require(versions.first)
@@ -60,12 +60,6 @@ struct MediaVersionsTests {
         // Without the real frame rate, the average.
         #expect(versions[1].video?.frameRate == 25)
         #expect(versions[2].video == nil)
-    }
-
-    @Test func `an item without media sources has no versions`() async throws {
-        _ = register(host: "noversions.test", path: "/jf/Items/f1", reply: .json(#"{"Id":"f1","Type":"Folder"}"#))
-
-        #expect(try await session(host: "noversions.test").mediaVersions(of: "f1").isEmpty)
     }
 
     @Test func `a picked version is remembered for the user and the item`() throws {

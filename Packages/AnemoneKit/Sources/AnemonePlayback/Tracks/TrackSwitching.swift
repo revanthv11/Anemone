@@ -150,29 +150,60 @@ enum TrackSwitching {
     }
 
     /// The engine's track for `track`: the engine lists the stream's tracks of that kind in the
-    /// server's order, so by position when the counts agree, else by name or language. Adapted
-    /// from Swiftfin's `AVMediaPlayer.selectionOption`.
+    /// server's order, so by position when the counts agree, else by name, codec or language.
+    /// Adapted from Swiftfin's `AVMediaPlayer.selectionOption`.
     ///
     /// MPV lists the subtitle files it adds after the stream's own, in the server's order, and
     /// any it's given later, such as a downloaded one, after those; before the file has opened it
-    /// lists only the stream's. So its subtitles go by position whenever it lists that many.
+    /// lists only the stream's. It says which are files, so the stream's own and the files are
+    /// matched apart: a track in the file that the server sends as a file instead (MPV lists
+    /// both) moves nothing in the other group, and the files go by position even with a
+    /// downloaded one after them.
     static func playerTrack(
         for track: MediaTrack,
         in stream: PlaybackStream,
         options: [PlayerTrack],
         rendering: SubtitleRendering = .avPlayer,
     ) -> PlayerTrack? {
-        let listed = listed(track.kind, in: stream, rendering: rendering)
-        guard let position = listed.firstIndex(where: { $0.index == track.index }) else { return nil }
-        if listed.count == options.count || (rendering == .mpv && track.kind == .subtitle) {
-            return options.indices.contains(position) ? options[position] : nil
+        var listed = listed(track.kind, in: stream, rendering: rendering)
+        var options = options
+        var amongFiles = false
+        if rendering == .mpv, track.kind == .subtitle, options.allSatisfy({ $0.isExternal != nil }) {
+            let isFile = { (other: MediaTrack) in delivery(of: other, in: stream) == .external }
+            amongFiles = isFile(track)
+            listed = listed.filter { isFile($0) == amongFiles }
+            options = options.filter { $0.isExternal == amongFiles }
         }
+        guard let position = listed.firstIndex(where: { $0.index == track.index }) else { return nil }
+        if listed.count == options.count || (amongFiles && options.count > listed.count) {
+            return options[position]
+        }
+        return matching(track, among: listed, options: options)
+    }
+
+    /// The one option with `track`'s name; else the one with its codec and language; else the
+    /// one in its language, when it's the only one listed in it.
+    private static func matching(_ track: MediaTrack, among listed: [MediaTrack], options: [PlayerTrack])
+        -> PlayerTrack?
+    {
         let named = options.filter { [track.displayTitle, track.title].contains($0.title) }
         if named.count == 1 {
             return named.first
         }
-        let sameLanguage = listed.filter { LanguageCode.same($0.language, track.language) }
+        if let codec = TrackCodec(track.codec) {
+            let unknown = LanguageCode.isUnknown(track.language)
+            let sameCodec = options.filter { option in
+                let sameLanguage = unknown
+                    ? LanguageCode.isUnknown(option.language)
+                    : LanguageCode.same(option.language, track.language)
+                return sameLanguage && TrackCodec(option.codec) == codec
+            }
+            if sameCodec.count == 1 {
+                return sameCodec.first
+            }
+        }
         let languageOptions = options.filter { LanguageCode.same($0.language, track.language) }
+        let sameLanguage = listed.filter { LanguageCode.same($0.language, track.language) }
         return sameLanguage.count == 1 && languageOptions.count == 1 ? languageOptions.first : nil
     }
 
@@ -183,7 +214,8 @@ enum TrackSwitching {
     ///
     /// Over AVPlayer, which has Anemone draw the text subtitles sent as files, the playlist has
     /// none of those, nor any at all when the one asked for is one of them. MPV lists the
-    /// subtitles the stream carries, then the files it adds (`MPVExternalSubtitles`).
+    /// subtitles the stream carries, by the same rule in HLS, then the files it adds
+    /// (`MPVExternalSubtitles`).
     static func listed(
         _ kind: MediaTrack.Kind,
         in stream: PlaybackStream,
@@ -198,16 +230,23 @@ enum TrackSwitching {
             return tracks.filter { !$0.isExternal }
         case (.audio, _, _):
             return tracks.filter { $0.index == stream.audioStreamIndex }
+        case (.subtitle, .directPlay, .mpv):
+            return tracks.filter(inFile) + tracks.filter { $0.delivery == .external }
         case (.subtitle, _, .mpv):
-            let carried = stream.method == .directPlay ? tracks.filter(inFile) : tracks.filter { $0.delivery == .hls }
+            let carried = hasNoSubtitles(stream) ? [] : tracks.filter { $0.delivery == .hls }
             return carried + tracks.filter { $0.delivery == .external }
         case (.subtitle, .directPlay, .avPlayer):
             return tracks.filter(inFile)
         case (.subtitle, _, .avPlayer):
-            let leftOut = tracks.contains { track in
-                track.index == stream.subtitleStreamIndex && [.burnedIn, .dropped, .external].contains(track.delivery)
-            }
-            return leftOut ? [] : tracks.filter { $0.isText && $0.delivery != .external }
+            return hasNoSubtitles(stream) ? [] : tracks.filter { $0.isText && $0.delivery != .external }
+        }
+    }
+
+    /// Whether Jellyfin's HLS playlist for `stream` has no subtitles at all: it has them only when
+    /// the ones asked for come in it, not when they're burned in, left out or sent as a file.
+    private static func hasNoSubtitles(_ stream: PlaybackStream) -> Bool {
+        stream.tracks.of(.subtitle).contains { track in
+            track.index == stream.subtitleStreamIndex && [.burnedIn, .dropped, .external].contains(track.delivery)
         }
     }
 
@@ -215,4 +254,27 @@ enum TrackSwitching {
     static func delivery(of track: MediaTrack, in stream: PlaybackStream) -> MediaTrack.Delivery? {
         stream.tracks.first { $0.kind == track.kind && $0.index == track.index }?.delivery ?? track.delivery
     }
+}
+
+/// A codec under the names Jellyfin and libmpv give it, which differ for subtitles: `srt` and
+/// `subrip`, or `pgssub` and `hdmv_pgs_subtitle`.
+private struct TrackCodec: Equatable {
+    let name: String
+
+    init?(_ codec: String?) {
+        guard let codec = codec?.lowercased(), !codec.isEmpty else { return nil }
+        name = Self.aliases[codec] ?? codec
+    }
+
+    private static let aliases = [
+        "srt": "subrip",
+        "pgs": "pgssub",
+        "hdmv_pgs_subtitle": "pgssub",
+        "dvd_subtitle": "dvdsub",
+        "vobsub": "dvdsub",
+        "dvb_subtitle": "dvbsub",
+        "ssa": "ass",
+        "vtt": "webvtt",
+        "tx3g": "mov_text",
+    ]
 }
