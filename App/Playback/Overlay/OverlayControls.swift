@@ -47,15 +47,8 @@ struct OverlayControls: View {
             )
             .focusable(overlay.openMenuID == nil)
             .focused(focus, equals: .seekBar)
-            // VoiceOver's swipe up and down steps through the video, as left and right do.
-            .accessibilityAdjustableAction { direction in
-                switch direction {
-                case .increment: overlay.seeker.step(.forward)
-                case .decrement: overlay.seeker.step(.back)
-                @unknown default: return
-                }
-                overlay.pulse()
-            }
+            // No adjustable action for VoiceOver: left and right already seek, and an adjustable
+            // element would take the swipes up and down that move focus off the bar.
             ZStack {
                 transport
                 HStack(spacing: 20) {
@@ -270,7 +263,8 @@ struct SeekTrack: View {
     let sheets: TrickplaySheets?
     let isFocused: Bool
     let showsPreview: Bool
-    /// For the bar and its time, which UI tests read.
+    /// The bar's accessibility identifier, which UI tests find it by. Its value is where the bar
+    /// is in words, for VoiceOver ("1 minute, 5 seconds of 10 minutes"), not the clock's "1:05".
     let identifier: String
 
     @Environment(\.theme) private var theme

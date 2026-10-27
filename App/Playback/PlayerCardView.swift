@@ -19,13 +19,15 @@ struct PlayerCardView: View {
                     .accessibilityHidden(true)
             }
             VStack(alignment: .leading, spacing: 12) {
+                // The card's own label and value read these, so they're said once.
                 Text(card.title)
                     .font(.title3.bold())
                     .foregroundStyle(theme.onSurface)
-                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityHidden(true)
                 if let message = card.message {
                     Text(message)
                         .foregroundStyle(theme.secondaryText)
+                        .accessibilityHidden(true)
                 }
                 HStack(spacing: 24) {
                     ForEach(card.actions) { action in
