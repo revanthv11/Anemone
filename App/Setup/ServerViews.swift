@@ -1,22 +1,26 @@
 import AnemoneCore
 import AnemoneJellyfin
+import AnemoneUI
 import SwiftUI
 
 /// Saved servers, most recently used first, plus "Add server".
 struct ServerListView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.theme) private var theme
 
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 32) {
                 Text("Servers")
                     .font(.largeTitle.bold())
+                    .foregroundStyle(theme.onBackground)
+                    .accessibilityAddTraits(.isHeader)
                 if let notice = model.notice {
                     NoticeText(notice)
                 }
                 if model.accounts.servers.isEmpty {
                     Text("Add your Jellyfin server to get started.")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.secondaryText)
                 }
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
@@ -60,11 +64,14 @@ struct AddServerView: View {
     @State private var address = ""
     @State private var isConnecting = false
     @State private var error: ServerConnectionError?
+    @Environment(\.theme) private var theme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 32) {
             Text("Add a server")
                 .font(.largeTitle.bold())
+                .foregroundStyle(theme.onBackground)
+                .accessibilityAddTraits(.isHeader)
             TextField("Server address", text: $address)
                 .textContentType(.URL)
                 .keyboardType(.URL)
@@ -74,7 +81,7 @@ struct AddServerView: View {
                 .accessibilityIdentifier("addServer.address")
             Text("For example 192.168.1.20:8096 or https://jellyfin.example.com")
                 .font(.callout)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.secondaryText)
             Button(isConnecting ? "Connecting…" : "Connect", action: connect)
                 .disabled(isConnecting || address.isEmpty)
                 .accessibilityIdentifier("addServer.connect")
@@ -100,8 +107,11 @@ struct AddServerView: View {
     }
 }
 
+/// A problem to tell the user about, in the theme's error colour.
 struct NoticeText: View {
     private let text: String
+
+    @Environment(\.theme) private var theme
 
     init(_ text: String) {
         self.text = text
@@ -109,7 +119,7 @@ struct NoticeText: View {
 
     var body: some View {
         Label(text, systemImage: "exclamationmark.circle")
-            .foregroundStyle(.orange)
+            .foregroundStyle(theme.error)
             .accessibilityIdentifier("notice")
     }
 }

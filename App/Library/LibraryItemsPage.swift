@@ -17,6 +17,7 @@ struct LibraryItemsPage: View {
     var onExitTop: (() -> Void)?
 
     @Environment(BrowseModel.self) private var browse
+    @Environment(\.theme) private var theme
     @State private var settings: LibraryDisplaySettings?
     @State private var content = Content.loading
     @State private var isReloading = false
@@ -177,11 +178,13 @@ struct LibraryItemsPage: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(heading)
                     .font(.title2.bold())
+                    .foregroundStyle(theme.onBackground)
                     .lineLimit(1)
+                    .accessibilityAddTraits(.isHeader)
                 if let count {
                     Text(count == 1 ? "1 item" : "\(count.formatted()) items")
                         .font(.callout)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.secondaryText)
                 }
             }
             Spacer()
@@ -205,7 +208,7 @@ struct LibraryItemsPage: View {
                 .focusSection()
             VStack(spacing: 24) {
                 Text(text)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryText)
                     .multilineTextAlignment(.center)
                 actions()
             }
@@ -355,7 +358,9 @@ private struct SortMenu: View {
         } label: {
             Label(sort.field.title, systemImage: sort.direction.systemImage)
         }
-        .accessibilityLabel("Sort by \(sort.field.title), \(sort.direction == .ascending ? "ascending" : "descending")")
+        .accessibilityLabel(sort.direction == .ascending
+            ? Text("Sort by \(sort.field.title), ascending")
+            : Text("Sort by \(sort.field.title), descending"))
         .accessibilityIdentifier("library.sort")
     }
 }

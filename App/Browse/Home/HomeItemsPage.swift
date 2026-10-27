@@ -9,6 +9,7 @@ struct HomeItemsPage: View {
 
     @Environment(BrowseModel.self) private var browse
     @Environment(\.pageStack) private var stack
+    @Environment(\.theme) private var theme
     @State private var content = Content.loading
 
     private enum Content {
@@ -38,7 +39,7 @@ struct HomeItemsPage: View {
             case .failed:
                 VStack(spacing: 24) {
                     Text("Couldn't load \(link.title) from \(browse.server.name).")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.secondaryText)
                     Button("Try again") {
                         Task { await load() }
                     }
@@ -55,16 +56,20 @@ struct HomeItemsPage: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(link.title)
                 .font(.title2.bold())
+                .foregroundStyle(theme.onBackground)
                 .lineLimit(1)
             Text([link.query.library.name, count == 1 ? "1 item" : "\(count.formatted()) items"]
                 .filter { !$0.isEmpty }
                 .joined(separator: " · "))
                 .font(.callout)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.secondaryText)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        // Gives focus somewhere to rest above the grid, as the library page's buttons do.
+        // Gives focus somewhere to rest above the grid, as the library page's buttons do, and
+        // VoiceOver reads it as the page's heading when it's there.
         .focusable()
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
     }
 
     private func load() async {

@@ -265,41 +265,21 @@ private extension HomeRow {
     }
 }
 
-private struct HomeHeader: View {
-    let item: MediaItem?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(item?.displayTitle ?? " ")
-                .font(.title2.bold())
-                .lineLimit(1)
-                .accessibilityIdentifier("home.header.title")
-            Text(item?.subtitle ?? " ")
-                .font(.title3)
-                .lineLimit(1)
-            Text(item?.details ?? " ")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-            Text(item?.overview ?? " ")
-                .font(.callout)
-                .lineLimit(3, reservesSpace: true)
-                .frame(maxWidth: 1100, alignment: .leading)
-        }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .frame(height: HomeLayout.headerHeight, alignment: .bottomLeading)
-        .animation(nil, value: item)
-    }
-}
-
+/// A row's title over its cards. VoiceOver hears the row as a group named by its title, and the
+/// title as a heading.
 private struct HomeRowView: View {
     let row: HomeRow
     let focusedCard: FocusState<CardID?>.Binding
     let scrollTarget: CardID?
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(row.title)
                 .font(.headline)
+                .foregroundStyle(theme.onBackground)
+                .accessibilityAddTraits(.isHeader)
             ScrollViewReader { scroller in
                 ScrollView(.horizontal) {
                     LazyHStack(spacing: CGFloat(row.config.viewOptions.spacing) * HomeCardStyle.spacingPointsPerDp) {
@@ -327,6 +307,9 @@ private struct HomeRowView: View {
             }
         }
         .focusSection()
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text(verbatim: row.title))
+        .accessibilityIdentifier("home.row.\(row.id)")
         // Lets the menus of Continue Watching and Next Up cards take them out of their row.
         .environment(\.cardMenuSource, row.config.kind.menuSource)
     }
@@ -362,32 +345,7 @@ private extension HomeRowConfig.Kind {
     }
 }
 
-private struct HomeMessage<Actions: View>: View {
-    let title: String
-    let message: String
-    @ViewBuilder var actions: Actions
-
-    var body: some View {
-        VStack(spacing: 24) {
-            Text(title)
-                .font(.title2.bold())
-            Text(message)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 1000)
-            actions
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-private extension HomeMessage where Actions == EmptyView {
-    init(title: String, message: String) {
-        self.init(title: title, message: message) { EmptyView() }
-    }
-}
-
-private enum HomeLayout {
+enum HomeLayout {
     static let headerHeight: CGFloat = 340
     static let headerSpacing: CGFloat = 24
     static let horizontalInset: CGFloat = 80

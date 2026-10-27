@@ -2,7 +2,7 @@ import NukeUI
 import SwiftUI
 
 /// An item's logo, falling back to its title as text when there's no logo or it fails to load,
-/// like Wholphin's `TitleOrLogo`.
+/// like Wholphin's `TitleOrLogo`. VoiceOver reads the title either way.
 public struct LogoImage<Title: View>: View {
     private let url: URL?
     private let maxWidth: CGFloat
@@ -24,6 +24,9 @@ public struct LogoImage<Title: View>: View {
                         .resizable()
                         .scaledToFit()
                         .frame(maxWidth: maxWidth, maxHeight: height, alignment: .leading)
+                        .accessibilityRepresentation {
+                            title
+                        }
                 } else if state.error != nil {
                     title
                 } else {

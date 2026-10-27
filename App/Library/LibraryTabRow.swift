@@ -1,4 +1,5 @@
 import AnemoneJellyfin
+import AnemoneUI
 import SwiftUI
 
 /// Wholphin's tab row (`TabRow`) along the top of a library: selecting a tab shows it. Coming
@@ -42,8 +43,8 @@ extension LibrarySection {
     }
 }
 
-/// A tab: dim until its row has focus or it's the tab showing, which is underlined, and lit up
-/// when focused, like Wholphin's tab and its indicator.
+/// A tab: dim until its row has focus or it's the tab showing, which is underlined in the
+/// theme's accent, and lit up when focused, like Wholphin's tab and its indicator.
 private struct TabButtonStyle: ButtonStyle {
     let isSelected: Bool
 
@@ -56,6 +57,7 @@ private struct TabButtonStyle: ButtonStyle {
         let isSelected: Bool
 
         @Environment(\.isFocused) private var isFocused
+        @Environment(\.theme) private var theme
 
         var body: some View {
             configuration.label
@@ -65,11 +67,11 @@ private struct TabButtonStyle: ButtonStyle {
                 .padding(.vertical, 12)
                 .background {
                     Capsule()
-                        .fill(isFocused ? AnyShapeStyle(.white) : AnyShapeStyle(.clear))
+                        .fill(isFocused ? theme.focusedPlatter : theme.focusedPlatter.withAlpha(0))
                 }
                 .overlay(alignment: .bottom) {
                     Capsule()
-                        .fill(.primary)
+                        .fill(theme.accent)
                         .frame(width: 32, height: 3)
                         .opacity(isSelected && !isFocused ? 1 : 0)
                 }
@@ -77,13 +79,13 @@ private struct TabButtonStyle: ButtonStyle {
                 .animation(.easeOut(duration: 0.15), value: isFocused)
         }
 
-        private var foreground: AnyShapeStyle {
+        private var foreground: ThemeColor {
             if isFocused {
-                AnyShapeStyle(.black)
+                theme.onFocusedPlatter
             } else if isSelected {
-                AnyShapeStyle(.primary)
+                theme.onBackground
             } else {
-                AnyShapeStyle(.secondary)
+                theme.secondaryText
             }
         }
     }

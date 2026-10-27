@@ -4,9 +4,13 @@ import SwiftUI
 ///
 /// Put it in a borderless button: on tvOS the artwork lifts when focused, like the TV app, with a
 /// ring in the theme's focus colour, as Wholphin's cards have.
+///
+/// VoiceOver reads it as one element, whether or not the caption shows: the title, the subtitle,
+/// then the marks over the artwork (`CardSpokenMark`). The artwork itself is decoration.
 public struct MediaCard: View {
     private let title: String
     private let subtitle: String?
+    private let spokenSubtitle: Text?
     private let imageURL: URL?
     private let shape: CardShape
     private let width: CGFloat
@@ -20,6 +24,8 @@ public struct MediaCard: View {
     @Environment(\.isFocused) private var isFocused
 
     /// - Parameters:
+    ///   - spokenSubtitle: what VoiceOver reads for the subtitle when it's written for the eye,
+    ///     like an episode's "S1:E3"; the subtitle itself when `nil`.
     ///   - progress: from 0 to 1; draws a bar along the bottom when above 0.
     ///   - showsCaption: whether the title and subtitle show under the artwork.
     ///   - menuItem: what the card shows, for the long-press menu that `cardMenu()` on the
@@ -27,6 +33,7 @@ public struct MediaCard: View {
     public init(
         title: String,
         subtitle: String? = nil,
+        spokenSubtitle: Text? = nil,
         imageURL: URL?,
         shape: CardShape,
         width: CGFloat,
@@ -37,6 +44,7 @@ public struct MediaCard: View {
     ) {
         self.title = title
         self.subtitle = subtitle
+        self.spokenSubtitle = spokenSubtitle
         self.imageURL = imageURL
         self.shape = shape
         self.width = width
@@ -47,8 +55,9 @@ public struct MediaCard: View {
     }
 
     public var body: some View {
+        let marks = shownMarks
         VStack(alignment: .leading, spacing: 12) {
-            artwork(shownMarks)
+            artwork(marks)
             if showsCaption {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
@@ -63,7 +72,23 @@ public struct MediaCard: View {
                 .frame(width: width, alignment: .leading)
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel { _ in
+            Text(verbatim: title)
+            if let subtitle = spokenSubtitle ?? writtenSubtitle {
+                subtitle
+            }
+            ForEach(CardSpokenMark.marks(for: marks), id: \.self) { mark in
+                Text(mark.spoken)
+            }
+        }
         .preference(key: CardMenuRequestKey.self, value: menuItem.map { CardMenuRequest(item: $0, marks: givenMarks) })
+    }
+
+    /// The subtitle as written, unless there's nothing to read.
+    private var writtenSubtitle: Text? {
+        guard let subtitle, !subtitle.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
+        return Text(verbatim: subtitle)
     }
 
     private var givenMarks: CardMarks {
@@ -88,7 +113,7 @@ public struct MediaCard: View {
             }
             .overlay(alignment: .topLeading) {
                 if badges.isFavorite {
-                    Badge(systemImage: "heart.fill", tint: theme.favorite, fill: theme.cardBadge, label: "Favorite")
+                    Badge(systemImage: "heart.fill", tint: theme.favorite, fill: theme.cardBadge)
                         .padding(Self.progressInset)
                 }
             }
@@ -100,7 +125,6 @@ public struct MediaCard: View {
                             systemImage: "checkmark",
                             tint: theme.onWatchedBadge,
                             fill: theme.watchedBadge,
-                            label: "Watched",
                         )
                     }
                     if let count = badges.unplayedCount, count > 0 {
@@ -110,7 +134,6 @@ public struct MediaCard: View {
                             .frame(minWidth: Badge.size, minHeight: Badge.size)
                             .foregroundStyle(theme.onCardBadge)
                             .background(theme.cardBadge, in: .capsule)
-                            .accessibilityLabel("\(count) unwatched")
                     }
                 }
                 .padding(Self.progressInset)
@@ -161,7 +184,6 @@ private struct Badge: View {
     let systemImage: String
     let tint: ThemeColor
     let fill: ThemeColor
-    let label: String
 
     var body: some View {
         Image(systemName: systemImage)
@@ -169,7 +191,6 @@ private struct Badge: View {
             .foregroundStyle(tint)
             .frame(width: Self.size, height: Self.size)
             .background(fill, in: .circle)
-            .accessibilityLabel(label)
     }
 }
 
@@ -189,7 +210,5 @@ private struct ProgressBar: View {
                     .fill(theme.progress)
                     .frame(width: width * min(progress, 1))
             }
-            .accessibilityElement()
-            .accessibilityLabel("\(Int((progress * 100).rounded()))% watched")
     }
 }

@@ -5,7 +5,7 @@ import SwiftUI
 ///
 /// Put it in a button styled `.personCard`: the photo lifts itself when focused, staying round,
 /// with a ring and a glow in the theme's focus colours. tvOS's own focus effects draw a square
-/// platter around it.
+/// platter around it. VoiceOver reads the name, then the role.
 public struct PersonCard: View {
     private let name: String
     private let role: String?
@@ -56,6 +56,14 @@ public struct PersonCard: View {
             .offset(y: isFocused ? 10 : 0)
         }
         .animation(.easeOut(duration: 0.2), value: isFocused)
+        // The photo is decoration; a blank role, which keeps the caption's height, isn't read.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel { _ in
+            Text(verbatim: name)
+            if let role, !role.trimmingCharacters(in: .whitespaces).isEmpty {
+                Text(verbatim: role)
+            }
+        }
     }
 }
 

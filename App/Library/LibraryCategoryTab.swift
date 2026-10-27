@@ -20,6 +20,7 @@ struct LibraryCategoryTab: View {
     var onExitTop: (() -> Void)?
 
     @Environment(BrowseModel.self) private var browse
+    @Environment(\.theme) private var theme
     @State private var content = Content.loading
     /// Genre cards' artwork, which arrives after the genres.
     @State private var genreArt: [String: ItemImage] = [:]
@@ -77,7 +78,7 @@ struct LibraryCategoryTab: View {
             header: {
                 Text(pager.count == 1 ? "1 \(singular)" : "\(pager.count.formatted()) \(noun)")
                     .font(.callout)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryText)
             },
         )
     }
@@ -85,7 +86,7 @@ struct LibraryCategoryTab: View {
     private func message(_ text: String, @ViewBuilder actions: () -> some View) -> some View {
         VStack(spacing: 24) {
             Text(text)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.secondaryText)
                 .multilineTextAlignment(.center)
             actions()
         }
@@ -161,7 +162,8 @@ struct LibraryCategoryPage: Hashable {
     let title: String
 }
 
-/// A 16:9 card with a name over a picture, like Wholphin's `GenreCard` and `StudioCard`.
+/// A 16:9 card with a name over a picture, like Wholphin's `GenreCard` and `StudioCard`, which
+/// VoiceOver reads by its name, even when a studio's logo stands for it.
 private struct CategoryCard: View {
     let id: String?
     let name: String
@@ -170,19 +172,25 @@ private struct CategoryCard: View {
     let showsNameOverImage: Bool
     let width: CGFloat
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         ZStack {
             Rectangle()
-                .fill(.quaternary)
+                .fill(theme.surfaceVariant)
             if let imageURL {
                 ArtworkImage(url: imageURL)
                     .opacity(0.75)
             }
             if showsNameOverImage || imageURL == nil {
-                Rectangle()
-                    .fill(Color(id: id).opacity(showsNameOverImage ? 0.6 : 0.4))
+                // A card still loading shows the placeholder alone.
+                if let id {
+                    Rectangle()
+                        .fill(Color(id: id).opacity(showsNameOverImage ? 0.6 : 0.4))
+                }
                 Text(name)
                     .font(.title3.bold())
+                    .foregroundStyle(theme.onSurfaceVariant)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .padding(16)
@@ -191,17 +199,15 @@ private struct CategoryCard: View {
         .frame(width: width, height: width / CardShape.thumb.aspectRatio)
         .clipShape(.rect(cornerRadius: 12))
         .hoverEffect(.highlight)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: name))
     }
 }
 
 private extension Color {
     /// A colour of the ID's own, like Wholphin's `rememberIdColor`: a hue from the ID, fairly
     /// saturated and dark, so white text stands out on it. The same ID always gets the same one.
-    init(id: String?) {
-        guard let id else {
-            self = .gray
-            return
-        }
+    init(id: String) {
         // FNV-1a, since Swift's own hashes change from one launch to the next.
         var hash: UInt64 = 0xCBF2_9CE4_8422_2325
         for byte in id.utf8 {

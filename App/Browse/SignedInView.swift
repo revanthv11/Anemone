@@ -1,5 +1,6 @@
 import AnemoneCore
 import AnemoneJellyfin
+import AnemoneUI
 import SwiftUI
 
 /// The signed-in app: a sidebar with Home, Search, Favorites, the user's libraries and Settings,
@@ -86,13 +87,18 @@ struct PlaceholderPage: View {
     let title: String
     let message: String
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             Text(title)
                 .font(.largeTitle.bold())
+                .foregroundStyle(theme.onBackground)
             Text(message)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.secondaryText)
         }
+        // Read as one, since it's focused as one.
+        .accessibilityElement(children: .combine)
         // Gives focus somewhere to rest, so pressing left opens the sidebar again.
         .focusable()
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
