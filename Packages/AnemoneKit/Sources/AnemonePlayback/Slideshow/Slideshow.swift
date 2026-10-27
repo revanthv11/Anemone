@@ -27,6 +27,10 @@ public final class Slideshow {
     /// Wholphin's limits for the time each photo shows.
     public static let durationRange = 1000 ... 30000
 
+    /// Waits for a length of time before the slideshow moves on. Tests pass their own, so they
+    /// don't depend on how busy the machine is.
+    public typealias Sleep = @Sendable (Duration) async throws -> Void
+
     public let pager: SlideshowPager
     /// The photo showing, or about to once its page loads.
     public private(set) var position = 0
@@ -36,23 +40,41 @@ public final class Slideshow {
     public private(set) var isPaused = false
     @ObservationIgnored private let delay: Duration
     @ObservationIgnored private let loadTimeout: Duration
+    @ObservationIgnored private let sleep: Sleep
     @ObservationIgnored private var timer: Task<Void, Never>?
     /// Photos and clips that couldn't be shown, which a running slideshow passes over.
     @ObservationIgnored private var failed: Set<MediaItem.ID> = []
     /// How long the clip showing is, once it's playing.
     @ObservationIgnored private var clipLength: Duration?
+    /// The photo on screen, once it has loaded. Moving to it again, as a slideshow of one photo
+    /// does, or back to it while the next is still loading behind it, changes nothing on screen,
+    /// so no `photoShown()` comes; its time starts at once instead.
+    @ObservationIgnored private var shownID: MediaItem.ID?
 
-    /// - Parameter loadTimeout: how long a running slideshow waits for a photo or clip to load
-    ///   before moving on anyway.
-    public init(pager: SlideshowPager, delay: Duration, loadTimeout: Duration = .seconds(15)) {
+    /// - Parameters:
+    ///   - loadTimeout: how long a running slideshow waits for a photo or clip to load before
+    ///     moving on anyway.
+    ///   - sleep: waits for each photo's time, `Task.sleep` unless a test passes its own.
+    public init(
+        pager: SlideshowPager,
+        delay: Duration,
+        loadTimeout: Duration = .seconds(15),
+        sleep: @escaping Sleep = { try await Task.sleep(for: $0) },
+    ) {
         self.pager = pager
         self.delay = delay
         self.loadTimeout = loadTimeout
+        self.sleep = sleep
     }
 
     /// How long each photo shows, from the user's setting within Wholphin's limits.
     public static func delay(in defaults: UserDefaults = .standard) -> Duration {
-        let milliseconds = Preferences.slideshowDuration.value(in: defaults)
+        let key = Preferences.slideshowDuration.key
+        // `integer(forKey:)` also reads the setting given as a launch argument
+        // (`-slideshowDuration 2000`), which arrives as a string that `Preference` passes over.
+        let milliseconds = defaults.object(forKey: key) == nil
+            ? Preferences.slideshowDuration.defaultValue
+            : defaults.integer(forKey: key)
         return .milliseconds(durationRange.contains(milliseconds) ? milliseconds : 5000)
     }
 
@@ -123,6 +145,7 @@ public final class Slideshow {
 
     /// The photo showing has loaded: its time starts now.
     public func photoShown() {
+        shownID = current?.id
         restartTime()
     }
 
@@ -131,6 +154,8 @@ public final class Slideshow {
     public func itemFailed(_ itemID: MediaItem.ID) {
         failed.insert(itemID)
         if current?.id == itemID {
+            // Its message shows in place of the last photo.
+            shownID = nil
             restartTime()
         }
     }
@@ -161,15 +186,16 @@ public final class Slideshow {
     private func wait(_ length: Duration) {
         timer?.cancel()
         guard isActive else { return }
-        timer = Task { [weak self] in
-            try? await Task.sleep(for: length)
+        timer = Task { [weak self, sleep] in
+            try? await sleep(length)
             guard !Task.isCancelled else { return }
             self?.moveOn()
         }
     }
 
     /// The next photo that hasn't failed, or the first after the last; when they all have, the
-    /// next anyway. Its time starts once it has loaded, unless it doesn't in time.
+    /// next anyway. Its time starts once it has loaded, unless it doesn't in time, or at once
+    /// when it's the photo already on screen.
     private func moveOn() {
         let count = pager.count
         guard isActive, count > 0 else { return }
@@ -178,7 +204,13 @@ public final class Slideshow {
             pager.item(at: candidate).map { !failed.contains($0.id) } ?? true
         } ?? following[0]
         go(to: index)
-        if current.map({ !failed.contains($0.id) }) ?? true {
+        guard let current else {
+            wait(loadTimeout)
+            return
+        }
+        if current.id == shownID {
+            restartTime()
+        } else if !failed.contains(current.id) {
             wait(loadTimeout)
         }
     }
@@ -188,6 +220,10 @@ public final class Slideshow {
             clipLength = nil
         }
         position = index
+        if current?.kind == .video {
+            // A clip plays in place of the photo view, which loads its photo afresh after it.
+            shownID = nil
+        }
         guard let current else {
             let pager = pager
             Task { [weak self] in
