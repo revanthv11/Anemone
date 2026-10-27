@@ -157,7 +157,18 @@ Tested live in the simulator against the Jellyfin 12.3 demo server profile saved
 
 #### 2d: search
 
-Not started. Wholphin's search page: type-ahead, results in rows by type, search type and view options, recent searches.
+- [x] Search tab with the system search keyboard: results appear as the user types, 750 ms after typing pauses, as in Wholphin. The keyboard's dictation stands in for Wholphin's voice search button, so its "show voice search button" setting is left out
+- [x] Results in a row per type, in Wholphin's order: movies, TV shows, episodes, collections, people, albums, artists, songs, music videos, playlists, videos, photos and photo albums. Each row says "Searching…" until its own search ends; rows with nothing found are hidden. People are always searched, other types only when one of the user's libraries holds them. Results are ranked by Wholphin's `SearchRelevance`: exact name, then prefix, word start, anywhere, near miss, with `/pattern/` queries matched as regular expressions
+- [x] View options: combined results (one grid of everything, best match first) and the types to include, kept per profile on the device
+- [x] Recent searches, which Wholphin doesn't have: a search is kept when one of its results is opened, up to 10, and offered before anything is typed, with a button to clear them. Picking one searches at once and moves focus to the first row with results, as Wholphin does after a search is submitted
+- [x] Selecting a result opens its page on the Search tab's own stack; Back returns focus to the result, with the query and results still there
+- [x] The requests behind Wholphin's `SearchForDialog` (search one type, and its newest items as suggestions), for picking a collection or playlist in Settings › Home (2e)
+
+Fixed while porting: a home-videos library makes videos, photos and photo albums searchable (Wholphin's list keeps only photo albums), and a library of mixed content or folders makes movies, series, episodes and videos searchable (Wholphin searches none of them there).
+
+Tested live in the simulator against the Jellyfin 12.3 demo server: typing "St. Louis" shows The Great St. Louis Bank Robbery in a Movies row; selecting it opens the movie page, and Back returns focus to its card with the query and results still showing. "th" gives Movies, Episodes, People, Albums and Songs rows. After relaunching, "St. Louis" is under Recent Searches, and picking it searches at once and moves focus to the result. Combined results show one grid; leaving People out hides its row, and including it again brings the row back. Not verified live: dictation (the simulator has no microphone), rows for collections, playlists, music videos, videos and photos (the demo server has none of those libraries), a failed search's message, and the `SearchForDialog` requests, which only the unit tests cover.
+
+Not yet: Live TV channels and programs in results (with 5a), Seerr's Discover row (5d), the card context menu (2h), and artist pages: an artist opens the generic item page until music (5b).
 
 #### 2e: home row types, customization and server sync
 
