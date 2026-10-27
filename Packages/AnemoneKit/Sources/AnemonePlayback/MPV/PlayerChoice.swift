@@ -113,6 +113,9 @@ public final class SwitchingEngine: PerEntryEngine, MPVEngineProviding {
     /// The engine playing; MPV until an entry says otherwise.
     public private(set) var kind = EngineKind.mpv
     private var isShown = false
+    /// Counts prepares and stops, so a choice the server answers after the player stopped, or
+    /// after a newer entry's, changes nothing.
+    private var generation = 0
 
     init(choose: @escaping Choose, makeMPV: @escaping @MainActor () -> MPVPlayerEngine) {
         self.choose = choose
@@ -120,7 +123,10 @@ public final class SwitchingEngine: PerEntryEngine, MPVEngineProviding {
     }
 
     public func prepare(for entry: PlaybackQueue.Entry) async {
+        generation += 1
+        let preparing = generation
         let kind = await choose(entry)
+        guard preparing == generation else { return }
         Logger.mpv.info("Prefer MPV: \(entry.metadata.title, privacy: .public) plays in \(String(describing: kind))")
         guard kind != self.kind || !isShown else { return }
         if isShown {
@@ -134,6 +140,12 @@ public final class SwitchingEngine: PerEntryEngine, MPVEngineProviding {
 
     public var mpvEngine: MPVPlayerEngine? {
         kind == .mpv ? mpvPlayer : nil
+    }
+
+    /// The engine playing, if it's been made: what isn't loading a stream uses it, so asking
+    /// where playback is, or stopping, before the first entry is prepared doesn't start one.
+    private var existing: (any PlayerEngine)? {
+        kind == .mpv ? mpvPlayer : avPlayer
     }
 
     /// The engine playing, made when it's first needed.
@@ -182,43 +194,45 @@ public final class SwitchingEngine: PerEntryEngine, MPVEngineProviding {
     }
 
     public func play() {
-        active.play()
+        existing?.play()
     }
 
     public func pause() {
-        active.pause()
+        existing?.pause()
     }
 
     public func stop() {
-        active.stop()
+        generation += 1
+        existing?.stop()
     }
 
     public func seek(to position: Duration) async -> Bool {
-        await active.seek(to: position)
+        await existing?.seek(to: position) ?? false
     }
 
     public var currentTime: Duration {
-        active.currentTime
+        existing?.currentTime ?? .zero
     }
 
     public var duration: Duration? {
-        active.duration
+        existing?.duration
     }
 
+    /// Kept for an engine made later.
     public var rate: Float {
         get { speed }
         set {
             speed = newValue
-            active.rate = newValue
+            existing?.rate = newValue
         }
     }
 
     public func tracks(_ kind: PlayerTrack.Kind) async -> [PlayerTrack] {
-        await active.tracks(kind)
+        await existing?.tracks(kind) ?? []
     }
 
     public func select(_ track: PlayerTrack?, _ kind: PlayerTrack.Kind) async {
-        await active.select(track, kind)
+        await existing?.select(track, kind)
     }
 }
 

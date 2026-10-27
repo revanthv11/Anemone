@@ -1,3 +1,4 @@
+import AnemoneJellyfin
 import Foundation
 import JellyfinAPI
 import os
@@ -18,10 +19,10 @@ public final class MPVPlayerEngine: PlayerEngine {
     private let client: (any MPVClient)?
     private var listener: Task<Void, Never>?
     /// The stream loading or loaded, until another replaces it or the engine stops.
-    private var current: Load?
-    /// Seeks waiting for libmpv to land, newest last. A newer seek replaces older ones.
-    private var seeks: [(id: Int, done: CheckedContinuation<Bool, Never>)] = []
-    private var seekCount = 0
+    private var current: MPVLoad?
+    /// The newest playlist entry libmpv has named, for a load whose entry libmpv didn't say.
+    private var newestEntry: Int64 = 0
+    private let seeks: MPVSeeks
     private var lastTime = Duration.zero
     private var speed: Float = 1
     /// What libmpv last said, which together decide the status.
@@ -32,20 +33,6 @@ public final class MPVPlayerEngine: PlayerEngine {
     /// What the subtitles look like, with a second look for HDR video if the user set one.
     private var subtitleStyles: SubtitleStyles?
     private var isHDR = false
-
-    /// A stream being played: its events, where it starts, and how far it's got.
-    private struct Load {
-        let events: AsyncStream<PlayerEvent>.Continuation
-        let start: Duration?
-        /// The playlist entry libmpv made for it, which tells its start and end apart from those
-        /// of the file it replaced.
-        let entry: Int64
-        /// libmpv started on this file; anything it says about the file before belongs to the
-        /// one this replaced.
-        var hasStarted = false
-        var isReady = false
-        var hasEnded = false
-    }
 
     #if os(tvOS) || os(iOS)
         /// An engine with libmpv set up from the user's settings.
@@ -61,10 +48,11 @@ public final class MPVPlayerEngine: PlayerEngine {
         }
     #endif
 
-    init(client: (any MPVClient)?, layer: CALayer, profile: DeviceProfile) {
+    init(client: (any MPVClient)?, layer: CALayer, profile: DeviceProfile, seeks: MPVSeeks = MPVSeeks()) {
         self.client = client
         videoOutput = .layer(layer)
         deviceProfile = profile
+        self.seeks = seeks
         listen()
     }
 
@@ -91,12 +79,13 @@ public final class MPVPlayerEngine: PlayerEngine {
         }
         // The index argument (-1) only matters when inserting; options come after it.
         let arguments = ["loadfile", url.absoluteString, "replace", "-1", options.joined(separator: ",")]
-        guard let entry = client.loadFile(arguments) else {
+        guard case let .started(entry) = client.loadFile(arguments) else {
             events.yield(.failed(PlayerError.streamFailed(underlying: MPVError.refused)))
             events.finish()
             return stream
         }
-        current = Load(events: events, start: start, entry: entry)
+        current = MPVLoad(events: events, url: url, entry: entry, newerThan: newestEntry)
+        newestEntry = max(newestEntry, entry ?? 0)
         lastTime = start ?? .zero
         reportedStatus = nil
         isHDR = false
@@ -118,16 +107,18 @@ public final class MPVPlayerEngine: PlayerEngine {
     }
 
     /// Exact, like AVPlayer's, rather than to the keyframe before it. libmpv says it has landed
-    /// with a playback restart; a newer seek replaces this one.
+    /// with a playback restart; a newer seek replaces this one, and one libmpv refuses, as on a
+    /// live stream, doesn't get there (see `MPVSeeks`).
     public func seek(to position: Duration) async -> Bool {
-        guard let client, current?.isReady == true else { return false }
-        seekCount += 1
-        let id = seekCount
+        guard let client, current?.isReady == true,
+              client.command(["seek", Self.seconds(position), "absolute+exact"])
+        else { return false }
         lastTime = position
-        client.command(["seek", Self.seconds(position), "absolute+exact"])
-        return await withCheckedContinuation { done in
-            seeks.append((id, done))
-        }
+        let landed = await seeks.land()
+        #if DEBUG
+            Logger.mpv.info("seek to \(Self.seconds(position), privacy: .public): \(landed ? "landed" : "didn't land")")
+        #endif
+        return landed
     }
 
     public var currentTime: Duration {
@@ -177,17 +168,43 @@ public final class MPVPlayerEngine: PlayerEngine {
         applySubtitleStyle()
     }
 
-    /// Adds subtitles from outside the file, such as ones just downloaded, and shows them.
-    public func addSubtitles(from url: URL, title: String, language: String?) {
-        var arguments = ["sub-add", url.absoluteString, "select", title]
+    /// Adds subtitles from outside the file, such as ones just downloaded, listed among the
+    /// tracks, and shows them unless `selecting` is off.
+    public func addSubtitles(from url: URL, title: String, language: String?, selecting: Bool = true) {
+        var arguments = ["sub-add", url.absoluteString, selecting ? "select" : "auto", title]
         if let language {
             arguments.append(language)
         }
         client?.command(arguments)
     }
 
-    // MARK: - libmpv's events
+    /// Adds the subtitle files beside the stream loaded from `url` once libmpv has opened it,
+    /// showing the server's default; nothing if another stream has replaced it. MPV's profile
+    /// has the server deliver such files as External, so they aren't in the stream itself.
+    public func addExternalSubtitles(_ subtitles: [ExternalSubtitle], toStreamFrom url: URL) {
+        guard current?.url == url else { return }
+        guard current?.isLoaded == true else {
+            current?.pendingSubtitles += subtitles
+            return
+        }
+        add(subtitles)
+    }
 
+    private func add(_ subtitles: [ExternalSubtitle]) {
+        for subtitle in subtitles {
+            addSubtitles(
+                from: subtitle.url,
+                title: subtitle.title,
+                language: subtitle.language,
+                selecting: subtitle.isDefault,
+            )
+        }
+    }
+}
+
+// MARK: - libmpv's events
+
+extension MPVPlayerEngine {
     private func listen() {
         guard let events = client?.events else { return }
         listener = Task { [weak self] in
@@ -198,25 +215,38 @@ public final class MPVPlayerEngine: PlayerEngine {
         }
     }
 
+    /// Events about a file count only when they name the current stream's entry.
     func handle(_ event: MPVEvent) {
         switch event {
         case let .startFile(entry):
-            if current?.entry == entry {
-                current?.hasStarted = true
-            }
-        case .playbackRestart:
+            newestEntry = max(newestEntry, entry)
+            current?.started(entry)
+        case let .fileLoaded(entry) where current?.owns(entry) == true:
+            fileLoaded()
+        case let .seek(entry) where current?.owns(entry) == true:
+            seeks.started()
+        case let .playbackRestart(entry) where current?.owns(entry) == true:
             restarted()
-        case let .endFile(entry, reason):
-            ended(entry, reason)
+        case let .endFile(entry, reason) where current?.owns(entry) == true:
+            ended(reason)
         case let .property(name, value):
             changed(name, to: value)
         case .shutdown:
-            endLoad()
+            fail(MPVError.stopped)
+        case .fileLoaded, .seek, .playbackRestart, .endFile:
+            break
         }
     }
 
+    private func fileLoaded() {
+        current?.isLoaded = true
+        let pending = current?.pendingSubtitles ?? []
+        current?.pendingSubtitles = []
+        add(pending)
+    }
+
     private func restarted() {
-        guard var load = current, load.hasStarted else { return }
+        guard var load = current else { return }
         guard load.isReady else {
             load.isReady = true
             current = load
@@ -225,22 +255,28 @@ public final class MPVPlayerEngine: PlayerEngine {
             reportStatus()
             return
         }
-        // A seek landed: the newest one got there, older ones were replaced.
-        finishSeeks { $0 == seekCount }
+        seeks.landed()
     }
 
     /// A file that won't open (the server's error, a format libmpv doesn't know) ends with an
     /// error before it ever loads, so its entry, not how far it got, says it's this stream's.
-    private func ended(_ entry: Int64, _ reason: MPVEndReason) {
-        guard let load = current, load.entry == entry else { return }
+    /// The engine ends a stream itself before it stops or replaces it, so a stream libmpv
+    /// unloads any other way, as when it shuts down, failed.
+    private func ended(_ reason: MPVEndReason) {
         switch reason {
-        case let .failed(message):
-            load.events.yield(.failed(PlayerError.streamFailed(underlying: MPVError(reason: message))))
-            endLoad()
-        case .endOfFile:
+        case .endOfFile where current?.isReady == true:
             reachedEnd()
-        case .stopped:
-            break
+        case .endOfFile:
+            // Unloaded before it ever played.
+            fail(MPVError.endedEarly)
+        case let .redirected(next?):
+            current?.redirect(to: next)
+        case .redirected(nil):
+            fail(MPVError.emptyPlaylist)
+        case let .failed(message):
+            fail(MPVError(reason: message))
+        case .stopped, .quit:
+            fail(MPVError.stopped)
         }
     }
 
@@ -270,13 +306,26 @@ public final class MPVPlayerEngine: PlayerEngine {
         reportStatus()
     }
 
-    /// With `keep-open`, the last frame stays up at the end, as with AVPlayer, for Up Next.
+    /// With `keep-open`, the last frame stays up at the end, as with AVPlayer, for Up Next. An
+    /// end well before the duration is a read or network error (see `isRealEnd(at:of:)`).
     private func reachedEnd() {
         guard var load = current, load.isReady, !load.hasEnded else { return }
+        guard Self.isRealEnd(at: currentTime, of: duration) else {
+            return fail(MPVError.endedEarly)
+        }
         load.hasEnded = true
         current = load
-        finishSeeks { _ in true }
+        seeks.finishAll(landed: true)
         load.events.yield(.ended)
+    }
+
+    /// Fails the stream and ends its events, unless it already played to the end.
+    private func fail(_ error: MPVError) {
+        if let load = current, !load.hasEnded {
+            Logger.mpv.info("stream failed: \(error.reason, privacy: .public)")
+            load.events.yield(.failed(PlayerError.streamFailed(underlying: error)))
+        }
+        endLoad()
     }
 
     private func reportStatus() {
@@ -302,21 +351,11 @@ public final class MPVPlayerEngine: PlayerEngine {
 
     /// Ends the current stream's events; seeks waiting for it didn't get there.
     private func endLoad() {
-        finishSeeks { _ in false }
+        seeks.finishAll(landed: false)
         current?.events.finish()
         current = nil
     }
 
-    private func finishSeeks(_ landed: (Int) -> Bool) {
-        let waiting = seeks
-        seeks = []
-        for seek in waiting {
-            seek.done.resume(returning: landed(seek.id))
-        }
-    }
-}
-
-extension MPVPlayerEngine {
     /// In debug builds, what libmpv decodes, for live checks in the console.
     private func logDecoding() {
         #if DEBUG
@@ -325,30 +364,5 @@ extension MPVPlayerEngine {
             let values = names.map { "\($0)=\(client.string($0) ?? "-")" }.joined(separator: " ")
             Logger.mpv.info("playing: \(values, privacy: .public)")
         #endif
-    }
-
-    /// Seconds as libmpv reads them.
-    static func seconds(_ duration: Duration) -> String {
-        String(format: "%.3f", duration / .seconds(1))
-    }
-
-    /// A value for loadfile's option list, which commas and quotes would break: libmpv's
-    /// `%n%` prefix gives the value's length, so anything can follow.
-    static func escaped(_ value: String) -> String {
-        "%\(value.utf8.count)%\(value)"
-    }
-}
-
-/// The layer libmpv draws in. MoltenVK briefly sets the drawable size to 1×1 to finish a
-/// presentation, which can leave the video flickering or stuck at that size, so such sizes are
-/// ignored. From MPVKit's demo (`MetalLayer`, LGPL-3.0), after mpv-player/mpv#13651.
-final class MPVMetalLayer: CAMetalLayer {
-    override var drawableSize: CGSize {
-        get { super.drawableSize }
-        set {
-            if Int(newValue.width) > 1, Int(newValue.height) > 1 {
-                super.drawableSize = newValue
-            }
-        }
     }
 }

@@ -10,11 +10,13 @@ protocol MPVClient: AnyObject {
 
     /// Sets a property, or an option before the file loads, as `--name=value` would.
     func set(_ name: String, _ value: String)
-    /// Runs a command such as `seek`, as an input.conf line would.
-    func command(_ arguments: [String])
-    /// Runs `loadfile` and returns the playlist entry ID libmpv gave the file, which its
-    /// start-file and end-file events carry. `nil` when libmpv refused the command.
-    func loadFile(_ arguments: [String]) -> Int64?
+    /// Runs a command such as `seek`, as an input.conf line would, and says whether libmpv
+    /// took it.
+    @discardableResult
+    func command(_ arguments: [String]) -> Bool
+    /// Runs `loadfile`, saying which playlist entry libmpv made for the file, or that it
+    /// refused the command.
+    func loadFile(_ arguments: [String]) -> MPVLoadResult
     /// A property's value as text, or `nil` when it has none now, such as `time-pos` with
     /// nothing loaded.
     func string(_ name: String) -> String?
@@ -49,16 +51,32 @@ extension MPVClient {
     }
 }
 
-/// What libmpv sends, reduced to what the engine follows.
+/// What `loadfile` did.
+enum MPVLoadResult: Equatable, Sendable {
+    /// libmpv took the file as a playlist entry, whose ID its events about the file carry; `nil`
+    /// when libmpv didn't say which.
+    case started(entry: Int64?)
+    /// libmpv refused the command, as it does arguments it can't parse.
+    case refused
+}
+
+/// What libmpv sends, reduced to what the engine follows. Events about a file name its
+/// playlist entry, so what libmpv says about a file that a newer load replaced isn't taken for
+/// the new one's.
 enum MPVEvent: Equatable, Sendable {
-    /// libmpv began opening a playlist entry. What it says from here until the next entry
-    /// starts is about this one.
+    /// libmpv began opening a playlist entry. What it says from here until the entry ends is
+    /// about this one.
     case startFile(entry: Int64)
-    /// Playback restarted after loading or after a seek: the picture is at the new position.
-    case playbackRestart
-    /// The entry was unloaded: it failed (with libmpv's reason), or something replaced or
-    /// stopped it. A file that won't open fails this way without ever loading. With
-    /// `keep-open`, reaching the end doesn't unload it; `eof-reached` says so.
+    /// The entry's file was opened, and decoding starts.
+    case fileLoaded(entry: Int64)
+    /// libmpv started a seek in the entry; a playback restart follows once it lands.
+    case seek(entry: Int64)
+    /// Playback of the entry restarted after loading or after a seek: the picture is at the
+    /// new position.
+    case playbackRestart(entry: Int64)
+    /// The entry was unloaded: it failed (with libmpv's reason), something replaced or stopped
+    /// it, or it was a playlist. A file that won't open fails this way without ever loading.
+    /// With `keep-open`, reaching the end doesn't unload it; `eof-reached` says so.
     case endFile(entry: Int64, MPVEndReason)
     /// An observed property changed; see `LibMPVClient.observed`.
     case property(String, MPVValue)
@@ -68,7 +86,13 @@ enum MPVEvent: Equatable, Sendable {
 
 enum MPVEndReason: Equatable, Sendable {
     case endOfFile
+    /// A command such as `stop`, or another `loadfile`, ended it.
     case stopped
+    /// libmpv is shutting down.
+    case quit
+    /// The file was a playlist: libmpv put its entries in its place and plays on from `next`,
+    /// the first of them, or from nothing when it had none.
+    case redirected(next: Int64?)
     case failed(String)
 }
 
@@ -109,6 +133,13 @@ public struct MPVError: LocalizedError, Equatable {
     public static let unavailable = Self(reason: "The MPV player couldn't start.")
     /// libmpv wouldn't take the stream to load.
     public static let refused = Self(reason: "The MPV player couldn't load the stream.")
+    /// libmpv stopped the stream without being asked to, such as while shutting down.
+    public static let stopped = Self(reason: "The MPV player stopped the stream.")
+    /// The stream was a playlist with nothing in it.
+    public static let emptyPlaylist = Self(reason: "The stream was an empty playlist.")
+    /// The stream ran out well before its duration, as when the connection drops: with
+    /// `keep-open`, libmpv reports that as the end of the file.
+    public static let endedEarly = Self(reason: "The stream stopped before its end.")
 
     public var errorDescription: String? {
         reason

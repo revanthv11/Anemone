@@ -16,6 +16,10 @@ final class FakeMPVClient: MPVClient {
     private(set) var entries: [Int64] = []
     /// Refuses `loadfile`, as libmpv does with arguments it can't parse.
     var refusesLoads = false
+    /// Takes `loadfile` without saying which playlist entry it made.
+    var hidesEntries = false
+    /// Commands, by name, that fail, as `seek` does with nothing to seek in.
+    var refusedCommands: Set<String> = []
     private(set) var isDestroyed = false
 
     init() {
@@ -27,17 +31,22 @@ final class FakeMPVClient: MPVClient {
         properties[name] = value
     }
 
-    func command(_ arguments: [String]) {
+    func command(_ arguments: [String]) -> Bool {
         commands.append(arguments)
+        guard let name = arguments.first, !refusedCommands.contains(name) else { return false }
+        if name == "sub-add" {
+            addTrack(subAdd: arguments)
+        }
+        return true
     }
 
-    func loadFile(_ arguments: [String]) -> Int64? {
+    func loadFile(_ arguments: [String]) -> MPVLoadResult {
         commands.append(arguments)
-        guard !refusesLoads else { return nil }
+        guard !refusesLoads else { return .refused }
         // libmpv numbers entries from 1 and never reuses one.
         let entry = Int64(entries.count + 1)
         entries.append(entry)
-        return entry
+        return .started(entry: hidesEntries ? nil : entry)
     }
 
     func string(_ name: String) -> String? {
@@ -62,8 +71,11 @@ final class FakeMPVClient: MPVClient {
         var selected = false
     }
 
+    private(set) var tracks: [Track] = []
+
     /// Lists tracks the way libmpv's `track-list` sub-properties do.
     func list(_ tracks: [Track]) {
+        self.tracks = tracks
         properties["track-list/count"] = String(tracks.count)
         for (index, track) in tracks.enumerated() {
             properties["track-list/\(index)/type"] = track.type
@@ -72,6 +84,45 @@ final class FakeMPVClient: MPVClient {
             properties["track-list/\(index)/lang"] = track.lang
             properties["track-list/\(index)/selected"] = track.selected ? "yes" : "no"
         }
+    }
+
+    /// `sub-add <url> <flags> [title [lang]]` adds a subtitle track after the others, selected
+    /// with `select`, as libmpv does.
+    private func addTrack(subAdd arguments: [String]) {
+        let selects = arguments.count > 2 && arguments[2] == "select"
+        var tracks = tracks
+        if selects {
+            for index in tracks.indices where tracks[index].type == "sub" {
+                tracks[index].selected = false
+            }
+        }
+        let id = (tracks.filter { $0.type == "sub" }.map(\.id).max() ?? 0) + 1
+        let title = arguments.count > 3 ? arguments[3] : nil
+        let lang = arguments.count > 4 ? arguments[4] : nil
+        tracks.append(Track(type: "sub", id: id, title: title, lang: lang, selected: selects))
+        list(tracks)
+    }
+}
+
+/// Time for the MPV engine's seek timeouts that passes only when the test says.
+@MainActor
+final class ManualTime {
+    private var waiting: [CheckedContinuation<Void, Never>] = []
+
+    /// How many timeouts are running.
+    var running: Int {
+        waiting.count
+    }
+
+    func wait(_: Duration) async {
+        await withCheckedContinuation { waiting.append($0) }
+    }
+
+    /// Ends every timeout running.
+    func pass() {
+        let ended = waiting
+        waiting = []
+        ended.forEach { $0.resume() }
     }
 }
 
@@ -100,21 +151,29 @@ final class PlayerEventLog {
 }
 
 extension MPVPlayerEngine {
-    static func testing(_ client: FakeMPVClient?) -> MPVPlayerEngine {
-        MPVPlayerEngine(client: client, layer: CALayer(), profile: MPVProfile.deviceProfile())
+    /// An engine on `client`, whose seek timeouts pass when `time` says, if given.
+    static func testing(_ client: FakeMPVClient?, time: ManualTime? = nil) -> MPVPlayerEngine {
+        let seeks = time.map { time in MPVSeeks { await time.wait($0) } } ?? MPVSeeks()
+        return MPVPlayerEngine(client: client, layer: CALayer(), profile: MPVProfile.deviceProfile(), seeks: seeks)
     }
 
     /// A load of a file from its beginning, with what its events say.
-    func loadLog() -> PlayerEventLog {
-        PlayerEventLog(load(URL(filePath: "/m.mkv"), from: nil, metadata: PlaybackMetadata(title: "M")))
+    func loadLog(_ path: String = "/m.mkv") -> PlayerEventLog {
+        PlayerEventLog(load(URL(filePath: path), from: nil, metadata: PlaybackMetadata(title: "M")))
     }
 
     /// Loads a file as libmpv would through `client`, this engine's: the file starts, loads, and
     /// plays from its start.
-    func loadAndStart(on client: FakeMPVClient) -> PlayerEventLog {
-        let log = loadLog()
-        handle(.startFile(entry: client.entries.last ?? 0))
-        handle(.playbackRestart)
+    func loadAndStart(on client: FakeMPVClient, _ path: String = "/m.mkv") -> PlayerEventLog {
+        let log = loadLog(path)
+        start(client.entries.last ?? 0)
         return log
+    }
+
+    /// libmpv's events as it starts, opens and plays `entry`.
+    func start(_ entry: Int64) {
+        handle(.startFile(entry: entry))
+        handle(.fileLoaded(entry: entry))
+        handle(.playbackRestart(entry: entry))
     }
 }
