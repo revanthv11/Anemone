@@ -24,9 +24,9 @@ final class ItemContextActions {
     /// Marks changed from menus, which cards show until their pages reload.
     let marks = CardMarksStore()
     let menu: CardMenu
-    /// Goes up whenever a menu saves a change or playback ends, so pages listing items by their
-    /// state, like Favorites, load again.
-    private(set) var revision = 0
+    /// The last favourite a menu added or removed, so the Favorites page can load that row again.
+    /// Other changes show on the cards through `marks`, and need no reload.
+    private(set) var favoriteChange: FavoriteChange?
     var playback: PlaybackRequest?
     var alert: ItemAlert?
     /// The item whose playlist choice is showing.
@@ -48,6 +48,9 @@ final class ItemContextActions {
             return false
         }
         note(state, for: target.id, given: given)
+        if case .favorite = change {
+            favoriteChange = FavoriteChange(serial: (favoriteChange?.serial ?? 0) + 1, kind: target.item.kind)
+        }
         return true
     }
 
@@ -89,8 +92,15 @@ final class ItemContextActions {
         // one take it from here, and only those do.
         badges.unplayedCount = state.unplayedCount ?? given.badges.unplayedCount.map { state.isPlayed ? 0 : $0 }
         marks.record(CardMarks(badges: badges, progress: state.progress), for: id, replacing: given)
-        revision += 1
     }
+}
+
+/// A favourite added or removed from a card's menu.
+struct FavoriteChange: Equatable {
+    /// Counts the changes, so changing the same kind of item twice is two changes.
+    let serial: Int
+    /// The changed item's type, whose row on the Favorites page it's in.
+    let kind: MediaItem.Kind
 }
 
 /// The item a card's menu is about, and the user's state with it when the card knows it.
