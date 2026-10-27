@@ -69,13 +69,11 @@ public final class Slideshow {
 
     /// How long each photo shows, from the user's setting within Wholphin's limits.
     public static func delay(in defaults: UserDefaults = .standard) -> Duration {
-        let key = Preferences.slideshowDuration.key
-        // `integer(forKey:)` also reads the setting given as a launch argument
-        // (`-slideshowDuration 2000`), which arrives as a string that `Preference` passes over.
-        let milliseconds = defaults.object(forKey: key) == nil
-            ? Preferences.slideshowDuration.defaultValue
-            : defaults.integer(forKey: key)
-        return .milliseconds(durationRange.contains(milliseconds) ? milliseconds : 5000)
+        // Also given as a launch argument (`-slideshowDuration 2000`), which arrives as text.
+        let milliseconds = Preferences.slideshowDuration.value(in: defaults)
+        return .milliseconds(
+            durationRange.contains(milliseconds) ? milliseconds : Preferences.slideshowDuration.defaultValue,
+        )
     }
 
     public var current: SlideshowItem? {
