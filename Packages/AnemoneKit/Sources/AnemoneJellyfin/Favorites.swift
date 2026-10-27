@@ -163,6 +163,7 @@ private extension MediaItem.Kind {
         case .video: .video
         case .musicVideo: .musicVideo
         case .musicAlbum: .musicAlbum
+        case .musicArtist: .musicArtist
         case .audio: .audio
         case .photo: .photo
         case .folder, .other: nil

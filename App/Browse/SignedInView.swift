@@ -68,6 +68,7 @@ struct SignedInView: View {
         .tabViewStyle(.sidebarAdaptable)
         .itemContextActions()
         .environment(browse)
+        .musicPlayback(session: browse.session)
         .deepLinkTabs(selection: $selection)
         .task {
             await browse.load()
