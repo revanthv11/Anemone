@@ -26,6 +26,7 @@ struct SlideshowView: View {
     @Environment(BrowseModel.self) private var browse
     @Environment(\.dismiss) private var dismiss
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.theme) private var theme
     @State private var slideshow: Slideshow?
     @State private var problem: String?
     @State private var showsDetails = false
@@ -60,7 +61,7 @@ struct SlideshowView: View {
             } else if let problem {
                 VStack(spacing: 40) {
                     Text(problem)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.secondaryText)
                         .multilineTextAlignment(.center)
                     Button("OK") { dismiss() }
                 }
@@ -71,6 +72,7 @@ struct SlideshowView: View {
                 VStack {
                     Text(notice.text)
                         .font(.callout)
+                        .foregroundStyle(theme.onSurface)
                         .padding(.horizontal, 32)
                         .padding(.vertical, 16)
                         .background(.regularMaterial, in: .capsule)
@@ -117,7 +119,7 @@ struct SlideshowView: View {
                     ClipView(player: clip.player)
                     if clip.hasFailed {
                         Text("Couldn't play this clip.")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(theme.secondaryText)
                     }
                 } else {
                     SlideshowPhoto(url: photoURL(item)) { loaded in
@@ -151,12 +153,24 @@ struct SlideshowView: View {
                 toggleSlideshow(slideshow)
             }
         }
+        // The photo, then where it is in the slideshow and whether that's running; Select shows
+        // its details and controls.
         .accessibilityLabel(item?.name ?? "Photo")
+        .accessibilityValue(photoValue(in: slideshow))
+        .accessibilityHint("Shows the details and controls")
         .accessibilityIdentifier("slideshow.photo")
         .onChange(of: item?.id) {
             framing = PhotoFraming()
             prepare(item, in: slideshow)
         }
+    }
+
+    private func photoValue(in slideshow: Slideshow) -> Text {
+        let position = slideshow.position + 1
+        let count = slideshow.pager.count
+        return slideshow.isRunning
+            ? Text("\(position) of \(count), slideshow playing")
+            : Text("\(position) of \(count)")
     }
 
     private func photoURL(_ item: SlideshowItem?) -> URL? {

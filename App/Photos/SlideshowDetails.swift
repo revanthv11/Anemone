@@ -1,5 +1,6 @@
 import AnemoneJellyfin
 import AnemonePlayback
+import AnemoneUI
 import SwiftUI
 
 /// Wholphin's `ImageDetailsHeader` and `ImageControlsOverlay`, along the bottom of the photo:
@@ -12,6 +13,7 @@ struct SlideshowDetails: View {
     @Binding var framing: PhotoFraming
     let toggleSlideshow: () -> Void
 
+    @Environment(\.theme) private var theme
     @FocusState private var isSlideshowButtonFocused: Bool
 
     var body: some View {
@@ -19,7 +21,9 @@ struct SlideshowDetails: View {
         VStack(alignment: .leading, spacing: 16) {
             Text(item?.name ?? "")
                 .font(.title2.bold())
+                .foregroundStyle(theme.onBackground)
                 .lineLimit(1)
+                .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("slideshow.title")
             HStack(spacing: 24) {
                 Text("\(slideshow.position + 1) of \(slideshow.pager.count)")
@@ -29,13 +33,15 @@ struct SlideshowDetails: View {
                 }
                 if let width = item?.width, let height = item?.height {
                     Text(verbatim: "\(width)×\(height)")
+                        .accessibilityLabel("\(width) by \(height) pixels")
                 }
             }
             .font(.callout)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(theme.secondaryText)
             if let overview = item?.overview, !overview.isEmpty {
                 Text(overview)
                     .font(.callout)
+                    .foregroundStyle(theme.onBackground)
                     .lineLimit(3)
                     .frame(maxWidth: 1200, alignment: .leading)
             }
@@ -46,6 +52,7 @@ struct SlideshowDetails: View {
                     action: toggleSlideshow,
                 )
                 .focused($isSlideshowButtonFocused)
+                .accessibilityValue(slideshow.isRunning ? "Playing" : "Stopped")
                 .accessibilityIdentifier("slideshow.toggle")
                 if item?.kind == .video, let clip {
                     ActionButton(
@@ -54,6 +61,7 @@ struct SlideshowDetails: View {
                     ) {
                         clip.togglePause()
                     }
+                    .accessibilityValue(clip.isPaused ? "Paused" : "Playing")
                     .accessibilityIdentifier("slideshow.clip")
                 } else {
                     photoControls
@@ -67,7 +75,7 @@ struct SlideshowDetails: View {
         .padding(.bottom, 60)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
         .background(alignment: .bottom) {
-            LinearGradient(colors: [.clear, .black.opacity(0.8)], startPoint: .top, endPoint: .bottom)
+            LinearGradient(colors: [.clear, theme.scrim.withAlpha(0.8).color], startPoint: .top, endPoint: .bottom)
                 .frame(height: 520)
         }
         .defaultFocus($isSlideshowButtonFocused, true)
