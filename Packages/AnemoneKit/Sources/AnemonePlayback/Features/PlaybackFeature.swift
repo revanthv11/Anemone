@@ -30,8 +30,9 @@ public enum PlaybackEvent: Sendable {
     /// another entry while handling this or set the controller's `closesAtEnd` to `false`.
     case ended
     /// The server couldn't offer a stream, or the stream failed. A stream that failed to direct
-    /// play or direct stream is retried as a transcode, so `loaded` can follow; otherwise the
-    /// player shows the error.
+    /// play or direct stream is retried as a transcode, so `loaded` can follow; an intro whose
+    /// transcode fails is passed over, so the next entry's `loaded` follows (an intro the server
+    /// won't offer at all is passed over without a word); otherwise the player shows the error.
     case failed(any Error)
     /// The loaded stream's play session is over, at this position: it ended, failed, was
     /// replaced, or the player closed. Comes once after each `loaded`.

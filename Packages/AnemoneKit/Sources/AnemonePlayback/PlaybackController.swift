@@ -46,6 +46,8 @@ public final class PlaybackController: Identifiable {
     /// Finds the rest of the queue once the first entry is loading; see `PlaybackRequest`.
     @ObservationIgnored private var following: PlaybackRequest.Following?
     @ObservationIgnored private var followingLoad: Task<Void, Never>?
+    /// Finds what plays before the first entry; see `PlaybackRequest`.
+    @ObservationIgnored private var intros: PlaybackRequest.Intros?
     /// How often features hear where playback is.
     @ObservationIgnored private let positionInterval: Duration
     /// What's loaded in the engine.
@@ -67,15 +69,15 @@ public final class PlaybackController: Identifiable {
 
     /// A player for `request` on `session`'s server, with the features every player gets.
     public convenience init(session: JellyfinSession, request: PlaybackRequest) {
-        // AVPlayer for everything until the MPV engine (Phase 4) chooses per item.
-        let engine = AVPlayerEngine()
-        let profile = engine.deviceProfile
+        let engine = PlayerChoice.engine(for: session)
+        let profiles = DeviceProfileSource(engine)
         self.init(
             request: request,
             engine: engine,
             features: Self.features(for: session),
         ) { itemID, allowsDirect, mediaSourceID in
             let maxBitrate = AVPlayerProfile.maxBitrate
+            let profile = await profiles.current
             // A retry keeps the version playing.
             if let mediaSourceID {
                 return try await session.playbackStream(
@@ -109,6 +111,7 @@ public final class PlaybackController: Identifiable {
         }
         self.queue = queue
         following = request.following
+        intros = request.intros
         self.engine = engine
         self.features = features
         self.positionInterval = positionInterval
@@ -120,6 +123,10 @@ public final class PlaybackController: Identifiable {
     public func start() async {
         guard !hasStarted else { return }
         hasStarted = true
+        // What the request's `intros` finds plays first; a failure plays the queue as it is.
+        if let intros, let found = try? await intros(queue.current), !isStopped {
+            queue.insertBeforeCurrent(found)
+        }
         loadFollowing()
         await load(allowsDirect: true, from: queue.current.startPosition, as: beginLoad())
     }
@@ -165,9 +172,10 @@ public final class PlaybackController: Identifiable {
         }
     }
 
-    /// Does nothing at the end of the queue.
+    /// Plays `queue.next`, passing over intros; does nothing at the end of the queue.
     public func playNext() {
-        play(entryAt: queue.currentIndex + 1)
+        guard let index = queue.nextIndex else { return }
+        play(entryAt: index)
     }
 
     /// Closes the player, as at the end of the queue; for features such as pass-out protection.
@@ -205,6 +213,11 @@ public final class PlaybackController: Identifiable {
     private func load(allowsDirect: Bool, from position: Duration?, as attempt: Int) async {
         guard !isStopped else { return }
         let entry = queue.current
+        // A new entry may need the other engine, as with "Prefer MPV"; a retry keeps it.
+        if stream == nil, let engine = engine as? any PerEntryEngine {
+            await engine.prepare(for: entry)
+            guard !isStopped, attempt == loads else { return }
+        }
         do {
             let stream = try await loadStream(entry.itemID, allowsDirect, stream?.mediaSourceID)
             guard !isStopped, attempt == loads else {
@@ -215,6 +228,10 @@ public final class PlaybackController: Identifiable {
             await play(stream, entry, from: position)
         } catch {
             guard !isStopped, attempt == loads else { return }
+            // An intro the server won't offer is passed over (Phase 5c).
+            if let afterIntro = queue.afterIntroIndex {
+                return play(entryAt: afterIntro)
+            }
             state = .failed(error)
             await publish(.failed(error))
         }
@@ -241,7 +258,11 @@ public final class PlaybackController: Identifiable {
         // Unless a feature moved on meanwhile.
         guard !isStopped, attempt == loads else { return }
         guard stream.method != .transcode else {
-            state = .failed(error)
+            if let afterIntro = queue.afterIntroIndex {
+                play(entryAt: afterIntro)
+            } else {
+                state = .failed(error)
+            }
             return
         }
         let position = currentPosition
@@ -256,6 +277,11 @@ public final class PlaybackController: Identifiable {
 
     private func finished() async {
         guard !isStopped else { return }
+        // An intro plays straight into what follows, as in Wholphin: features don't hear it end,
+        // so Up Next doesn't offer what's next.
+        if let afterIntro = queue.afterIntroIndex {
+            return play(entryAt: afterIntro)
+        }
         stopWatching()
         let attempt = loads
         await publish(.ended)
@@ -310,7 +336,8 @@ private extension PlaybackController {
         watchers = [
             Task { [weak self] in
                 for await event in events {
-                    guard let self else { return }
+                    // Cancelled, it still gets what the replaced stream buffered, such as its pause.
+                    guard let self, !Task.isCancelled else { return }
                     switch event {
                     case .ready:
                         ready()

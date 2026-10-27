@@ -1,22 +1,32 @@
 import AnemoneCore
-import AnemoneJellyfin
+@testable import AnemoneJellyfin
 @testable import AnemonePlayback
 import Foundation
 import Synchronization
 import Testing
 
 /// The player the app builds asks the server for the user's bitrate limit and picked version.
+/// Each test plays with the versions picked in a store of its own (`MediaVersionChoices.current`),
+/// so tests running side by side can't see or undo each other's choices.
 @MainActor
 struct PlaybackSettingsTests {
+    private let suite = "PlaybackSettingsTests.\(UUID().uuidString)"
+    private let choices: MediaVersionChoices
+
+    init() throws {
+        try #require(UserDefaults(suiteName: suite)).removePersistentDomain(forName: suite)
+        choices = MediaVersionChoices(suiteName: suite)
+    }
+
     @Test func `playback info carries the bitrate setting and the picked version`() async throws {
         let host = "settings.test"
         let userID = "settings-user-\(UUID().uuidString)"
         let server = PlaybackInfoServer.register(host: host)
         Preferences.maxBitrate.set(3_000_000)
-        MediaVersionChoices.standard.choose("v1080", for: "m1", userID: userID)
+        choices.choose("v1080", for: "m1", userID: userID)
         defer {
             Preferences.maxBitrate.reset()
-            MediaVersionChoices.standard.forget("m1", userID: userID)
+            UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite)
         }
         let session = try JellyfinSession(
             serverURL: #require(URL(string: "https://\(host)/jf")),
@@ -30,7 +40,9 @@ struct PlaybackSettingsTests {
             request: PlaybackRequest(.item("m1")),
         )
 
-        await playback.start()
+        await MediaVersionChoices.$current.withValue(choices) {
+            await playback.start()
+        }
         await playback.stop()
 
         let body = try #require(server.bodies.first)
@@ -42,8 +54,8 @@ struct PlaybackSettingsTests {
         let host = "goneversion.test"
         let userID = "settings-user-\(UUID().uuidString)"
         let server = PlaybackInfoServer.register(host: host)
-        MediaVersionChoices.standard.choose("v720", for: "m1", userID: userID)
-        defer { MediaVersionChoices.standard.forget("m1", userID: userID) }
+        choices.choose("v720", for: "m1", userID: userID)
+        defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
         let session = try JellyfinSession(
             serverURL: #require(URL(string: "https://\(host)/jf")),
             userID: userID,
@@ -54,12 +66,14 @@ struct PlaybackSettingsTests {
         // Played from Up Next, say, without the item's page loading first.
         let playback = PlaybackController(session: session, request: PlaybackRequest(.item("m1")))
 
-        await playback.start()
+        await MediaVersionChoices.$current.withValue(choices) {
+            await playback.start()
+        }
         await playback.stop()
 
         // The server answers without the version, as Jellyfin answers one it no longer has.
         #expect(server.bodies.map { $0["MediaSourceId"] as? String } == ["v720", nil])
-        #expect(MediaVersionChoices.standard.choice(for: "m1", userID: userID) == nil)
+        #expect(choices.choice(for: "m1", userID: userID) == nil)
     }
 
     @Test func `the limit is Wholphin's 100 Mbit/s until it's changed`() {

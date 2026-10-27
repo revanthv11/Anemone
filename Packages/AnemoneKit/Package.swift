@@ -39,6 +39,9 @@ let package = Package(
         .package(url: "https://github.com/kean/Get", from: "2.2.1"),
         // Image loading and caching for artwork.
         .package(url: "https://github.com/kean/Nuke", from: "13.2.0"),
+        // libmpv with FFmpeg, libass and MoltenVK as prebuilt xcframeworks, for the MPV engine. The
+        // LGPL build, which leaves out samba. Pinned, since each release swaps all the binaries.
+        .package(url: "https://github.com/mpvkit/MPVKit", exact: "1.1.0-n9.0.2"),
         // What the Seerr client that scripts/generate-seerr-client.sh generates runs on. Only
         // built and linked with the ANEMONE_SEERR trait (docs/seerr.md).
         .package(url: "https://github.com/apple/swift-openapi-runtime", from: "1.13.0"),
@@ -61,6 +64,9 @@ let package = Package(
                 "AnemoneCore",
                 "AnemoneJellyfin",
                 .product(name: "JellyfinAPI", package: "jellyfin-sdk-swift"),
+                // Not on macOS, so `swift test` doesn't link libmpv; the engine's libmpv calls are
+                // behind `#if os(tvOS) || os(iOS)`.
+                .product(name: "MPVKit", package: "MPVKit", condition: .when(platforms: [.tvOS, .iOS])),
             ],
         ),
         // Built empty, with none of the client's packages, unless ANEMONE_SEERR is on; see

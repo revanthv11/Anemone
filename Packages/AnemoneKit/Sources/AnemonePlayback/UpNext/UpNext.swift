@@ -90,7 +90,8 @@ public final class UpNext: PlaybackFeature {
     /// playing, as the media segments feature finds them. With "During the credits", the card
     /// shows now rather than at the end, once for each.
     public func creditsStarted(id: MediaSegment.ID) {
-        guard let controller, offer == nil, controller.queue.next != nil,
+        // Never during an intro, which plays straight into what follows (Phase 5c).
+        guard let controller, offer == nil, !controller.queue.current.isIntro, controller.queue.next != nil,
               settings.timing == .duringCredits || settings.testCreditsStart != nil,
               creditsOffered.insert(id).inserted
         else { return }
@@ -167,8 +168,8 @@ private extension UpNext {
     }
 
     func offerNext(atEnd: Bool, creditsID: MediaSegment.ID? = nil, in controller: PlaybackController) {
-        let index = controller.queue.currentIndex + 1
-        guard let next = controller.queue.next else { return }
+        guard let index = controller.queue.nextIndex else { return }
+        let next = controller.queue.entries[index]
         if settings.autoplays, settings.passOutCount > 0, autoplaysWithoutInput >= settings.passOutCount {
             offer = Offer(isAtEnd: atEnd, creditsID: creditsID)
             count(down: settings.stillWatchingTimeout) { [weak self] left in
@@ -297,10 +298,10 @@ private extension UpNext {
 
 /// The note about skipped items.
 extension UpNext {
-    /// Once, when the first entry gets under way.
+    /// Once, when the first entry gets under way, after any intros.
     private func noteSkipped(in controller: PlaybackController) {
         let queue = controller.queue
-        guard !hasNotedSkipped, queue.skippedCount + queue.overLimitCount > 0 else { return }
+        guard !hasNotedSkipped, !queue.current.isIntro, queue.skippedCount + queue.overLimitCount > 0 else { return }
         hasNotedSkipped = true
         let accessories = controller.accessories
         let (title, message) = Self.skippedNote(for: queue)
@@ -323,10 +324,10 @@ extension UpNext {
         }
     }
 
-    /// How many items were left out, and why. Wholphin leaves out what's past its 100 items
-    /// without a word.
+    /// How many items were left out, and why, not counting intros among those playing. Wholphin
+    /// leaves out what's past its 100 items without a word.
     static func skippedNote(for queue: PlaybackQueue) -> (title: String, message: String) {
-        let playing = queue.entries.count
+        let playing = queue.countWithoutIntros
         let skipped = queue.skippedCount
         let overLimit = queue.overLimitCount
         let title = if overLimit > 0 {
