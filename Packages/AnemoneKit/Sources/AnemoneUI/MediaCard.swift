@@ -12,10 +12,15 @@ public struct MediaCard: View {
     private let progress: Double?
     private let badges: CardBadges
     private let showsCaption: Bool
+    private let menuItem: CardMenuItem?
+
+    @Environment(\.cardMenu) private var menu
 
     /// - Parameters:
     ///   - progress: from 0 to 1; draws a bar along the bottom when above 0.
     ///   - showsCaption: whether the title and subtitle show under the artwork.
+    ///   - menuItem: what the card shows, for the long-press menu that `cardMenu()` on the
+    ///     card's button opens; no menu when `nil`.
     public init(
         title: String,
         subtitle: String? = nil,
@@ -25,6 +30,7 @@ public struct MediaCard: View {
         progress: Double? = nil,
         badges: CardBadges = CardBadges(),
         showsCaption: Bool = true,
+        menuItem: CardMenuItem? = nil,
     ) {
         self.title = title
         self.subtitle = subtitle
@@ -34,11 +40,12 @@ public struct MediaCard: View {
         self.progress = progress
         self.badges = badges
         self.showsCaption = showsCaption
+        self.menuItem = menuItem
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            artwork
+            artwork(shownMarks)
             if showsCaption {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
@@ -52,10 +59,23 @@ public struct MediaCard: View {
                 .frame(width: width, alignment: .leading)
             }
         }
+        .preference(key: CardMenuRequestKey.self, value: menuItem.map { CardMenuRequest(item: $0, marks: givenMarks) })
     }
 
-    private var artwork: some View {
-        ShapedArtwork(url: imageURL, shape: shape, width: width)
+    private var givenMarks: CardMarks {
+        CardMarks(badges: badges, progress: progress)
+    }
+
+    /// The caller's marks, or what a card menu changed them to since.
+    private var shownMarks: CardMarks {
+        guard let menuItem, let menu else { return givenMarks }
+        return menu.marks.marks(for: menuItem.id, given: givenMarks)
+    }
+
+    private func artwork(_ marks: CardMarks) -> some View {
+        let badges = marks.badges
+        let progress = marks.progress
+        return ShapedArtwork(url: imageURL, shape: shape, width: width)
             .overlay(alignment: .bottom) {
                 if let progress, progress > 0 {
                     ProgressBar(progress: progress, width: width - 2 * Self.progressInset)
