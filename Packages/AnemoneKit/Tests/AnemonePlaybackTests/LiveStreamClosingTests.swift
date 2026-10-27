@@ -12,7 +12,10 @@ struct LiveStreamClosingTests {
 
     /// Each request for a stream opens another live stream, as `isAutoOpenLiveStream` does;
     /// `isLive: false` hands out recordings' and films' streams, which have none.
-    private func controller(isLive: Bool = true) -> PlaybackController {
+    ///
+    /// - Parameter answers: when given, the server answers each request only once the test sends
+    ///   one, as a slow server would, though it has opened the stream by then.
+    private func controller(isLive: Bool = true, answers: AsyncStream<Void>? = nil) -> PlaybackController {
         let server = server
         return PlaybackController(
             request: PlaybackRequest(.item("channel1")),
@@ -24,6 +27,11 @@ struct LiveStreamClosingTests {
             positionInterval: .milliseconds(10),
         ) { itemID, allowsDirect, _ in
             let number = server.open()
+            if let answers {
+                for await _ in answers {
+                    break
+                }
+            }
             return PlaybackStream(
                 itemID: itemID,
                 url: URL(filePath: "/\(itemID)/\(number)"),
@@ -71,6 +79,21 @@ struct LiveStreamClosingTests {
         #expect(server.stopReports.map(\.liveStreamID) == ["live2"])
     }
 
+    @Test func `a live stream that arrives after the player closed is closed`() async {
+        let (answers, answer) = AsyncStream.makeStream(of: Void.self)
+        let playback = controller(answers: answers)
+        let starting = Task { await playback.start() }
+        #expect(await eventually { server.openedCount == 1 })
+
+        await playback.stop()
+        answer.yield()
+        await starting.value
+
+        #expect(server.closed == ["live1"])
+        #expect(server.stopReports.isEmpty)
+        #expect(engine.loads.isEmpty)
+    }
+
     @Test func `streams without a live stream close nothing`() async {
         let playback = controller(isLive: false)
         await playback.start()
@@ -97,6 +120,10 @@ private final class LiveTVServerLog: Sendable {
 
     var reportCount: Int {
         state.withLock(\.reports.count)
+    }
+
+    var openedCount: Int {
+        state.withLock(\.opened)
     }
 
     var stopReports: [PlaybackStream] {

@@ -6,9 +6,9 @@ import AnemoneJellyfin
 /// Once playback is under way, `ProgressReporting`'s stop report carries the live stream's ID and
 /// the server closes it then. A session that ends before that (the stream failed, was replaced
 /// by a transcode, or the player closed while loading) sends no stop report, so this closes the
-/// stream itself. Closing it after the stop report too would close it twice, which could cut off
-/// someone else sharing the tuner's stream. Adapted from Swiftfin's
-/// `MediaProgressReporter.discard`.
+/// stream itself, as it does a stream that arrives after the player closed. Closing it after the
+/// stop report too would close it twice, which could cut off someone else sharing the tuner's
+/// stream. Adapted from Swiftfin's `MediaProgressReporter.discard`.
 @MainActor
 public final class LiveStreamClosing: PlaybackFeature {
     typealias Close = @Sendable (String) async throws -> Void
@@ -26,6 +26,14 @@ public final class LiveStreamClosing: PlaybackFeature {
 
     init(close: @escaping Close) {
         self.close = close
+    }
+
+    /// Closes the live stream of a stream the controller dropped without loading it: the player
+    /// closed, or another load replaced it, while the server was still answering. Like Swiftfin's
+    /// `MediaPlayerItemResolver`, which closes the live streams of a resolution it abandons.
+    func discard(_ stream: PlaybackStream) async {
+        guard let liveStreamID = stream.liveStreamID else { return }
+        try? await close(liveStreamID)
     }
 
     public func handle(_ event: PlaybackEvent, in _: PlaybackController) async {
