@@ -8,8 +8,11 @@ import Foundation
 /// track parts of its `PlaybackViewModel` and `ItemPlaybackRepository`.
 ///
 /// A switch the stream can make on its own happens at once: audio in a file that plays
-/// directly, and text subtitles. Anything else asks the server for another stream and goes on
-/// from the same position, as Wholphin's `changeStreams` does.
+/// directly, and text subtitles, which the server sends AVPlayer as files of their own for
+/// Anemone to draw (`DrawnSubtitles`). MPV shows such files itself (`MPVExternalSubtitles`), so
+/// while it plays they're its tracks, as they were before Anemone drew any. Anything else asks
+/// the server for another stream and goes on from the same position, as Wholphin's
+/// `changeStreams` does.
 ///
 /// Live TV is left to the server, as Wholphin and Swiftfin leave it: the request names no
 /// version or tracks, and the menus offer what the live stream can switch to by itself.
@@ -197,8 +200,9 @@ public final class TrackSelection: PlaybackFeature {
         self.entry = entry
         showMenus(in: controller)
         applying?.cancel()
-        applying = Task { [weak self, engine = controller.engine] in
-            await self?.select(in: engine, for: stream)
+        applying = Task { [weak self, weak controller] in
+            guard let controller else { return }
+            await self?.select(in: controller, for: stream)
         }
     }
 
@@ -216,10 +220,22 @@ public final class TrackSelection: PlaybackFeature {
         )
     }
 
-    /// Selects the chosen tracks in the engine, where the stream carries them as tracks of
-    /// its own, and turns off subtitles the player would otherwise pick by itself.
-    func select(in engine: any PlayerEngine, for stream: PlaybackStream) async {
+    /// Whether Anemone draws the text subtitles the server sends as files of their own: over
+    /// AVPlayer. MPV adds those files to its own tracks and shows them itself, so drawing them
+    /// too would show every line twice.
+    static func drawsFiles(in engine: any PlayerEngine) -> Bool {
+        engine.mpv == nil
+    }
+
+    /// Has text subtitles that come as a file of their own drawn over AVPlayer, and selects the
+    /// chosen tracks in the engine where it lists them, turning off subtitles the player would
+    /// otherwise pick by itself.
+    func select(in controller: PlaybackController, for stream: PlaybackStream) async {
         guard let entry, entry.stream == stream else { return }
+        let engine = controller.engine
+        let drawsFiles = Self.drawsFiles(in: engine)
+        let drawn = entry.subtitle.flatMap { drawsFiles && TrackSwitching.isSentAsFile($0, in: stream) ? $0 : nil }
+        controller.feature(DrawnSubtitles.self)?.show(drawn, in: stream)
         if stream.method == .directPlay, let audio = entry.audio {
             let options = await engine.tracks(.audio)
             guard !Task.isCancelled, self.entry?.stream == stream else { return }
@@ -229,7 +245,11 @@ public final class TrackSelection: PlaybackFeature {
         }
         let options = await engine.tracks(.subtitle)
         guard !Task.isCancelled, self.entry?.stream == stream else { return }
-        let wanted = entry.subtitle.flatMap { TrackSwitching.playerTrack(for: $0, in: stream, options: options) }
+        let wanted = drawn == nil
+            ? entry.subtitle.flatMap {
+                TrackSwitching.playerTrack(for: $0, in: stream, options: options, drawsFiles: drawsFiles)
+            }
+            : nil
         if wanted?.id != options.first(where: \.isSelected)?.id {
             await engine.select(wanted, .subtitle)
         }
@@ -238,10 +258,18 @@ public final class TrackSelection: PlaybackFeature {
     /// AVPlayer showed no HLS subtitles that were selected before playback got under way, the
     /// server's default included, until they were selected again; so they are, once it has.
     private func reselectSubtitles(in engine: any PlayerEngine) async {
-        guard let entry, let stream = entry.stream, let subtitle = entry.subtitle else { return }
+        let drawsFiles = Self.drawsFiles(in: engine)
+        guard let entry, let stream = entry.stream, let subtitle = entry.subtitle,
+              !(drawsFiles && TrackSwitching.isSentAsFile(subtitle, in: stream))
+        else { return }
         let options = await engine.tracks(.subtitle)
         guard self.entry?.stream == stream,
-              let wanted = TrackSwitching.playerTrack(for: subtitle, in: stream, options: options)
+              let wanted = TrackSwitching.playerTrack(
+                  for: subtitle,
+                  in: stream,
+                  options: options,
+                  drawsFiles: drawsFiles,
+              )
         else { return }
         await engine.select(nil, .subtitle)
         await engine.select(wanted, .subtitle)
@@ -252,7 +280,8 @@ public final class TrackSelection: PlaybackFeature {
 extension TrackSelection {
     func showMenus(in controller: PlaybackController) {
         guard let entry else { return }
-        let audio = entry.tracks.of(.audio).filter { offers($0, in: entry) }
+        let drawsFiles = Self.drawsFiles(in: controller.engine)
+        let audio = entry.tracks.of(.audio).filter { offers($0, in: entry, drawsFiles: drawsFiles) }
         if audio.count > 1 {
             let options = audio.map { track in
                 option(
@@ -281,7 +310,7 @@ extension TrackSelection {
         } else {
             controller.accessories.removeMenu("audio")
         }
-        let subtitles = entry.tracks.of(.subtitle).filter { offers($0, in: entry) }
+        let subtitles = entry.tracks.of(.subtitle).filter { offers($0, in: entry, drawsFiles: drawsFiles) }
         guard !subtitles.isEmpty else {
             controller.accessories.removeMenu("subtitles")
             return
@@ -303,10 +332,15 @@ extension TrackSelection {
 
     /// Whether the menus offer `track`: every one, except in a live stream, which offers those
     /// the player can switch to by itself.
-    private func offers(_ track: MediaTrack, in entry: Entry) -> Bool {
+    private func offers(_ track: MediaTrack, in entry: Entry, drawsFiles: Bool) -> Bool {
         guard entry.isLive else { return true }
         guard let stream = entry.stream else { return false }
-        return TrackSwitching.switchesInPlace(to: track, in: stream, burnsInStyled: burnsInStyledSubtitles)
+        return TrackSwitching.switchesInPlace(
+            to: track,
+            in: stream,
+            burnsInStyled: burnsInStyledSubtitles,
+            drawsFiles: drawsFiles,
+        )
     }
 
     private func subtitleOption(

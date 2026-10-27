@@ -69,11 +69,18 @@ struct AVPlayerProfileTests {
         #expect(transcode.context == .streaming)
     }
 
-    @Test func `picture subtitles are burned in`() throws {
+    @Test func `picture subtitles are burned in, and text ones come as files Anemone draws`() throws {
         let subtitles = try #require(AVPlayerProfile.deviceProfile(decoders: Self.appleTVHD).subtitleProfiles)
 
         #expect(subtitles.first { $0.format == "pgssub" }?.method == .encode)
-        #expect(subtitles.first { $0.format == "vtt" }?.method == .hls)
+        for format in ["srt", "subrip", "vtt", "webvtt"] {
+            #expect(subtitles.filter { $0.format == format }.map(\.method) == [.external])
+        }
+        // None in the HLS playlist, whose WebVTT AVPlayer showed 10 s late.
+        #expect(!subtitles.contains { $0.method == .hls })
+        // The server converts other text, such as ASS, to the first.
+        #expect(subtitles.first?.format == "srt")
+        #expect(subtitles.first { $0.format == "mov_text" }?.method == .embed)
     }
 
     @Test func `the bitrate limit applies to files and streams`() {
