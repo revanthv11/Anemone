@@ -325,6 +325,8 @@ private struct HomeRowView: View {
     @ViewBuilder
     private func link(to card: HomeCard, @ViewBuilder label: () -> some View) -> some View {
         switch card.destination {
+        case .item where row.config.kind == .tvChannels || row.config.kind == .tvPrograms:
+            LiveTVHomeCard(item: card.item, isChannel: row.config.kind == .tvChannels, label: label)
         case .item:
             NavigationLink(value: card.item, label: label)
         case let .items(link):

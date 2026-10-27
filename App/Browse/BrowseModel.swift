@@ -107,7 +107,7 @@ final class BrowseModel {
             itemsPerRow: Preferences.maxItemsPerRow.value(),
             enableRewatchingNextUp: Preferences.enableRewatchingNextUp.value(),
             maxDaysNextUp: Preferences.maxDaysNextUp.value(),
-            liveTV: Self.liveTVSource,
+            liveTV: liveTVSource,
             cache: homeCache,
             isRefresh: isRefresh,
         )
@@ -186,15 +186,15 @@ extension BrowseModel {
         }
     }
 
-    /// Where Home's Live TV rows come from: nothing until Live TV lands, or made-up rows in DEBUG
-    /// builds launched with `-homeMockLiveTV YES`.
-    static var liveTVSource: any HomeLiveTVSource {
+    /// Where Home's Live TV rows come from: the server's Live TV, or made-up rows in DEBUG builds
+    /// launched with `-homeMockLiveTV YES`.
+    var liveTVSource: any HomeLiveTVSource {
         #if DEBUG
             if UserDefaults.standard.bool(forKey: "homeMockLiveTV") {
                 return HomeDebugData.MockLiveTV()
             }
         #endif
-        return NoLiveTV()
+        return session.liveTVHomeRows
     }
 
     #if DEBUG
