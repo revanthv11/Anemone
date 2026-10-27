@@ -102,4 +102,27 @@ struct FavoritesTests {
             try await session(host: "favorite-revoked.test").favorites(for: libraries)
         }
     }
+
+    @Test func `a row loaded again after a change replaces its old one, in the page's order`() {
+        func favorite(_ id: String, _ kind: MediaItem.Kind) -> ItemDetails {
+            ItemDetails(item: MediaItem(id: id, name: id, kind: kind))
+        }
+        let page = FavoritesContent(
+            sections: [
+                FavoritesSection(kind: .movie, items: [favorite("m1", .movie)]),
+                FavoritesSection(kind: .musicAlbum, items: [favorite("a1", .musicAlbum)]),
+            ],
+            failedKinds: [.series],
+        )
+
+        let added = page.replacing(.series, with: [favorite("s1", .series)])
+        let removed = page.replacing(.movie, with: [])
+        let changed = page.replacing(.musicAlbum, with: [favorite("a1", .musicAlbum), favorite("a2", .musicAlbum)])
+
+        #expect(added.sections.map(\.kind) == [.movie, .series, .musicAlbum])
+        #expect(added.failedKinds.isEmpty)
+        #expect(removed.sections.map(\.kind) == [.musicAlbum])
+        #expect(removed.failedKinds == [.series])
+        #expect(changed.sections.last?.items.map(\.id) == ["a1", "a2"])
+    }
 }

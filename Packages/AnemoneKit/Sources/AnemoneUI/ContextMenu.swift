@@ -68,37 +68,6 @@ public extension View {
     }
 }
 
-/// Marks changed from card menus, so every card of that item shows the change at once, the way
-/// Wholphin refreshes the row after a menu action. The pages holding the cards keep their own
-/// copies of the item, which catch up when they reload.
-///
-/// A change shows only while a card's own marks are still the ones the menu changed: once a
-/// card's page reloads with something else, its own marks are newer and win.
-@MainActor
-@Observable
-public final class CardMarksStore {
-    private struct Change {
-        let before: CardMarks
-        let after: CardMarks
-    }
-
-    private var changes: [String: Change] = [:]
-
-    public init() {}
-
-    /// What a card of the item shows, given the marks its caller passed.
-    public func marks(for id: String, given marks: CardMarks) -> CardMarks {
-        guard let change = changes[id], change.before == marks else { return marks }
-        return change.after
-    }
-
-    /// Notes that the menu changed an item's marks from `before`, the marks its card was given,
-    /// to `after`.
-    public func record(_ after: CardMarks, for id: String, replacing before: CardMarks) {
-        changes[id] = Change(before: before, after: after)
-    }
-}
-
 /// What a `MediaCard` asks its button's menu for: its item, and the marks its caller passed.
 struct CardMenuRequest: Equatable, Sendable {
     let item: CardMenuItem
