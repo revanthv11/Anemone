@@ -101,7 +101,7 @@ struct SeasonPage: View {
                     }
                     ChaptersRow(chapters: episodeExtras.chapters, focus: $focus, memory: memory, play: playEpisode)
                     peopleRows
-                    ExtrasRow(extras: seasonExtras.features, focus: $focus, memory: memory)
+                    ExtrasRow(extras: $seasonExtras, focus: $focus, memory: memory)
                 }
                 .padding(.horizontal, ItemLayout.horizontalInset)
                 .padding(.top, 40)

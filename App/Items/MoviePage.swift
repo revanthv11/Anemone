@@ -125,7 +125,7 @@ struct MoviePage: View {
             PeopleRow(id: "people", title: "People", people: item.people, focus: $focus, memory: memory)
         }
         ChaptersRow(chapters: extras.chapters, focus: $focus, memory: memory, play: play(from:))
-        ExtrasRow(extras: extras.features, focus: $focus, memory: memory)
+        ExtrasRow(extras: $extras, focus: $focus, memory: memory)
         if !similar.isEmpty {
             // Wholphin shows posters only when the page is a movie's.
             ItemRow(

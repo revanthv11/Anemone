@@ -7,7 +7,9 @@ import SwiftUI
 /// a card per extra, or per kind when there are several of it. Selecting an extra plays it; a
 /// kind's card lists its extras to pick from. Hidden when there are none.
 struct ExtrasRow: View {
-    let extras: [ExtrasEntry]
+    /// The page's extras, whose special features the row shows. Reloaded when an extra's player
+    /// closes, so its card shows the new progress, or the extra marked watched.
+    @Binding var extras: ItemExtras
     let focus: FocusState<ItemFocus?>.Binding
     let memory: RowMemory
 
@@ -18,8 +20,8 @@ struct ExtrasRow: View {
     @State private var isPicking = false
 
     var body: some View {
-        if !extras.isEmpty {
-            CardRow(id: "extras", title: "Extras", elements: extras, focus: focus, memory: memory) { entry in
+        if !extras.features.isEmpty {
+            CardRow(id: "extras", title: "Extras", elements: extras.features, focus: focus, memory: memory) { entry in
                 Button {
                     if let extra = entry.items.first, entry.items.count == 1 {
                         play(extra)
@@ -45,13 +47,25 @@ struct ExtrasRow: View {
                     .accessibilityIdentifier("extra.\(extra.id)")
                 }
             }
-            .player($playback) {}
+            .player($playback) {
+                await reload()
+            }
         }
     }
 
     /// From where it was left, as episode cards play.
     private func play(_ extra: ItemDetails) {
         playback = browse.playback(of: extra, from: extra.userState.resumePosition)
+    }
+
+    /// Like the pages after their own playback: a failed reload keeps what's showing. One for an
+    /// item the page has moved away from meanwhile is dropped.
+    private func reload() async {
+        guard let id = extras.itemID else { return }
+        let session = browse.session
+        let loaded = await browse.optional(attempt { try await session.itemExtras(id: id) })
+        guard let loaded, extras.itemID == id else { return }
+        extras = loaded
     }
 }
 

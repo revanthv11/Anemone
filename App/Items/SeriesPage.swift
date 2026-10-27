@@ -135,7 +135,7 @@ struct SeriesPage: View {
         if !series.people.isEmpty {
             PeopleRow(id: "people", title: "People", people: series.people, focus: $focus, memory: memory)
         }
-        ExtrasRow(extras: extras.features, focus: $focus, memory: memory)
+        ExtrasRow(extras: $extras, focus: $focus, memory: memory)
         if !similar.isEmpty {
             ItemRow(
                 id: "similar",
