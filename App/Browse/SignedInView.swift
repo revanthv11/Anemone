@@ -63,6 +63,7 @@ struct SignedInView: View {
         .itemContextActions()
         .environment(browse)
         .musicPlayback(session: browse.session)
+        .deepLinkTabs(selection: $selection)
         .task {
             await browse.load()
         }

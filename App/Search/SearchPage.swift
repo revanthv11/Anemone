@@ -72,6 +72,7 @@ struct SearchPage: View {
         .onSubmit(of: .search) {
             submit()
         }
+        .deepLinkSearch(pick)
         .pageTask(id: run) {
             await search(run)
         }

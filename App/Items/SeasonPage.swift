@@ -220,6 +220,7 @@ struct SeasonPage: View {
                 .focused($focus, equals: .action(.favorite))
                 DeleteButton(item: episode, canDelete: episodeExtras.canDelete) { remove(episode) }
                     .focused($focus, equals: .action(.delete))
+                VersionPicker(itemID: episode.id)
             }
         }
         .frame(minHeight: 80)

@@ -116,6 +116,7 @@ struct MoviePage: View {
             .focused($focus, equals: .action(.favorite))
             TrailerButton(trailers: extras.trailers).focused($focus, equals: .action(.trailer))
             DeleteButton(item: item, canDelete: extras.canDelete).focused($focus, equals: .action(.delete))
+            VersionPicker(itemID: item.id)
         }
         .padding(.vertical, 20)
         .focusSection()

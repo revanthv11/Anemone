@@ -9,7 +9,12 @@ public extension PlaybackController {
             SegmentSkipping(session: session),
             UpNext(),
             PlaybackDetails(session: session),
+            // Before Now Playing: stopped music gives up Now Playing and the remote's commands.
             MusicStopping(),
+            NowPlaying(),
+            SkipBackOnResume(),
+            PlaybackLifecycle(),
+            DisplayCriteriaMatching(),
         ]
     }
 }
