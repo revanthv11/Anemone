@@ -19,7 +19,7 @@ final class DiscoveryResponder: Sendable {
         Thread { [self] in
             while !stopped.load(ordering: .relaxed) {
                 guard let probe = socket.receive(timeout: .milliseconds(50)) else { continue }
-                heard.withLock { $0.append(String(decoding: probe.data, as: UTF8.self)) }
+                heard.withLock { $0.append(String(data: probe.data, encoding: .utf8) ?? "") }
                 for reply in self.replies {
                     _ = socket.send(reply, to: probe.sender)
                 }

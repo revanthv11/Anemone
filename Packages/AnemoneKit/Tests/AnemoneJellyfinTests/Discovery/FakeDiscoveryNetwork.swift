@@ -71,7 +71,7 @@ final class FakeDiscoveryNetwork: Sendable {
             let host = InterfaceAddress.dotted(UInt32(bigEndian: address.sin_addr.s_addr))
             guard !network.unreachable.contains(host) else { return POSIXError(.EHOSTUNREACH) }
             let probe = Probe(
-                text: String(decoding: data, as: UTF8.self),
+                text: String(data: data, encoding: .utf8) ?? "",
                 destination: "\(host):\(UInt16(bigEndian: address.sin_port))",
             )
             network.record.withLock { $0.probes.append(probe) }
