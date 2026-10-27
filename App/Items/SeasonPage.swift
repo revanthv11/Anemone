@@ -220,7 +220,7 @@ struct SeasonPage: View {
                 .focused($focus, equals: .action(.favorite))
                 DeleteButton(item: episode, canDelete: episodeExtras.canDelete) { remove(episode) }
                     .focused($focus, equals: .action(.delete))
-                VersionPicker(itemID: episode.id)
+                VersionPicker(item: episode)
             }
         }
         // As wide as the page, so Down from any episode, not just those above the buttons, lands
