@@ -62,6 +62,7 @@ struct SignedInView: View {
         .tabViewStyle(.sidebarAdaptable)
         .itemContextActions()
         .environment(browse)
+        .deepLinkTabs(selection: $selection)
         .task {
             await browse.load()
         }
