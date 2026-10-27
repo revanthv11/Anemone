@@ -208,7 +208,15 @@ Not yet: chapters for episodes outside a season, Wholphin's "Show media manageme
 
 #### 2h: Favorites page and card context menu
 
-Not started. The Favorites destination is in the sidebar, before the libraries as in Wholphin's drawer, and hidden until this lands.
+- [x] Favorites page in the sidebar, before the libraries as in Wholphin's drawer: a row per type where Wholphin has a tab per type, in its order, for the types the user's libraries can hold (up to 100 per row, by name), with a header and backdrop for the focused card. It reloads when it shows again and after a card's menu changes something; a row that fails is left out with a notice
+- [x] Card context menu on a long press of Select, in Wholphin's order: Go to, Play or Resume and Restart, Add to playlist, Remove from Continue Watching, Remove from Next Up (Home's, from 2e), Mark as watched or unwatched, Add to or remove from favorites, and Go to series; people get Go to and favourites. `MediaCard` says what it shows, `CardRow` opens the menu on the card's button, and one handler set in `SignedInView` does the work, so every card on item pages and in Search has it
+- [x] A change from the menu shows at once on every card of that item, until the card's page reloads with newer state
+- [x] Add to playlist lists the 25 newest playlists the user may edit, as Wholphin does. One that already holds the item has a check, and choosing it takes the item out again; Wholphin doesn't look inside, so it can add an item twice
+- Cards that hold only a `MediaItem` don't know whether it's watched or a favourite, so their menu offers both ways. Home and library grids don't pass their items to the menu yet, and Home sets which of its rows are Continue Watching and Next Up (`cardMenuSource`)
+
+Tested live in the simulator against the Jellyfin 12.3 demo server, with throwaway UI tests: on The Great Train Robbery's card on a person page, the menu added it to favorites and marked it unwatched and watched again, with the card's heart and check following each time; the Favorites page then listed it under Movies, and removing it there from the card's menu took it off the page. "Go to series" on a Pioneer One episode card on the season page opened the series page, and Back returned to the season page. Add to playlist added the movie to playlist "123", showed the check the next time, and took it out again. Play from the menu played the movie and closed back to the page. Long-pressing a person card shows no menu. Not verified live: Resume and Restart, Remove from Continue Watching and Next Up (Home doesn't pass its items to the menu yet), the menu in Search results, and an item whose state the card doesn't know.
+
+Not yet: Home rows and library grids passing their items (and Home its row types) to the menu; creating a playlist from Add to playlist; Wholphin's person card menu; delete (with 2g's option); after playing from a menu, focus returns to the page's first control rather than the card.
 
 ### Phase 3: playback v1 (AVPlayer)
 
