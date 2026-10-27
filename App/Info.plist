@@ -24,6 +24,10 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
 	<!-- HTTPS through the system only, which is exempt; see docs/release/export-compliance.md. -->
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>

@@ -10,6 +10,8 @@ public extension PlaybackController {
             UpNext(),
             TrackSelection(session: session),
             PlaybackDetails(session: session),
+            // Before Now Playing: stopped music gives up Now Playing and the remote's commands.
+            MusicStopping(),
             NowPlaying(),
             SkipBackOnResume(),
             PlaybackLifecycle(),
