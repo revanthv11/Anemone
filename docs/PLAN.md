@@ -102,7 +102,7 @@ Apart from Settings, now a list with a page for each part of the app, nothing vi
 - [ ] Spike: MPVKit on Apple TV hardware with HEVC 10-bit HDR, ASS subtitles and TrueHD
 - [ ] Spike: AVPlayer playing Jellyfin 12 HLS with Dolby Vision
 - [ ] Spike: multicast entitlement and UDP discovery on tvOS
-- [ ] App icon and Top Shelf image (tvOS layered brand assets)
+- [x] App icon and Top Shelf image: the Monogram mark (two tentacles form the A, a magenta play wedge for the crossbar) in `App Icon & Top Shelf Image.brandassets`, rendered from the SVG sources in `docs/brand/monogram` by `scripts/render-brand-assets.mjs` (headless Chrome); the App Icon and App Store stacks have Back, Middle and Front parallax layers, the Top Shelf images are flat composites, and `icon-ios-1024.png` waits for the iOS app
 
 ### Phase 1: foundation
 
