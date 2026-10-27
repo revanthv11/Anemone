@@ -226,16 +226,45 @@
 
     extension Client {
         /// A client for the Seerr server at `serverURL` (its own address; the API's is derived).
-        init(serverURL: URL, signing: SeerrSigning, transport: URLSessionTransport) {
+        init(serverURL: URL, signing: SeerrSigning, transport: SeerrTransport) {
             self.init(serverURL: SeerrAddress.apiURL(for: serverURL), transport: transport, middlewares: [signing])
         }
     }
 
-    extension URLSessionTransport {
-        /// A transport for Seerr that waits at most `timeout` for each request and handles no
-        /// cookies itself, so the session cookie only ever lives in `SeerrSigning`. It works on a
-        /// copy of `configuration`, leaving the caller's as it was.
-        static func seerr(_ configuration: URLSessionConfiguration, timeout: TimeInterval) -> URLSessionTransport {
+    /// Sends Seerr's requests through a URL session of its own, which it closes once nothing can
+    /// send through it any more: when the check of an address is over, or the connection that
+    /// signed in with it has gone, as after a Retry. A URL session lives until it's invalidated,
+    /// so leaving one open for every address checked and every sign-in would add up.
+    struct SeerrTransport: ClientTransport {
+        /// Invalidates the session once the last copy of the transport has gone, so no request
+        /// can start on it afterwards.
+        private final class Session: Sendable {
+            let session: URLSession
+            let host: String
+
+            init(_ session: URLSession, host: String) {
+                self.session = session
+                self.host = host
+                SeerrTransport.opened(host, by: 1)
+            }
+
+            deinit {
+                session.finishTasksAndInvalidate()
+                SeerrTransport.opened(host, by: -1)
+            }
+        }
+
+        private let session: Session
+        private let transport: URLSessionTransport
+
+        /// How many sessions are open to each server, by host, so tests can check that checking
+        /// an address or letting a connection go leaves none behind.
+        private static let open = Mutex<[String: Int]>([:])
+
+        /// A transport to the Seerr server at `serverURL` that waits at most `timeout` for each
+        /// request and handles no cookies itself, so the session cookie only ever lives in
+        /// `SeerrSigning`. It works on a copy of `configuration`, leaving the caller's as it was.
+        init(to serverURL: URL, _ configuration: URLSessionConfiguration, timeout: TimeInterval) {
             // A configuration's copy is always a configuration.
             let configuration = configuration.copy() as? URLSessionConfiguration ?? .ephemeral
             configuration.timeoutIntervalForRequest = min(configuration.timeoutIntervalForRequest, timeout)
@@ -243,10 +272,27 @@
             configuration.httpShouldSetCookies = false
             configuration.httpCookieAcceptPolicy = .never
             configuration.urlCache = nil
-            return URLSessionTransport(configuration: .init(
-                session: URLSession(configuration: configuration),
-                httpBodyProcessingMode: .buffered,
-            ))
+            let session = URLSession(configuration: configuration)
+            self.session = Session(session, host: serverURL.host() ?? "")
+            transport = URLSessionTransport(configuration: .init(session: session, httpBodyProcessingMode: .buffered))
+        }
+
+        func send(
+            _ request: HTTPRequest,
+            body: HTTPBody?,
+            baseURL: URL,
+            operationID: String,
+        ) async throws -> (HTTPResponse, HTTPBody?) {
+            try await transport.send(request, body: body, baseURL: baseURL, operationID: operationID)
+        }
+
+        /// How many of the transports' sessions to `host` are open.
+        static func openSessions(to host: String) -> Int {
+            open.withLock { $0[host, default: 0] }
+        }
+
+        private static func opened(_ host: String, by change: Int) {
+            open.withLock { $0[host, default: 0] += change }
         }
     }
 
