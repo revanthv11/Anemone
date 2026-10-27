@@ -16,7 +16,7 @@ struct ChaptersRow: View {
 
     var body: some View {
         if !chapters.isEmpty {
-            CardRow(id: "chapters", title: "Chapters", elements: chapters, focus: focus, memory: memory) { chapter in
+            CardRow(id: rowID, title: "Chapters", elements: chapters, focus: focus, memory: memory) { chapter in
                 Button {
                     play(chapter.start)
                 } label: {
@@ -31,6 +31,13 @@ struct ChaptersRow: View {
                 .buttonStyle(.borderless)
             }
         }
+    }
+
+    /// A row of its own for each item's chapters. Chapters are known by their index, so on the
+    /// season page, where the row follows the selected episode, one row for every episode would
+    /// enter a new episode's chapters at the index last focused in another's.
+    private var rowID: String {
+        "chapters.\(chapters.first?.itemID ?? "")"
     }
 
     private static let cardWidth = CardShape.thumb.cardWidth

@@ -11,18 +11,29 @@ enum UserStateChange {
 extension BrowseModel {
     /// Saves whether the user watched or likes an item, and returns the item's new state. When
     /// the server can't save it, reports why through `failed` and returns `nil`.
+    ///
+    /// The change shows at once on every card of the item, through `cardMarks`, whether a card's
+    /// menu or a page's own button made it. So a card doesn't go on showing an earlier change
+    /// after the item is changed back.
+    ///
+    /// - Parameter given: the marks of the card whose menu made the change; `nil` for the page's
+    ///   own buttons, whose `details` are what the page shows.
     func save(
         _ change: UserStateChange,
         for details: ItemDetails,
+        given: CardMarks? = nil,
         failed: (ItemAlert) -> Void,
     ) async -> ItemDetails.UserState? {
         do {
-            switch change {
+            let state = switch change {
             case let .played(isPlayed):
-                return try await session.setPlayed(isPlayed, itemID: details.id)
+                try await session.setPlayed(isPlayed, itemID: details.id)
             case let .favorite(isFavorite):
-                return try await session.setFavorite(isFavorite, itemID: details.id)
+                try await session.setFavorite(isFavorite, itemID: details.id)
             }
+            let before = given ?? details.cardMarks
+            cardMarks.record(CardMarks(state, replacing: before), for: details.id, replacing: before)
+            return state
         } catch {
             if let message = problem(with: error, doing: "update \(details.item.name)") {
                 failed(.failed(message))
@@ -97,6 +108,11 @@ extension ItemDetails {
             isPlayed: userState.isPlayed,
             unplayedCount: hasCount ? userState.unplayedCount : nil,
         )
+    }
+
+    /// What an item page's card of it shows over its artwork.
+    var cardMarks: CardMarks {
+        CardMarks(badges: badges, progress: item.progress)
     }
 
     /// The card shape Wholphin's collection rows use for this kind of item.
@@ -178,6 +194,17 @@ extension ItemDetails {
               let remaining = timeRemaining ?? item.runtime, remaining > .zero
         else { return nil }
         return remaining.endsAtText(from: now)
+    }
+}
+
+extension CardMarks {
+    /// What the server's answer to a change leaves on cards that showed `before`. The answer
+    /// doesn't always have an unplayed count: cards that show one take it from here, and only
+    /// those do.
+    init(_ state: ItemDetails.UserState, replacing before: CardMarks) {
+        var badges = CardBadges(isFavorite: state.isFavorite, isPlayed: state.isPlayed)
+        badges.unplayedCount = state.unplayedCount ?? before.badges.unplayedCount.map { state.isPlayed ? 0 : $0 }
+        self.init(badges: badges, progress: state.progress)
     }
 }
 
