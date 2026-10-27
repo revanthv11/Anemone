@@ -28,6 +28,8 @@ struct HomeCardView: View {
                 width: style.width,
                 progress: card.item.progress,
                 showsCaption: options.showTitles,
+                // A home row holds no watched or favourite state, so the menu offers both ways.
+                menuItem: CardMenuItem(card.item),
             )
         }
     }

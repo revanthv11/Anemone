@@ -1,3 +1,4 @@
+import AnemoneCore
 import AnemoneJellyfin
 import AnemoneUI
 import SwiftUI
@@ -245,8 +246,6 @@ private struct HomeRowView: View {
     let focusedCard: FocusState<CardID?>.Binding
     let scrollTarget: CardID?
 
-    @Environment(BrowseModel.self) private var browse
-
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(row.title)
@@ -259,11 +258,11 @@ private struct HomeRowView: View {
                                 HomeCardView(card: card, options: row.config.viewOptions)
                             }
                             .buttonStyle(.borderless)
+                            // The long-press menu, for cards that show an item; genres and studios
+                            // have none.
+                            .cardMenu()
                             .focused(focusedCard, equals: CardID(rowID: row.id, itemID: card.id))
                             .accessibilityIdentifier("card.\(row.id).\(card.id)")
-                            .removeFromNextUpMenu(isOffered: offersRemoveFromNextUp(card)) {
-                                Task { await browse.removeFromNextUp(card.item) }
-                            }
                         }
                     }
                     .padding(.vertical, HomeLayout.focusPadding)
@@ -278,6 +277,8 @@ private struct HomeRowView: View {
             }
         }
         .focusSection()
+        // Lets the menus of Continue Watching and Next Up cards take them out of their row.
+        .environment(\.cardMenuSource, row.config.kind.menuSource)
     }
 
     @ViewBuilder
@@ -289,25 +290,17 @@ private struct HomeRowView: View {
             NavigationLink(value: link, label: label)
         }
     }
-
-    /// Wholphin offers this on episodes in Next Up and the combined row.
-    private func offersRemoveFromNextUp(_ card: HomeCard) -> Bool {
-        card.item.kind == .episode && (row.config.kind == .nextUp || row.config.kind == .continueWatchingCombined)
-    }
 }
 
-private extension View {
-    /// Wholphin's "Remove from Next Up", on a long press. The card context menu (Phase 2h) will
-    /// take this over.
-    @ViewBuilder
-    func removeFromNextUpMenu(isOffered: Bool, action: @escaping () -> Void) -> some View {
-        if isOffered {
-            contextMenu {
-                Button("Remove from Next Up", systemImage: "minus.circle", action: action)
-                    .accessibilityIdentifier("home.removeFromNextUp")
-            }
-        } else {
-            self
+private extension HomeRowConfig.Kind {
+    /// Which watching row this is, for the card menu's Remove from Continue Watching and Remove
+    /// from Next Up, as Wholphin's home page passes them.
+    var menuSource: ItemMenuSource {
+        switch self {
+        case .continueWatching: .continueWatching
+        case .nextUp: .nextUp
+        case .continueWatchingCombined: .continueWatchingAndNextUp
+        default: .other
         }
     }
 }
