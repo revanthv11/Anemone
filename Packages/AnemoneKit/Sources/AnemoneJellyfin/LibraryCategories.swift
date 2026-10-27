@@ -88,6 +88,70 @@ public struct GenreBackdrops: Hashable, Sendable {
     /// False when one failed or the task was cancelled part way, as when the tab is left while
     /// the artwork loads; keeping that would leave those cards plain until it expired.
     public let isComplete: Bool
+
+    public init(images: [String: ItemImage], isComplete: Bool) {
+        self.images = images
+        self.isComplete = isComplete
+    }
+}
+
+/// Genre cards' artwork, kept for two hours per library as Wholphin keeps it, so going back to
+/// the Genres tab doesn't ask for it all again or change every picture.
+@MainActor
+public final class GenreArtCache {
+    /// The cache the Genres tabs share.
+    public static let shared = GenreArtCache()
+    /// How long a full set is kept, as in Wholphin.
+    public static let lifetime: TimeInterval = 2 * 60 * 60
+
+    private var entries: [String: (fetched: Date, images: [String: ItemImage])] = [:]
+    private let now: @MainActor () -> Date
+
+    public init(now: @escaping @MainActor () -> Date = { .now }) {
+        self.now = now
+    }
+
+    /// The artwork for a library's genres, kept from before or asked for with
+    /// `JellyfinSession.genreBackdrops(for:in:)`.
+    ///
+    /// - Returns: each genre's picture; none at all when it couldn't be loaded, so the cards
+    ///   stay plain.
+    /// - Throws: `SessionError.signedOut` only, for the page to say so.
+    public func images(
+        for genreIDs: [String],
+        in library: Library,
+        session: JellyfinSession,
+    ) async throws -> [String: ItemImage] {
+        try await images(key: "\(session.serverURL.absoluteString)|\(session.userID)|\(library.id)") {
+            try await session.genreBackdrops(for: genreIDs, in: library)
+        }
+    }
+
+    /// `images(for:in:session:)`, for the library `key` names, fetched with `fetch`.
+    public func images(
+        key: String,
+        fetch: @Sendable () async throws -> GenreBackdrops,
+    ) async throws -> [String: ItemImage] {
+        if let cached = entries[key], now().timeIntervalSince(cached.fetched) < Self.lifetime {
+            return cached.images
+        }
+        let backdrops: GenreBackdrops
+        do {
+            backdrops = try await fetch()
+        } catch SessionError.signedOut {
+            throw SessionError.signedOut
+        } catch {
+            // Anything else leaves the cards plain, as one genre's failed request does its card.
+            return [:]
+        }
+        // Only a full set is kept. Wholphin caches only when every request succeeds; one cut
+        // short by leaving the tab, or missing a genre whose request failed, would otherwise
+        // leave those cards plain for two hours.
+        if backdrops.isComplete {
+            entries[key] = (now(), backdrops.images)
+        }
+        return backdrops.images
+    }
 }
 
 /// One genre's request for its artwork: the picture, if there is one, or that it failed.
