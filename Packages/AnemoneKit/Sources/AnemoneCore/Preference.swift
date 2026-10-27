@@ -55,9 +55,52 @@ public extension PreferenceValue {
     }
 }
 
-extension Bool: PreferenceValue {}
-extension Int: PreferenceValue {}
-extension Double: PreferenceValue {}
+/// Numbers and switches also read from text: a launch argument such as `-controllerTimeoutMs 500`
+/// reaches UserDefaults as the string "500", which `integer(forKey:)` reads but a cast to `Int`
+/// doesn't. Text that isn't a number (or a yes or no) counts as not set.
+extension Bool: PreferenceValue {
+    public static func read(_ key: String, from defaults: UserDefaults) -> Bool? {
+        switch defaults.object(forKey: key) {
+        case let value as Bool:
+            value
+        case let text as String:
+            switch text.trimmingCharacters(in: .whitespaces).lowercased() {
+            case "yes", "true", "1": true
+            case "no", "false", "0": false
+            default: nil
+            }
+        default:
+            nil
+        }
+    }
+}
+
+extension Int: PreferenceValue {
+    public static func read(_ key: String, from defaults: UserDefaults) -> Int? {
+        switch defaults.object(forKey: key) {
+        case let value as Int:
+            value
+        case let text as String:
+            Int(text.trimmingCharacters(in: .whitespaces))
+        default:
+            nil
+        }
+    }
+}
+
+extension Double: PreferenceValue {
+    public static func read(_ key: String, from defaults: UserDefaults) -> Double? {
+        switch defaults.object(forKey: key) {
+        case let value as Double:
+            value
+        case let text as String:
+            Double(text.trimmingCharacters(in: .whitespaces))
+        default:
+            nil
+        }
+    }
+}
+
 extension String: PreferenceValue {}
 
 public extension PreferenceValue where Self: RawRepresentable, RawValue: PreferenceValue {

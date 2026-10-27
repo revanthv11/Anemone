@@ -10,6 +10,12 @@ struct PreferenceTests {
         case autoSkip
     }
 
+    private enum RepeatMode: Int, PreferenceValue {
+        case off
+        case all
+        case one
+    }
+
     private let defaults: UserDefaults
 
     init() throws {
@@ -56,5 +62,73 @@ struct PreferenceTests {
 
         #expect(behaviour.value(in: defaults) == .ask)
         #expect(count.value(in: defaults) == 3)
+    }
+
+    /// A launch argument such as `-controllerTimeoutMs 500` reaches UserDefaults as text, as
+    /// these do; a test can't set the process's own arguments without replacing them for every
+    /// test running beside it.
+    @Test func `numbers and switches given as launch arguments are read`() {
+        let timeout = Preference("controllerTimeoutMs", default: 5000)
+        let scale = Preference("scale", default: 1.0)
+        let autoPlay = Preference("autoPlayNext", default: false)
+        let refreshRate = Preference("refreshRate", default: false)
+
+        defaults.set("500", forKey: "controllerTimeoutMs")
+        defaults.set("1.25", forKey: "scale")
+        defaults.set("YES", forKey: "autoPlayNext")
+        defaults.set("true", forKey: "refreshRate")
+
+        #expect(timeout.value(in: defaults) == 500)
+        #expect(scale.value(in: defaults) == 1.25)
+        #expect(autoPlay.value(in: defaults))
+        #expect(refreshRate.value(in: defaults))
+
+        defaults.set("NO", forKey: "autoPlayNext")
+        defaults.set("0", forKey: "refreshRate")
+        #expect(!autoPlay.value(in: defaults, default: true))
+        #expect(!refreshRate.value(in: defaults, default: true))
+    }
+
+    @Test func `an enum with an Int raw value is read from a launch argument too`() {
+        let mode = Preference("repeatMode", default: RepeatMode.off)
+
+        defaults.set("2", forKey: "repeatMode")
+
+        #expect(mode.value(in: defaults) == .one)
+    }
+
+    @Test func `text that isn't a number or a switch falls back to the default`() {
+        let timeout = Preference("controllerTimeoutMs", default: 5000)
+        let scale = Preference("scale", default: 1.0)
+        let autoPlay = Preference("autoPlayNext", default: true)
+
+        defaults.set("soon", forKey: "controllerTimeoutMs")
+        defaults.set("", forKey: "scale")
+        defaults.set("maybe", forKey: "autoPlayNext")
+
+        #expect(timeout.value(in: defaults) == 5000)
+        #expect(scale.value(in: defaults) == 1.0)
+        #expect(autoPlay.value(in: defaults))
+    }
+
+    @Test func `stored numbers keep being read as they were`() {
+        let timeout = Preference("controllerTimeoutMs", default: 5000)
+        let autoPlay = Preference("autoPlayNext", default: false)
+        let scale = Preference("scale", default: 1.0)
+
+        defaults.set(800, forKey: "controllerTimeoutMs")
+        defaults.set(true, forKey: "autoPlayNext")
+        defaults.set(2, forKey: "scale")
+
+        #expect(timeout.value(in: defaults) == 800)
+        #expect(autoPlay.value(in: defaults))
+        #expect(scale.value(in: defaults) == 2.0)
+    }
+}
+
+private extension Preference<Bool> {
+    /// The value with another default, to tell a stored `false` from a missing one.
+    func value(in defaults: UserDefaults, default fallback: Bool) -> Bool {
+        Preference(key, default: fallback).value(in: defaults)
     }
 }
