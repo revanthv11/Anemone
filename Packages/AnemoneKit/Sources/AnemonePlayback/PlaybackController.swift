@@ -69,7 +69,6 @@ public final class PlaybackController: Identifiable {
 
     /// A player for `request` on `session`'s server, with the features every player gets.
     public convenience init(session: JellyfinSession, request: PlaybackRequest) {
-        // AVPlayer or MPV as Settings asks; "Prefer MPV" picks one, and so its profile, per entry.
         let engine = PlayerChoice.engine(for: session)
         let profiles = DeviceProfileSource(engine)
         self.init(
