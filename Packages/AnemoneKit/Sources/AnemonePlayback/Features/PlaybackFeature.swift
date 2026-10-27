@@ -59,14 +59,24 @@ public struct StreamRequest: Hashable, Sendable {
 }
 
 extension JellyfinSession {
-    /// The stream `request` asks for, at up to `maxBitrate`.
+    /// The stream `request` asks for, at up to `maxBitrate`: the version it names, as a retry, a
+    /// reload or chosen tracks do, else the version picked on the item's page while the server
+    /// still has it. The server ignores track indices sent without a version.
     func playbackStream(for request: StreamRequest, maxBitrate: Int) async throws -> PlaybackStream {
-        try await playbackStream(
+        guard let mediaSourceID = request.mediaSourceID else {
+            return try await playbackStream(
+                forPickedVersionOf: request.itemID,
+                profile: request.profile,
+                maxBitrate: maxBitrate,
+                allowsDirect: request.allowsDirect,
+            )
+        }
+        return try await playbackStream(
             for: request.itemID,
             profile: request.profile,
             maxBitrate: maxBitrate,
             allowsDirect: request.allowsDirect,
-            mediaSourceID: request.mediaSourceID,
+            mediaSourceID: mediaSourceID,
             audioStreamIndex: request.audioStreamIndex,
             subtitleStreamIndex: request.subtitleStreamIndex,
         )

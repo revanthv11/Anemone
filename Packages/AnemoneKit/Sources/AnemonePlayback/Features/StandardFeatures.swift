@@ -10,6 +10,10 @@ public extension PlaybackController {
             UpNext(),
             TrackSelection(session: session),
             PlaybackDetails(session: session),
+            NowPlaying(),
+            SkipBackOnResume(),
+            PlaybackLifecycle(),
+            DisplayCriteriaMatching(),
         ]
     }
 }

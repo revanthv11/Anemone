@@ -38,6 +38,9 @@ public struct PlaybackStream: Hashable, Sendable {
     public let subtitleStreamIndex: Int?
     /// The source's audio and subtitle tracks, with how this stream carries each subtitle.
     public let tracks: [MediaTrack]
+    /// The version's video as the server read it from the file, before any transcode; `nil` when
+    /// PlaybackInfo didn't describe it.
+    public let video: MediaVersion.Video?
 
     public init(
         itemID: MediaItem.ID,
@@ -49,6 +52,7 @@ public struct PlaybackStream: Hashable, Sendable {
         audioStreamIndex: Int? = nil,
         subtitleStreamIndex: Int? = nil,
         tracks: [MediaTrack] = [],
+        video: MediaVersion.Video? = nil,
     ) {
         self.itemID = itemID
         self.url = url
@@ -59,6 +63,7 @@ public struct PlaybackStream: Hashable, Sendable {
         self.audioStreamIndex = audioStreamIndex
         self.subtitleStreamIndex = subtitleStreamIndex
         self.tracks = tracks
+        self.video = video
     }
 }
 
@@ -93,34 +98,16 @@ public extension JellyfinSession {
         audioStreamIndex: Int? = nil,
         subtitleStreamIndex: Int? = nil,
     ) async throws -> PlaybackStream {
-        let request = PlaybackInfoDto(
-            allowAudioStreamCopy: allowsDirect,
-            allowVideoStreamCopy: allowsDirect,
-            audioStreamIndex: audioStreamIndex,
-            deviceProfile: profile,
-            enableDirectPlay: allowsDirect,
-            enableDirectStream: allowsDirect,
-            enableTranscoding: true,
-            isAlwaysBurnInSubtitleWhenTranscoding: false,
-            isAutoOpenLiveStream: true,
-            maxStreamingBitrate: maxBitrate,
+        let response = try await playbackInfo(
+            for: itemID,
+            profile: profile,
+            maxBitrate: maxBitrate,
+            allowsDirect: allowsDirect,
             mediaSourceID: mediaSourceID,
+            audioStreamIndex: audioStreamIndex,
             subtitleStreamIndex: subtitleStreamIndex,
-            userID: userID,
         )
-        let response = try await send(Paths.getPostedPlaybackInfo(itemID: itemID, request))
-        if let error = response.errorCode {
-            throw PlaybackError(error)
-        }
-        guard let source = response.mediaSources?.first,
-              let stream = PlaybackStream(
-                  itemID: itemID,
-                  source: source,
-                  playSessionID: response.playSessionID,
-                  client: client,
-              )
-        else { throw PlaybackError.nothingToPlay }
-        return stream
+        return try stream(from: response, for: itemID)
     }
 
     /// Tells the server playback has begun, so it shows on its dashboard.
@@ -145,6 +132,53 @@ public extension JellyfinSession {
             positionTicks: max(position, .zero).ticks,
         )
         try await send(Paths.reportPlaybackStopped(info))
+    }
+}
+
+extension JellyfinSession {
+    /// The server's PlaybackInfo answer, for `playbackStream(for:…)`, which takes the parameters
+    /// it describes.
+    func playbackInfo(
+        for itemID: MediaItem.ID,
+        profile: DeviceProfile,
+        maxBitrate: Int,
+        allowsDirect: Bool,
+        mediaSourceID: String?,
+        audioStreamIndex: Int? = nil,
+        subtitleStreamIndex: Int? = nil,
+    ) async throws -> PlaybackInfoResponse {
+        let request = PlaybackInfoDto(
+            allowAudioStreamCopy: allowsDirect,
+            allowVideoStreamCopy: allowsDirect,
+            audioStreamIndex: audioStreamIndex,
+            deviceProfile: profile,
+            enableDirectPlay: allowsDirect,
+            enableDirectStream: allowsDirect,
+            enableTranscoding: true,
+            isAlwaysBurnInSubtitleWhenTranscoding: false,
+            isAutoOpenLiveStream: true,
+            maxStreamingBitrate: maxBitrate,
+            mediaSourceID: mediaSourceID,
+            subtitleStreamIndex: subtitleStreamIndex,
+            userID: userID,
+        )
+        return try await send(Paths.getPostedPlaybackInfo(itemID: itemID, request))
+    }
+
+    /// The stream the server offers first, or why there's none.
+    func stream(from response: PlaybackInfoResponse, for itemID: MediaItem.ID) throws -> PlaybackStream {
+        if let error = response.errorCode {
+            throw PlaybackError(error)
+        }
+        guard let source = response.mediaSources?.first,
+              let stream = PlaybackStream(
+                  itemID: itemID,
+                  source: source,
+                  playSessionID: response.playSessionID,
+                  client: client,
+              )
+        else { throw PlaybackError.nothingToPlay }
+        return stream
     }
 }
 
@@ -186,6 +220,7 @@ extension PlaybackStream {
             audioStreamIndex: source.defaultAudioStreamIndex,
             subtitleStreamIndex: source.defaultSubtitleStreamIndex,
             tracks: (source.mediaStreams ?? []).compactMap(MediaTrack.init),
+            video: source.mediaStreams?.first { $0.type == .video }.map(MediaVersion.Video.init),
         )
     }
 

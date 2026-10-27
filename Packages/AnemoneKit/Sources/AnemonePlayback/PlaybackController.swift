@@ -79,7 +79,7 @@ public final class PlaybackController: Identifiable {
             engine: AVPlayerEngine(),
             features: Self.features(for: session),
         ) { request in
-            try await session.playbackStream(for: request, maxBitrate: AVPlayerProfile.defaultMaxBitrate)
+            try await session.playbackStream(for: request, maxBitrate: AVPlayerProfile.maxBitrate)
         }
     }
 

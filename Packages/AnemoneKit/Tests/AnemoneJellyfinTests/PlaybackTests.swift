@@ -113,6 +113,28 @@ struct PlaybackTests {
         #expect(stream.url.queryValues["ApiKey"] == "tok")
     }
 
+    @Test func `the stream carries the version's video as the server read it`() async throws {
+        _ = register(host: "video.test", path: "/jf/Items/m1/PlaybackInfo", reply: .json("""
+        {"PlaySessionId":"ps1","MediaSources":[{"Id":"src1","SupportsDirectPlay":false,
+         "TranscodingUrl":"/videos/m1/master.m3u8?MediaSourceId=src1&VideoCodec=hevc","MediaStreams":[
+          {"Type":"Audio","Codec":"eac3"},
+          {"Type":"Video","Codec":"HEVC","Width":3840,"Height":2160,"RealFrameRate":23.976,
+           "VideoRangeType":"HDR10"}]}]}
+        """))
+
+        let stream = try await session(host: "video.test")
+            .playbackStream(for: "m1", profile: Self.profile, maxBitrate: 1000)
+
+        #expect(stream.method == .transcode)
+        #expect(stream.video == MediaVersion.Video(
+            codec: "hevc",
+            width: 3840,
+            height: 2160,
+            frameRate: 23.976,
+            range: .hdr10,
+        ))
+    }
+
     @Test func `the server's refusal comes back as a playback error`() async throws {
         _ = register(host: "refused.test", path: "/jf/Items/m1/PlaybackInfo", reply: .json("""
         {"ErrorCode":"NotAllowed","MediaSources":[]}
