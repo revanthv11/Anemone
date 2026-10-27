@@ -25,7 +25,7 @@ struct LiveStreamClosingTests {
                 LiveStreamClosing { server.close($0) },
             ],
             positionInterval: .milliseconds(10),
-        ) { itemID, allowsDirect, _ in
+        ) { request in
             let number = server.open()
             if let answers {
                 for await _ in answers {
@@ -33,9 +33,9 @@ struct LiveStreamClosingTests {
                 }
             }
             return PlaybackStream(
-                itemID: itemID,
-                url: URL(filePath: "/\(itemID)/\(number)"),
-                method: allowsDirect ? .directPlay : .transcode,
+                itemID: request.itemID,
+                url: URL(filePath: "/\(request.itemID)/\(number)"),
+                method: request.allowsDirect ? .directPlay : .transcode,
                 playSessionID: "ps\(number)",
                 liveStreamID: isLive ? "live\(number)" : nil,
             )
@@ -77,6 +77,36 @@ struct LiveStreamClosingTests {
         await playback.stop()
         #expect(server.closed == ["live1"])
         #expect(server.stopReports.map(\.liveStreamID) == ["live2"])
+    }
+
+    @Test func `a reload once under way leaves the old live stream to its stop report`() async {
+        let playback = controller()
+        await playback.start()
+        engine.send(.ready)
+        #expect(await eventually { server.reportCount == 1 })
+
+        playback.reload()
+        #expect(await eventually { engine.loads.count == 2 })
+        engine.send(.ready)
+        // The first stream's start and stop reports, then the second's start report.
+        #expect(await eventually { server.reportCount == 3 })
+        await playback.stop()
+
+        #expect(server.stopReports.map(\.liveStreamID) == ["live1", "live2"])
+        #expect(server.closed.isEmpty)
+    }
+
+    @Test func `a reload before playing closes the old live stream once, then the new one`() async {
+        let playback = controller()
+        await playback.start()
+
+        playback.reload()
+        #expect(await eventually { engine.loads.count == 2 })
+        #expect(server.closed == ["live1"])
+        await playback.stop()
+
+        #expect(server.closed == ["live1", "live2"])
+        #expect(server.stopReports.isEmpty)
     }
 
     @Test func `a live stream that arrives after the player closed is closed`() async {

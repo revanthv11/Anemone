@@ -30,9 +30,9 @@ struct CinemaIntrosTests {
             engine: engine,
             features: features + [log],
             positionInterval: .milliseconds(10),
-        ) { itemID, allowsDirect, mediaSourceID in
-            let stream = try await load(itemID, allowsDirect, mediaSourceID)
-            if failing.contains(itemID) {
+        ) { request in
+            let stream = try await load(request)
+            if failing.contains(request.itemID) {
                 throw PlaybackError.nothingToPlay
             }
             return stream

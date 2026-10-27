@@ -48,6 +48,11 @@ public final class PlaybackDetails: PlaybackFeature {
                 previewsTask = nil
                 fetchPreviewsIfWanted()
             }
+        case let .reloaded(stream):
+            // Another stream for the same entry and version, as for a track switch: the
+            // previews stay.
+            self.stream = stream
+            isPaused = true
         case .started, .resumed:
             isPaused = false
         case let .position(progress):

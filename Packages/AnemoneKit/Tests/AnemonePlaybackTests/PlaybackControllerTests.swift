@@ -294,7 +294,7 @@ struct PlaybackControllerTests {
             request: PlaybackRequest(queue: #require(PlaybackQueue(entries: entries)), shuffles: true),
             engine: engine,
             features: [],
-        ) { _, _, _ in throw CancellationError() }
+        ) { _ in throw CancellationError() }
 
         #expect(playback.queue.currentIndex == 0)
         #expect(Set(playback.queue.entries.map(\.itemID)) == Set(entries.map(\.itemID)))

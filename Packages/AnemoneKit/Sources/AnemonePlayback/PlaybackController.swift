@@ -16,12 +16,11 @@ public final class PlaybackController: Identifiable {
         case failed(any Error)
     }
 
-    /// Asks the server how to play an item: the item, whether direct play and direct stream are
-    /// allowed (not for Wholphin's retry as a transcode), and the version, which a retry keeps.
-    typealias StreamLoader = @Sendable (MediaItem.ID, Bool, String?) async throws -> PlaybackStream
+    /// Asks the server how to play an item, once features have prepared the request.
+    typealias StreamLoader = @Sendable (StreamRequest) async throws -> PlaybackStream
 
     public private(set) var queue: PlaybackQueue
-    public private(set) var state = State.loading
+    public internal(set) var state = State.loading
     /// What features show in the player.
     public let accessories = PlayerAccessories()
     /// Whether the player closes when an entry plays to the end and no feature has played
@@ -51,7 +50,9 @@ public final class PlaybackController: Identifiable {
     /// How often features hear where playback is.
     @ObservationIgnored private let positionInterval: Duration
     /// What's loaded in the engine.
-    @ObservationIgnored private var stream: PlaybackStream?
+    @ObservationIgnored var stream: PlaybackStream?
+    /// What `reload()` keeps for the current entry, in `Tracks/Reloading.swift`.
+    @ObservationIgnored var reloading = Reloading()
     /// Whether the loaded stream's play session is open, so features hear `stopped` once.
     @ObservationIgnored private var isSessionOpen = false
     /// The last session's `stopped`, which a later stop waits for.
@@ -60,8 +61,8 @@ public final class PlaybackController: Identifiable {
     @ObservationIgnored private var loads = 0
     /// Tasks following the loaded stream, cancelled when it's replaced or playback stops.
     @ObservationIgnored private var watchers: [Task<Void, Never>] = []
-    @ObservationIgnored private var status = PlayerStatus.paused
-    @ObservationIgnored private var isUnderWay = false
+    @ObservationIgnored var status = PlayerStatus.paused
+    @ObservationIgnored var isUnderWay = false
     @ObservationIgnored private var wasPaused = false
     @ObservationIgnored private var hasStarted = false
     /// What features asked to do once the player closes; see `whenStopped(_:)`.
@@ -69,32 +70,12 @@ public final class PlaybackController: Identifiable {
 
     /// A player for `request` on `session`'s server, with the features every player gets.
     public convenience init(session: JellyfinSession, request: PlaybackRequest) {
-        let engine = PlayerChoice.engine(for: session)
-        let profiles = DeviceProfileSource(engine)
         self.init(
             request: request,
-            engine: engine,
+            engine: PlayerChoice.engine(for: session),
             features: Self.features(for: session),
-        ) { itemID, allowsDirect, mediaSourceID in
-            let maxBitrate = AVPlayerProfile.maxBitrate
-            let profile = await profiles.current
-            // A retry keeps the version playing.
-            if let mediaSourceID {
-                return try await session.playbackStream(
-                    for: itemID,
-                    profile: profile,
-                    maxBitrate: maxBitrate,
-                    allowsDirect: allowsDirect,
-                    mediaSourceID: mediaSourceID,
-                )
-            }
-            // Otherwise the version picked on the item's page, while the server still has it.
-            return try await session.playbackStream(
-                forPickedVersionOf: itemID,
-                profile: profile,
-                maxBitrate: maxBitrate,
-                allowsDirect: allowsDirect,
-            )
+        ) { request in
+            try await session.playbackStream(for: request, maxBitrate: AVPlayerProfile.maxBitrate)
         }
     }
 
@@ -164,6 +145,7 @@ public final class PlaybackController: Identifiable {
         engine.pause()
         queue.currentIndex = index
         stream = nil
+        reloading.startEntry()
         state = .loading
         let attempt = beginLoad()
         Task {
@@ -205,12 +187,13 @@ public final class PlaybackController: Identifiable {
         }
     }
 
-    private func beginLoad() -> Int {
+    func beginLoad() -> Int {
+        reloading.isAsking = true
         loads += 1
         return loads
     }
 
-    private func load(allowsDirect: Bool, from position: Duration?, as attempt: Int) async {
+    func load(allowsDirect: Bool, from position: Duration?, as attempt: Int) async {
         guard !isStopped else { return }
         let entry = queue.current
         // A new entry may need the other engine, as with "Prefer MPV"; a retry keeps it.
@@ -218,16 +201,27 @@ public final class PlaybackController: Identifiable {
             await engine.prepare(for: entry)
             guard !isStopped, attempt == loads else { return }
         }
+        reloading.asks(allowsDirect: allowsDirect)
+        var request = StreamRequest(itemID: entry.itemID, allowsDirect: allowsDirect, profile: engine.deviceProfile)
+        // The version a retry or a reload keeps.
+        request.mediaSourceID = stream?.mediaSourceID
+        for feature in features {
+            await feature.prepare(&request)
+        }
+        guard !isStopped, attempt == loads else { return }
         do {
-            let stream = try await loadStream(entry.itemID, allowsDirect, stream?.mediaSourceID)
-            guard !isStopped, attempt == loads else {
+            let stream = try await loadStream(request)
+            guard !isStopped, attempt == loads, !reloading.asksAgain else {
                 // Features never hear of a stream nothing plays, so a live stream it opened is closed here.
                 await feature(LiveStreamClosing.self)?.discard(stream)
-                return
+                // A reload that came meanwhile asks again.
+                guard !isStopped, attempt == loads else { return }
+                return await load(allowsDirect: allowsDirect, from: position, as: attempt)
             }
             await play(stream, entry, from: position)
         } catch {
             guard !isStopped, attempt == loads else { return }
+            reloading.isAsking = false
             // An intro the server won't offer is passed over (Phase 5c).
             if let afterIntro = queue.afterIntroIndex {
                 return play(entryAt: afterIntro)
@@ -242,9 +236,10 @@ public final class PlaybackController: Identifiable {
         status = .paused
         isUnderWay = false
         wasPaused = false
+        reloading.answered(startingAt: position ?? .zero)
         let events = engine.load(stream.url, from: position, metadata: entry.metadata)
         isSessionOpen = true
-        await publish(.loaded(stream, entry))
+        await publish(reloading.hasReloaded ? .reloaded(stream) : .loaded(stream, entry))
         follow(events)
     }
 
@@ -297,7 +292,7 @@ public final class PlaybackController: Identifiable {
 
     /// Ends the loaded stream's play session, if it's open, and waits until features have heard.
     /// Runs on its own, so a stop report isn't cancelled with whatever asked for it.
-    private func endSession(at position: Duration) async {
+    func endSession(at position: Duration) async {
         if isSessionOpen {
             isSessionOpen = false
             let previous = sessionEnding
@@ -315,15 +310,15 @@ public final class PlaybackController: Identifiable {
         }
     }
 
-    private var currentPosition: Duration {
-        engine.currentTime
+    var currentPosition: Duration {
+        reloading.pendingStart ?? engine.currentTime
     }
 
     private var progress: PlaybackProgress {
         PlaybackProgress(position: currentPosition, isPaused: status == .paused)
     }
 
-    private func stopWatching() {
+    func stopWatching() {
         watchers.forEach { $0.cancel() }
         watchers = []
     }
@@ -361,8 +356,10 @@ private extension PlaybackController {
     }
 
     func ready() {
+        reloading.pendingStart = nil
         guard !isStopped else { return }
         state = .playing
+        guard !reloading.staysPaused else { return }
         engine.play()
     }
 
@@ -374,6 +371,7 @@ private extension PlaybackController {
         guard isUnderWay else {
             guard status == .playing, case .playing = state else { return }
             isUnderWay = true
+            reloading.staysPaused = false
             await publish(.started(progress))
             // Unless the stream was replaced meanwhile.
             guard !Task.isCancelled else { return }
