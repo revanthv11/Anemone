@@ -5,17 +5,28 @@ import SwiftUI
 /// kept in several versions, which one plays. The choice is remembered for the item
 /// (`MediaVersionChoices`), as Wholphin remembers it, so Play, Resume and Restart all use it,
 /// and so does the item when a queue reaches it. Shows nothing for the usual item, with one.
+///
+/// The versions come with the item the page loaded (`ItemDetails.versions`), as Wholphin's
+/// pages ask for media sources with the item, so the picker asks the server nothing itself.
 struct VersionPicker: View {
     let itemID: MediaItem.ID
+    let versions: [MediaVersion]
 
     @Environment(BrowseModel.self) private var browse
-    @State private var versions: [MediaVersion] = []
     /// The version that plays.
     @State private var chosenID: String?
     @State private var isChoosing = false
 
+    init(item: ItemDetails) {
+        itemID = item.id
+        #if DEBUG
+            versions = MediaVersion.withLaunchArgumentFakes(item.versions)
+        #else
+            versions = item.versions
+        #endif
+    }
+
     var body: some View {
-        // A container that stays put, so the task isn't restarted when the button appears.
         ZStack {
             Color.clear
                 .frame(width: 0, height: 0)
@@ -26,40 +37,27 @@ struct VersionPicker: View {
                 .accessibilityIdentifier("action.version")
             }
         }
-        .task(id: itemID) {
-            await load()
+        // Again when the page reloads the item, or the season page's focus moves to another
+        // episode.
+        .onChange(of: [itemID] + versions.map(\.id), initial: true) {
+            refreshChoice()
         }
         .sheet(isPresented: $isChoosing) {
             VersionList(versions: versions, chosenID: chosenID, choose: choose)
         }
     }
 
-    private func load() async {
-        versions = []
-        // The season page moves from episode to episode as focus does; only ask about the one
-        // focus stays on.
-        try? await Task.sleep(for: .milliseconds(300))
-        guard !Task.isCancelled else { return }
-        let session = browse.session
-        let id = itemID
-        // Without versions, the button stays hidden and the first plays.
-        guard let fetched = await browse.optional(attempt { try await session.mediaVersions(of: id) }),
-              !Task.isCancelled
-        else { return }
-        #if DEBUG
-            let loaded = MediaVersion.withLaunchArgumentFakes(fetched)
-        #else
-            let loaded = fetched
-        #endif
+    /// The version picked for the item, or the server's first. A version gone from the server is
+    /// forgotten, so Play goes back to the first.
+    private func refreshChoice() {
+        let userID = browse.session.userID
         let choices = MediaVersionChoices.standard
-        var chosen = choices.choice(for: id, userID: session.userID)
-        // A version gone from the server is forgotten, so Play goes back to the first.
-        if let current = chosen, !loaded.isEmpty, !loaded.contains(where: { $0.id == current }) {
-            choices.forget(id, userID: session.userID)
+        var chosen = choices.choice(for: itemID, userID: userID)
+        if let current = chosen, !versions.isEmpty, !versions.contains(where: { $0.id == current }) {
+            choices.forget(itemID, userID: userID)
             chosen = nil
         }
-        versions = loaded
-        chosenID = chosen ?? loaded.first?.id
+        chosenID = chosen ?? versions.first?.id
     }
 
     private func choose(_ version: MediaVersion) {

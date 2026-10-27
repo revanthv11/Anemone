@@ -157,13 +157,28 @@ public extension JellyfinSession {
         }
         let result = try await send(Paths.getItems(parameters: parameters))
         let items = result.items.musicItems
-        return MusicPage(items: items, totalCount: startIndex == 0 ? result.totalRecordCount ?? items.count : nil)
+        return MusicPage(
+            items: items,
+            totalCount: startIndex == 0 ? result.totalRecordCount ?? items.count : nil,
+            serverCount: result.items?.count,
+        )
+    }
+
+    /// Every entry of a playlist as a song, in the playlist's order, or `nil` when it holds
+    /// anything else: such a playlist is the video player's. One request, for Play on a playlist
+    /// page whose entries haven't loaded yet.
+    func playlistSongs(_ id: MediaItem.ID) async throws -> [MusicItem]? {
+        let page = try await songs(inPlaylist: id, startIndex: 0, limit: nil)
+        guard !page.items.isEmpty, page.items.count == page.serverCount else { return nil }
+        return page.items
     }
 
     /// A playlist's songs in the playlist's own order, from `/Playlists/{id}/Items`, as its page
     /// lists them. Wholphin's `getPagerForPlaylist` asks `/Items` for the playlist's children in
     /// the `Default` order, which a Jellyfin 12.3 server answers in another order (the demo server's
     /// "Binaerpilot" came back Bend, Thunderdays, Cornered! for Thunderdays, Cornered!, Bend).
+    /// Entries that aren't songs are left out; the page's `serverCount` still counts them, so the
+    /// next page starts after them.
     private func songs(inPlaylist id: MediaItem.ID, startIndex: Int, limit: Int?) async throws -> MusicPage {
         let parameters = Paths.GetPlaylistItemsParameters(
             userID: userID,
@@ -174,8 +189,13 @@ public extension JellyfinSession {
             imageTypeLimit: 1,
         )
         let result = try await send(Paths.getPlaylistItems(playlistID: id, parameters: parameters))
+        let entries = result.items ?? []
         let items = result.items.musicItems.filter { $0.item.kind == .audio }
-        return MusicPage(items: items, totalCount: startIndex == 0 ? result.totalRecordCount ?? items.count : nil)
+        return MusicPage(
+            items: items,
+            totalCount: startIndex == 0 ? result.totalRecordCount ?? entries.count : nil,
+            serverCount: entries.count,
+        )
     }
 
     /// Wholphin's artist page rows: albums by the artist, newest first.

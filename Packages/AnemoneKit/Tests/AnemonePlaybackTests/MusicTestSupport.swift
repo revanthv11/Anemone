@@ -44,6 +44,7 @@ final class FakeLibrary: Sendable {
     }
 
     private let stored = Mutex<[MusicItem]>([])
+    private let others = Mutex<Set<Int>>([])
     private let requests = Mutex<[Request]>([])
     private let failing = Mutex<Int?>(nil)
     private let holding = Mutex<LoadGate?>(nil)
@@ -51,6 +52,13 @@ final class FakeLibrary: Sendable {
     var songs: [MusicItem] {
         get { stored.withLock(\.self) }
         set { stored.withLock { $0 = newValue } }
+    }
+
+    /// Where the server's list holds entries that aren't songs, as a playlist with videos does:
+    /// the server sends and counts them, and they're left out of the page's songs.
+    var notSongs: Set<Int> {
+        get { others.withLock(\.self) }
+        set { others.withLock { $0 = newValue } }
     }
 
     /// Pages from this index on fail.
@@ -79,8 +87,13 @@ final class FakeLibrary: Sendable {
                 throw PlaybackError.nothingToPlay
             }
             let all = songs
-            let page = Array(all.dropFirst(startIndex).prefix(limit))
-            return MusicPage(items: page, totalCount: startIndex == 0 ? all.count : nil)
+            let notSongs = notSongs
+            let indices = all.indices.dropFirst(startIndex).prefix(limit)
+            return MusicPage(
+                items: indices.filter { !notSongs.contains($0) }.map { all[$0] },
+                totalCount: startIndex == 0 ? all.count : nil,
+                serverCount: indices.count,
+            )
         }
     }
 }

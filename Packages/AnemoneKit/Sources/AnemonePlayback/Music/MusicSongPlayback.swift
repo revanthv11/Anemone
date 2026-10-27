@@ -27,13 +27,17 @@ extension MusicPlayer {
         return requests
     }
 
+    /// Pages go by the server's count (`serverCount`), which takes in a playlist's entries that
+    /// aren't songs, so no page starts among the songs of the one before.
     func loadAll(_ source: MusicSource, shuffled: Bool, request: Int) async throws -> [MusicItem] {
         var songs: [MusicItem] = []
+        var fetched = 0
         var total = Self.queueLimit
-        while songs.count < total {
-            let page = try await loadSongs(source, shuffled, songs.count, min(Self.pageSize * 5, total - songs.count))
-            guard request == requests, !page.items.isEmpty else { break }
+        while fetched < total {
+            let page = try await loadSongs(source, shuffled, fetched, min(Self.pageSize * 5, total - fetched))
+            guard request == requests, page.serverCount > 0 else { break }
             songs += page.items
+            fetched += page.serverCount
             total = min(page.totalCount ?? total, Self.queueLimit)
             // A random order changes from one request to the next, so it comes in one page.
             if source.isRandomOrder || (shuffled && source.isLarge) {
@@ -43,24 +47,28 @@ extension MusicPlayer {
         return songs
     }
 
-    /// Adds the rest of `source` to the playing queue a page at a time, up to `queueLimit` songs.
-    /// A page that fails ends the queue where it is: the music has started, so it plays on.
+    /// Adds the rest of `source` to the playing queue a page at a time, up to `queueLimit` of the
+    /// server's entries. A page that fails ends the queue where it is: the music has started, so
+    /// it plays on.
     func addPages(of source: MusicSource, after first: MusicPage, request: Int) async {
-        let total = min(first.totalCount ?? first.items.count, Self.queueLimit)
-        var loaded = first.items.count
-        while loaded < total {
+        let total = min(first.totalCount ?? first.serverCount, Self.queueLimit)
+        var fetched = first.serverCount
+        while fetched < total {
             let page: MusicPage
             do {
-                page = try await loadSongs(source, false, loaded, Self.pageSize)
+                page = try await loadSongs(source, false, fetched, Self.pageSize)
             } catch {
                 guard request == requests else { return }
                 let reason = String(describing: error)
-                Self.log.error("A queue stopped at \(loaded) of \(total) songs, as a page failed: \(reason)")
+                Self.log.error("A queue stopped at \(fetched) of \(total) entries, as a page failed: \(reason)")
                 return
             }
-            guard request == requests, !page.items.isEmpty else { return }
-            queue.append(page.items)
-            loaded += page.items.count
+            guard request == requests, page.serverCount > 0 else { return }
+            if !page.items.isEmpty {
+                queue.append(page.items)
+                queueChanged()
+            }
+            fetched += page.serverCount
         }
     }
 
@@ -210,6 +218,12 @@ extension MusicPlayer {
             try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
             try? AVAudioSession.sharedInstance().setActive(true)
         #endif
+    }
+
+    /// Now Playing shows the song's new place and whether there's a next at once, rather than
+    /// at the song's next position event, which never comes at the end of the queue.
+    func queueChanged() {
+        nowPlaying?.musicQueueChanged()
     }
 
     // MARK: What the song's controller says

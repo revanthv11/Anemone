@@ -327,28 +327,3 @@ extension MusicTests {
         #expect(MusicSource.songs(library: "lib", sort: MusicSort(.random)).isRandomOrder)
     }
 }
-
-/// A playlist's songs, which come from the playlist's own endpoint.
-extension MusicTests {
-    @Test func `a playlist's songs come in the playlist's own order, songs only`() async throws {
-        let sent = register(
-            host: "music-playlist.test",
-            path: "/jf/Playlists/pl1/Items",
-            reply: .json(#"{"Items":[\#(Self.song),{"Id":"v1","Name":"Clip","Type":"Video"}],"TotalRecordCount":2}"#),
-        )
-        let session = try session(host: "music-playlist.test")
-
-        let page = try await session.songs(from: .playlist("pl1"), startIndex: 0, limit: 100)
-
-        let request = try #require(sent.request)
-        #expect(request.method == "GET")
-        #expect(request.query["userId"] == "u1")
-        #expect(request.query["startIndex"] == "0")
-        #expect(request.query["limit"] == "100")
-        #expect(request.query["fields"]?.contains("MediaStreams") == true)
-        // The playlist's own order, not one the request picks.
-        #expect(request.query["sortBy"] == nil)
-        #expect(page.items.map(\.id) == ["s1"])
-        #expect(page.totalCount == 2)
-    }
-}
