@@ -60,16 +60,28 @@
             )
         }
 
-        /// The requests the user may see, newest first, each with its title. Like Wholphin, a
-        /// title is looked up for each request, three at a time, and requests whose title can't be
-        /// found are left out.
-        func requests() async throws -> [SeerrRequestedItem] {
+        /// How many requests a page of the Requests list holds: Wholphin's `SEERR_PAGE_SIZE`, the
+        /// page size of its Discover grids.
+        static let requestsPageSize = 20
+
+        /// A page of the requests the user may see, newest first: `take` of them from the
+        /// `skip`th, each with its title. Like Wholphin, a title is looked up for each request,
+        /// three at a time, and requests whose title can't be found are left out.
+        ///
+        /// Fixed while porting: Wholphin reads only the first page, at Seerr's default of 10
+        /// requests, so a user with more never sees the older ones. `SeerrRequestList` reads on.
+        func requests(skip: Int = 0, take: Int = requestsPageSize) async throws -> SeerrRequestsPage {
             struct Wanted {
                 let request: SeerrRequest
                 let tmdbID: Int
                 let kind: SeerrMediaKind
             }
-            let requests = try await client.getRequest().ok.body.json.results ?? []
+            let page = try await client.getRequest(query: .init(take: take, skip: skip)).ok.body.json
+            let requests = page.results ?? []
+            let end = skip + requests.count
+            // Seerr counts every request the user may see. Without that count, a full page may
+            // have more after it.
+            let hasMore = !requests.isEmpty && (page.pageInfo?.results.map { end < $0 } ?? (requests.count >= take))
             let wanted = requests.compactMap { request -> Wanted? in
                 guard let tmdbID = request.media?.tmdbId,
                       let kind = SeerrMediaKind(mediaType: request._type), kind != .person
@@ -96,7 +108,7 @@
                     addNext()
                 }
             }
-            return wanted.compactMap { found[$0.request.id] }
+            return SeerrRequestsPage(items: wanted.compactMap { found[$0.request.id] }, end: end, hasMore: hasMore)
         }
 
         /// Asks for a movie, in 4K or not. Seerr picks the server, quality and folder.

@@ -179,19 +179,20 @@
         }
     }
 
-    /// Wholphin's `SeerrRequestsPage`: the requests the user may see, with their status.
+    /// Wholphin's `SeerrRequestsPage`: the requests the user may see, with their status, read a
+    /// page at a time as focus nears the end.
     private struct DiscoverRequestsPage: View {
         let connection: SeerrConnection
 
         @FocusState private var focus: ItemFocus?
-        @State private var requests: [SeerrRequestedItem]?
+        @State private var list = SeerrRequestList()
         @State private var problem: String?
 
         var body: some View {
             Group {
-                if let requests, requests.isEmpty {
+                if let requests = list.items, requests.isEmpty {
                     PageMessage(message: "No requests yet.")
-                } else if let requests {
+                } else if let requests = list.items {
                     ScrollView(.vertical) {
                         DiscoverGrid(
                             entries: requests.map {
@@ -211,11 +212,19 @@
             }
             .pageTask(id: connection.serverURL) {
                 do {
-                    requests = try await connection.requests()
+                    try await list.reload(from: connection)
                 } catch {
-                    if !Task.isCancelled, requests == nil {
+                    if !Task.isCancelled, list.items == nil {
                         problem = "Couldn't load your requests. \(error.seerrReason)"
                     }
+                }
+            }
+            .onChange(of: focus) { _, focus in
+                guard case let .card(_, item)? = focus, let id = Int(item) else { return }
+                // Not tied to the focused card, so moving on doesn't cancel it; a failure is
+                // tried again when focus moves.
+                Task {
+                    try? await list.readMore(near: id, from: connection)
                 }
             }
         }

@@ -166,10 +166,34 @@
                 }
             }
 
-            let requests = try await seerr.requests()
+            let page = try await seerr.requests()
 
-            #expect(requests.map(\.item.title) == ["Thrones", "Fight Club"])
-            #expect(requests.map(\.request.status) == [.approved, .pending])
+            #expect(page.items.map(\.item.title) == ["Thrones", "Fight Club"])
+            #expect(page.items.map(\.request.status) == [.approved, .pending])
+            #expect(page.end == 3)
+            #expect(page.hasMore == false)
+            let sent = SeerrMockServer.requests(to: "list.seerr.test").first { $0.path == "/api/v1/request" }
+            #expect(sent?.query == ["take": "20", "skip": "0"])
+        }
+
+        @Test func `without Seerr's count, a full page of requests may have more`() async throws {
+            let seerr = try await connection(to: "uncounted.seerr.test") { request in
+                switch request.path {
+                case "/api/v1/request":
+                    .json(#"{"results":[{"id":1,"status":1,"type":"movie","media":{"tmdbId":550}}]}"#)
+                case "/api/v1/movie/550":
+                    .json(#"{"id":550,"title":"Fight Club"}"#)
+                default:
+                    .status(404)
+                }
+            }
+
+            let full = try await seerr.requests(skip: 4, take: 1)
+            let short = try await seerr.requests(skip: 4, take: 2)
+
+            #expect(full.end == 5)
+            #expect(full.hasMore)
+            #expect(short.hasMore == false)
         }
     }
 

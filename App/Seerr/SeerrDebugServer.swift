@@ -11,7 +11,8 @@
     /// - `url`: the plugin gives only its address, which Settings › Seerr › Add offers;
     /// - `failing`: the plugin's sign-in is turned down, so Settings offers Retry;
     /// - `lapsing`: the plugin gives a shared account, whose first session lapses as soon as it's
-    ///   used, so the app has to sign in again.
+    ///   used, so the app has to sign in again;
+    /// - `many`: as `YES`, with 45 more requests, so the Requests page reads three pages.
     ///
     /// It answers Seerr's API for `https://seerr.mock` from a few made-up titles, and keeps the
     /// requests made to it until the app quits. It has no images, so cards show their titles.
@@ -25,7 +26,7 @@
         /// The plugin settings to use instead of the server's, when mocking.
         static var pluginSettings: SeerrPluginSettings? {
             switch mode {
-            case "yes", "plugin", "failing":
+            case "yes", "plugin", "failing", "many":
                 SeerrPluginSettings(serverURL: "https://\(host)", login: .apiKey("debug"))
             case "lapsing":
                 SeerrPluginSettings(serverURL: "https://\(host)", login: .local(username: "debug", password: "debug"))
@@ -135,7 +136,9 @@
                         .queryItems?.first { $0.name == "query" }?.value ?? ""
                     return (200, MockSeerr.search(query, state))
                 case ("GET", "/api/v1/request"):
-                    return (200, MockSeerr.requests(state))
+                    let query = request.url.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) }?
+                        .queryItems ?? []
+                    return (200, MockSeerr.requests(state, query: query))
                 case ("POST", "/api/v1/request"):
                     return MockSeerr.add(request.bodyJSON, to: &state)
                 default:
@@ -176,8 +179,23 @@
 
         static let state = Mutex(State(
             titles: Dictionary(uniqueKeysWithValues: titles.map { ($0.id, $0) }),
-            requests: [Request(id: 501, titleID: 9003, isMovie: true, seasons: [], is4K: false)],
+            requests: manyRequests + [Request(id: 501, titleID: 9003, isMovie: true, seasons: [], is4K: false)],
         ))
+
+        /// In `many` mode, 45 more requests, for each title in turn.
+        private static var manyRequests: [Request] {
+            guard UserDefaults.standard.string(forKey: "seerrMock")?.lowercased() == "many" else { return [] }
+            return (0 ..< 45).map { index in
+                let title = titles[index % titles.count]
+                return Request(
+                    id: 100 + index,
+                    titleID: title.id,
+                    isMovie: title.isMovie,
+                    seasons: title.isMovie ? [] : [1],
+                    is4K: false,
+                )
+            }
+        }
 
         private static let titles = [
             // King Lear is on the demo server, so its card opens its page there.
@@ -273,9 +291,20 @@
             return page(state, ids: ids.sorted())
         }
 
-        static func requests(_ state: State) -> Data {
-            let results = state.requests.reversed().map { requestJSON($0, state) }
-            return json(["pageInfo": ["page": 1, "pages": 1, "results": results.count], "results": results])
+        /// The requests, newest first, paged by `take` and `skip` as Seerr pages them: 10 at a
+        /// time unless asked.
+        static func requests(_ state: State, query: [URLQueryItem]) -> Data {
+            func number(_ name: String) -> Int? {
+                query.first { $0.name == name }?.value.flatMap { Int($0) }
+            }
+            let take = max(number("take") ?? 10, 1)
+            let skip = max(number("skip") ?? 0, 0)
+            let all = Array(state.requests.reversed())
+            let results = all.dropFirst(skip).prefix(take).map { requestJSON($0, state) }
+            return json([
+                "pageInfo": ["page": skip / take + 1, "pages": (all.count + take - 1) / take, "results": all.count],
+                "results": Array(results),
+            ])
         }
 
         /// A requested movie is pending until approved; a cancelled one is unknown again.
