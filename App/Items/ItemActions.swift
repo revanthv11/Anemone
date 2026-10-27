@@ -97,15 +97,12 @@ struct FavoriteButton: View {
 
 /// What an item page's alert says.
 enum ItemAlert: Hashable {
-    /// Music plays in Phase 5.
-    case musicUnavailable
     /// Play or Shuffle found nothing the player can play, and why.
     case nothingToPlay(String)
     case failed(String)
 
     var title: String {
         switch self {
-        case .musicUnavailable: "Playback isn't available yet"
         case .nothingToPlay: "Nothing to play"
         case .failed: "Something went wrong"
         }
@@ -113,8 +110,6 @@ enum ItemAlert: Hashable {
 
     var message: String {
         switch self {
-        case .musicUnavailable:
-            "Music plays in Phase 5."
         case let .nothingToPlay(message), let .failed(message):
             message
         }

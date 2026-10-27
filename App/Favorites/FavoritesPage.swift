@@ -172,6 +172,7 @@ private extension FavoritesSection {
         case .collection: "Collections"
         case .person: "People"
         case .musicAlbum: "Albums"
+        case .musicArtist: "Artists"
         case .audio: "Songs"
         case .musicVideo: "Music Videos"
         case .playlist: "Playlists"
