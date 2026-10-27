@@ -42,7 +42,7 @@ struct NowPlayingPage: View {
     @State private var showsOptions = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: 20) {
             HStack(alignment: .center, spacing: 80) {
                 songDetails
                 if showsLyrics, let shown = currentLyrics {
@@ -54,7 +54,7 @@ struct NowPlayingPage: View {
             }
             // Leaves room for the queue below on a 1080p screen.
             .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: 400)
+            .frame(height: 430)
             NowPlayingProgress(position: player.position, duration: player.duration ?? player.current?.item.runtime)
             controls
             UpNextRow(focus: $focus)
@@ -106,9 +106,9 @@ struct NowPlayingPage: View {
     @ViewBuilder
     private var songDetails: some View {
         if let song = player.current {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
                 if showsAlbumArt {
-                    MusicArtwork(image: song.coverImage, width: 220)
+                    MusicArtwork(image: song.coverImage, width: 200)
                         .padding(.bottom, 12)
                 }
                 Text(song.item.name)
