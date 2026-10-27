@@ -62,9 +62,12 @@ private struct BehaviorChoices: View {
                     Spacer()
                     if choice == behavior {
                         Image(systemName: "checkmark")
+                            .accessibilityHidden(true)
                     }
                 }
             }
+            // The check, for VoiceOver.
+            .accessibilityAddTraits(choice == behavior ? .isSelected : [])
             .accessibilityIdentifier("settings.skip.choice.\(choice.rawValue)")
         }
         .navigationTitle(title)

@@ -186,10 +186,13 @@ private struct HomeRowListEntry: View {
                     Spacer()
                     Image(systemName: "chevron.right")
                         .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
                 }
             }
             .buttonStyle(RowTitleButtonStyle())
             .focused($isTitleFocused)
+            // Where the row is on Home; the buttons beside it move it.
+            .accessibilityValue(Text("Row \(index + 1) of \(rows.count)"))
             .accessibilityIdentifier("settings.home.row.\(id)")
             Button("Move up", systemImage: "chevron.up") {
                 move(by: -1)
@@ -227,8 +230,8 @@ private struct HomeRowListEntry: View {
     }
 }
 
-/// A row title that highlights like a list row when focused. A borderless button, which the row
-/// needs, would only lift its chevron.
+/// A row title that highlights like a list row when focused, on the theme's light platter. A
+/// borderless button, which the row needs, would only lift its chevron.
 private struct RowTitleButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         RowTitle(label: configuration.label, isPressed: configuration.isPressed)
@@ -239,13 +242,14 @@ private struct RowTitleButtonStyle: ButtonStyle {
         let isPressed: Bool
 
         @Environment(\.isFocused) private var isFocused
+        @Environment(\.theme) private var theme
 
         var body: some View {
             label
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
-                .foregroundStyle(isFocused ? .black : .primary)
-                .background(isFocused ? .white : .clear, in: .rect(cornerRadius: 12))
+                .foregroundStyle(isFocused ? theme.onFocusedPlatter : theme.onBackground)
+                .background(isFocused ? theme.focusedPlatter.color : .clear, in: .rect(cornerRadius: 12))
                 .scaleEffect(isPressed ? 0.98 : 1)
                 .animation(.easeOut(duration: 0.15), value: isFocused)
         }

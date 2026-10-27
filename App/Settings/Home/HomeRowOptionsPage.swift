@@ -1,5 +1,6 @@
 import AnemoneCore
 import AnemoneJellyfin
+import AnemoneUI
 import SwiftUI
 
 /// One row's settings, Wholphin's `HomeRowSettings`: card size, image and titles; for episodes,
@@ -10,6 +11,7 @@ struct HomeRowOptionsPage: View {
 
     @Environment(BrowseModel.self) private var browse
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.theme) private var theme
 
     var body: some View {
         if let rows = browse.homeRows, rows.indices.contains(index) {
@@ -18,7 +20,7 @@ struct HomeRowOptionsPage: View {
         } else {
             // The row went, for example after Reset.
             Text("This row is no longer on Home.")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.secondaryText)
                 .focusable()
         }
     }
