@@ -82,12 +82,13 @@ public extension JellyfinSession {
         return try await send(Paths.getItems(parameters: parameters)).items.details
     }
 
-    /// A season's episodes in order. They come with their cast and crew, so the season page can
-    /// show the focused episode's people without asking for each one.
+    /// A season's episodes in order. They come with their cast and crew and their versions, as
+    /// Wholphin's `SeriesViewModel` asks for media sources, so the season page can show the
+    /// focused episode's people and Version button without asking for each one.
     func episodes(ofSeries seriesID: String, season seasonID: String) async throws -> [ItemDetails] {
         let parameters = Paths.GetEpisodesParameters(
             userID: userID,
-            fields: Self.rowFields + [.people],
+            fields: Self.rowFields + [.people, .mediaSources],
             seasonID: seasonID,
             enableUserData: true,
             sortBy: .indexNumber,
