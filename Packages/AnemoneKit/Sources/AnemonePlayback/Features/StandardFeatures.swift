@@ -6,6 +6,7 @@ public extension PlaybackController {
     static func features(for session: JellyfinSession) -> [any PlaybackFeature] {
         [
             ProgressReporting(session: session),
+            SegmentSkipping(session: session),
         ]
     }
 }
