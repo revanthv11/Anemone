@@ -15,23 +15,36 @@ env:
   SWIFTFORMAT_VERSION: 0.64.1
 
 jobs:
+  # Linux, so lint doesn't take one of the account's macOS runners. SwiftLint builds its Linux binary on
+  # Ubuntu 24.04, and it needs libraries (libxml2.so.2) that ubuntu-latest, now 26.04, doesn't have.
   lint:
-    runs-on: macos-26
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+      # The SwiftLint zip's other binary, swiftlint-static, is built without SourceKit.
       - name: Install SwiftLint and SwiftFormat
         run: |
-          curl -sSfLo swiftlint.zip "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/portable_swiftlint.zip"
-          curl -sSfLo swiftformat.zip "https://github.com/nicklockwood/SwiftFormat/releases/download/${SWIFTFORMAT_VERSION}/swiftformat.zip"
-          unzip -q swiftlint.zip -d "$RUNNER_TEMP/swiftlint"
+          curl -sSfLo swiftlint.zip "https://github.com/realm/SwiftLint/releases/download/${SWIFTLINT_VERSION}/swiftlint_linux_amd64.zip"
+          curl -sSfLo swiftformat.zip "https://github.com/nicklockwood/SwiftFormat/releases/download/${SWIFTFORMAT_VERSION}/swiftformat_linux.zip"
+          unzip -q swiftlint.zip swiftlint -d "$RUNNER_TEMP/swiftlint"
           unzip -q swiftformat.zip -d "$RUNNER_TEMP/swiftformat"
+          mv "$RUNNER_TEMP/swiftformat/swiftformat_linux" "$RUNNER_TEMP/swiftformat/swiftformat"
+          chmod +x "$RUNNER_TEMP/swiftlint/swiftlint" "$RUNNER_TEMP/swiftformat/swiftformat"
           rm swiftlint.zip swiftformat.zip
           echo "$RUNNER_TEMP/swiftlint" >> "$GITHUB_PATH"
           echo "$RUNNER_TEMP/swiftformat" >> "$GITHUB_PATH"
       - name: SwiftFormat
         run: swiftformat --lint .
+      # SwiftLint loads SourceKit from the runner image's Swift toolchain. If it can't use it, it skips
+      # the rules that need it (statement_position) with only a warning, so that fails the job too.
       - name: SwiftLint
-        run: swiftlint lint --strict
+        shell: bash
+        run: |
+          swiftlint lint --strict 2>&1 | tee "$RUNNER_TEMP/swiftlint.log"
+          if grep -E "requires SourceKit|SourceKit-based rules will be skipped" "$RUNNER_TEMP/swiftlint.log"; then
+            echo "::error::SwiftLint skipped the rules that need SourceKit."
+            exit 1
+          fi
 
   test:
     runs-on: macos-26
