@@ -5,7 +5,7 @@ import Testing
 struct SearchStateTests {
     @Test func `a typed term waits for typing to pause, then searches every row`() {
         var state = SearchState()
-        let run = run("th")
+        let run = searchRun("th")
 
         #expect(state.start(run) == .waitsForTyping)
         #expect(state.work(for: run) == .rows([.movie, .series]))
@@ -20,7 +20,7 @@ struct SearchStateTests {
     @Test func `a picked term searches at once and moves focus to the first row with results`() {
         var state = SearchState()
         state.submit()
-        let run = run("th", submission: 1)
+        let run = searchRun("th", submission: 1)
 
         #expect(state.start(run) == .searchesNow)
         #expect(state.work(for: run) == .rows([.movie, .series]))
@@ -35,14 +35,14 @@ struct SearchStateTests {
 
     @Test func `a card from the previous term's results isn't remembered for the new ones`() {
         var state = SearchState()
-        let first = run("cami")
+        let first = searchRun("cami")
         _ = state.start(first)
         _ = state.work(for: first)
         state.results.record(.found([item("m1"), item("m2")]), for: .movie)
         state.results.noteFocus(leaving: SearchCard(row: "movie", item: "m2"))
         #expect(state.results.entry(row: "movie", first: "m1") == "m2")
 
-        let second = run("st. louis")
+        let second = searchRun("st. louis")
         _ = state.start(second)
         _ = state.work(for: second)
         state.results.record(.found([item("m3"), item("m4")]), for: .movie)
@@ -56,7 +56,7 @@ struct SearchStateTests {
 
     @Test func `the combined grid remembers only its own cards`() {
         var state = SearchState()
-        let run = run("th", combined: true)
+        let run = searchRun("th", combined: true)
         _ = state.start(run)
         #expect(state.work(for: run) == .combined([.movie, .series]))
         state.results.recordCombined(.found([item("m1")]), kinds: [.movie, .series])
@@ -68,13 +68,13 @@ struct SearchStateTests {
 
     @Test func `opening a result while a new term waits keeps the term showing, and Back refreshes it`() {
         var state = SearchState()
-        let showing = run("cami")
+        let showing = searchRun("cami")
         _ = state.start(showing)
         _ = state.work(for: showing)
         state.results.record(.found([item("m1"), item("m2")]), for: .movie)
         state.results.record(.found([]), for: .series)
         // More typing, then a result opened before typing paused for long enough.
-        let typed = run("camin")
+        let typed = searchRun("camin")
         #expect(state.start(typed) == .waitsForTyping)
 
         let opened = state.openResult(typed: typed.request)
@@ -83,7 +83,7 @@ struct SearchStateTests {
         #expect(opened.restoresTerm)
         // Back: the page shows again with the term put back, which refreshes its results in
         // place rather than replacing them, so focus stays on the opened card.
-        let back = run("cami")
+        let back = searchRun("cami")
         #expect(state.start(back) == .searchesNow)
         #expect(state.work(for: back) == .rows([.movie, .series]))
         #expect(state.results.rows[.movie] == .found([item("m1"), item("m2")]))
@@ -91,7 +91,7 @@ struct SearchStateTests {
 
     @Test func `opening a result of the term searched keeps the field as it is`() {
         var state = SearchState()
-        let run = run("cami")
+        let run = searchRun("cami")
         _ = state.start(run)
         _ = state.work(for: run)
 
@@ -104,7 +104,7 @@ struct SearchStateTests {
     @Test func `back from a result searches every row again without moving focus`() {
         var state = SearchState()
         state.submit()
-        let run = run("th", submission: 1)
+        let run = searchRun("th", submission: 1)
         _ = state.start(run)
         _ = state.work(for: run)
         // A result opened before the results came, cutting the run short.
@@ -120,7 +120,7 @@ struct SearchStateTests {
     @Test func `a picked search cut short by the app leaving the foreground still moves focus`() {
         var state = SearchState()
         state.submit()
-        let run = run("st. louis", submission: 1)
+        let run = searchRun("st. louis", submission: 1)
         _ = state.start(run)
         _ = state.work(for: run)
         // Cut short as the app goes inactive, say as a link opens; back in the foreground, the
@@ -135,12 +135,12 @@ struct SearchStateTests {
     @Test func `a kind or layout change during a picked search keeps its focus move`() {
         var state = SearchState()
         state.submit()
-        let picked = run("th", kinds: [.movie], submission: 1)
+        let picked = searchRun("th", kinds: [.movie], submission: 1)
         _ = state.start(picked)
         _ = state.work(for: picked)
         // The libraries load, say, adding a kind: the run starts again with the same pick,
         // cutting the first one short.
-        let restarted = run("th", kinds: [.movie, .series], submission: 1)
+        let restarted = searchRun("th", kinds: [.movie, .series], submission: 1)
         #expect(state.start(restarted) == .searchesNow)
 
         // Movies was cut short, so it's searched again along with the new kind.
@@ -155,10 +155,10 @@ struct SearchStateTests {
         // A link picks a search as the page appears, before the page's first run, with nothing
         // typed, gets going.
         state.submit()
-        let empty = run("", submission: 0)
+        let empty = searchRun("", submission: 0)
         #expect(state.start(empty) == .nothing)
 
-        let picked = run("st. louis", submission: 1)
+        let picked = searchRun("st. louis", submission: 1)
         #expect(state.start(picked) == .searchesNow)
         _ = state.work(for: picked)
         state.results.record(.found([item("m1")]), for: .movie)
@@ -169,10 +169,10 @@ struct SearchStateTests {
     @Test func `switching to combined results during a picked search moves focus to the grid`() {
         var state = SearchState()
         state.submit()
-        let picked = run("th", submission: 1)
+        let picked = searchRun("th", submission: 1)
         _ = state.start(picked)
         _ = state.work(for: picked)
-        let combined = run("th", submission: 1, combined: true)
+        let combined = searchRun("th", submission: 1, combined: true)
         _ = state.start(combined)
 
         #expect(state.work(for: combined) == .combined([.movie, .series]))
@@ -183,10 +183,10 @@ struct SearchStateTests {
     @Test func `more typing during a picked search ends its focus move`() {
         var state = SearchState()
         state.submit()
-        let picked = run("th", submission: 1)
+        let picked = searchRun("th", submission: 1)
         _ = state.start(picked)
         _ = state.work(for: picked)
-        let typed = run("the", submission: 1)
+        let typed = searchRun("the", submission: 1)
         _ = state.start(typed)
 
         _ = state.work(for: typed)
@@ -199,13 +199,13 @@ struct SearchStateTests {
         var state = SearchState()
         state.submit()
         // Before the libraries load, only people are searched.
-        let picked = run("st. louis", kinds: [.person], submission: 1)
+        let picked = searchRun("st. louis", kinds: [.person], submission: 1)
         _ = state.start(picked)
         _ = state.work(for: picked)
         state.results.record(.found([]), for: .person)
         #expect(state.focusMove(for: picked) == nil)
 
-        let loaded = run("st. louis", kinds: [.movie, .person], submission: 1)
+        let loaded = searchRun("st. louis", kinds: [.movie, .person], submission: 1)
         #expect(state.start(loaded) == .searchesNow)
         #expect(state.work(for: loaded) == .rows([.movie]))
         state.results.record(.found([item("m1")]), for: .movie)
@@ -214,13 +214,13 @@ struct SearchStateTests {
 
     @Test func `rows cut short by more typing stop saying they're searching`() {
         var state = SearchState()
-        let first = run("st")
+        let first = searchRun("st")
         _ = state.start(first)
         _ = state.work(for: first)
         state.results.record(.found([item("m1")]), for: .movie)
         #expect(state.results.rows[.series] == .searching)
 
-        #expect(state.start(run("st.")) == .waitsForTyping)
+        #expect(state.start(searchRun("st.")) == .waitsForTyping)
 
         // While the new term waits, the old term's rows that found something stay, and the one
         // cut short is hidden instead of saying "Searching…".
@@ -230,24 +230,24 @@ struct SearchStateTests {
 
     @Test func `a combined grid cut short by more typing stops saying it's searching`() {
         var state = SearchState()
-        let first = run("st", combined: true)
+        let first = searchRun("st", combined: true)
         _ = state.start(first)
         _ = state.work(for: first)
         #expect(state.results.combined?.state == .searching)
 
-        _ = state.start(run("st.", combined: true))
+        _ = state.start(searchRun("st.", combined: true))
 
         #expect(state.results.combined == nil)
     }
 
     @Test func `a kind switched back on searches only its row`() {
         var state = SearchState()
-        let first = run("th", kinds: [.movie])
+        let first = searchRun("th", kinds: [.movie])
         _ = state.start(first)
         _ = state.work(for: first)
         state.results.record(.found([item("m1")]), for: .movie)
 
-        let more = run("th", kinds: [.movie, .series])
+        let more = searchRun("th", kinds: [.movie, .series])
         #expect(state.start(more) == .searchesNow)
         #expect(state.work(for: more) == .rows([.series]))
         #expect(state.results.rows[.movie] == .found([item("m1")]))
@@ -271,7 +271,7 @@ struct SearchStateTests {
         #expect(state.start(none) == .nothing)
         #expect(state.results == SearchResults(term: "th"))
         // Switching the kinds back on brings results, without taking focus.
-        let back = run("th", submission: 1)
+        let back = searchRun("th", submission: 1)
         _ = state.start(back)
         _ = state.work(for: back)
         state.results.record(.found([item("m1")]), for: .movie)
@@ -279,7 +279,7 @@ struct SearchStateTests {
         #expect(state.focusMove(for: back) == nil)
     }
 
-    private func run(
+    private func searchRun(
         _ term: String,
         kinds: [SearchKind] = [.movie, .series],
         submission: Int = 0,

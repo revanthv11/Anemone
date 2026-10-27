@@ -74,9 +74,9 @@ public final class ScreensaverTimer {
                 }
                 continue
             }
-            let settings = settings()
-            schedule.startDelay = settings.startDelay
-            guard settings.isEnabled else {
+            let current = settings()
+            schedule.startDelay = current.startDelay
+            guard current.isEnabled else {
                 // Checked again later, in case it's turned on meanwhile.
                 schedule.noteActivity(at: .now)
                 await wait(until: .now + pollInterval)
