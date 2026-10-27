@@ -8,11 +8,19 @@ public struct PlaybackQueue: Sendable {
         /// Where to start; the beginning when `nil`.
         public var startPosition: Duration?
         public var metadata: PlaybackMetadata
+        /// A cinema-mode intro, which plays straight into the entry after it (Phase 5c).
+        public var isIntro: Bool
 
-        public init(itemID: MediaItem.ID, startPosition: Duration? = nil, metadata: PlaybackMetadata) {
+        public init(
+            itemID: MediaItem.ID,
+            startPosition: Duration? = nil,
+            metadata: PlaybackMetadata,
+            isIntro: Bool = false,
+        ) {
             self.itemID = itemID
             self.startPosition = startPosition
             self.metadata = metadata
+            self.isIntro = isIntro
         }
     }
 
@@ -53,6 +61,11 @@ public struct PlaybackQueue: Sendable {
     /// Adds entries at the end, such as the episodes after the one playing once they've loaded.
     public mutating func append(_ more: [Entry]) {
         entries += more
+    }
+
+    /// Adds entries to play before the current one, from the first of them, such as intros.
+    public mutating func insertBeforeCurrent(_ more: [Entry]) {
+        entries.insert(contentsOf: more, at: currentIndex)
     }
 
     /// Puts the entries in a random order, to play from the first.

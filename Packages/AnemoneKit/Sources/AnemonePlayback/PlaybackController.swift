@@ -46,6 +46,8 @@ public final class PlaybackController: Identifiable {
     /// Finds the rest of the queue once the first entry is loading; see `PlaybackRequest`.
     @ObservationIgnored private var following: PlaybackRequest.Following?
     @ObservationIgnored private var followingLoad: Task<Void, Never>?
+    /// Finds what plays before the first entry; see `PlaybackRequest`.
+    @ObservationIgnored private var intros: PlaybackRequest.Intros?
     /// How often features hear where playback is.
     @ObservationIgnored private let positionInterval: Duration
     /// What's loaded in the engine.
@@ -98,6 +100,7 @@ public final class PlaybackController: Identifiable {
         }
         self.queue = queue
         following = request.following
+        intros = request.intros
         self.engine = engine
         self.features = features
         self.positionInterval = positionInterval
@@ -109,6 +112,7 @@ public final class PlaybackController: Identifiable {
     public func start() async {
         guard !hasStarted else { return }
         hasStarted = true
+        await loadIntros()
         loadFollowing()
         await load(allowsDirect: true, from: queue.current.startPosition, as: beginLoad())
     }
@@ -173,6 +177,15 @@ public final class PlaybackController: Identifiable {
     /// the segments feature where the credits start.
     public func feature<Feature: PlaybackFeature>(_: Feature.Type) -> Feature? {
         features.lazy.compactMap { $0 as? Feature }.first
+    }
+
+    /// Puts what the request's `intros` finds before the first entry. A failure plays the queue
+    /// as it is.
+    private func loadIntros() async {
+        guard let intros else { return }
+        self.intros = nil
+        guard let found = try? await intros(queue.current), !found.isEmpty, !isStopped else { return }
+        queue.insertBeforeCurrent(found)
     }
 
     /// Adds what the request's `following` finds to the end of the queue. A failure leaves the
@@ -241,6 +254,12 @@ public final class PlaybackController: Identifiable {
 
     private func finished() async {
         guard !isStopped else { return }
+        // An intro plays straight into what follows, as in Wholphin: features don't hear it end,
+        // so Up Next doesn't offer what's next.
+        if queue.current.isIntro, queue.next != nil {
+            playNext()
+            return
+        }
         stopWatching()
         let attempt = loads
         await publish(.ended)

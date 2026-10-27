@@ -102,7 +102,13 @@ private extension BrowseModel {
         shuffles: Bool = false,
         following: PlaybackRequest.Following? = nil,
     ) -> PlaybackRequest {
-        PlaybackRequest(queue: queue, shuffles: shuffles, following: following)
+        PlaybackRequest(
+            queue: queue,
+            shuffles: shuffles,
+            following: following,
+            // Cinema-mode intros (Phase 5c) play before what's asked for.
+            intros: CinemaIntros.finder(on: session),
+        )
     }
 
     /// One entry: the item from `position`, with what the player shows about it.
