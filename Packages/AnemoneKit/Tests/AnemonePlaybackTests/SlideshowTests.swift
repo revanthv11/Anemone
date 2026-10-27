@@ -14,9 +14,9 @@ struct SlideshowTests {
         clips: Set<Int> = [],
         delay: Duration = .milliseconds(30),
         loadTimeout: Duration = .seconds(15),
-        library: FakeLibrary? = nil,
-    ) -> (Slideshow, FakeLibrary) {
-        let library = library ?? FakeLibrary(count: count, clips: clips)
+        library: FakePhotoLibrary? = nil,
+    ) -> (Slideshow, FakePhotoLibrary) {
+        let library = library ?? FakePhotoLibrary(count: count, clips: clips)
         let pager = SlideshowPager(pageSize: 10, loader: library.load)
         return (Slideshow(pager: pager, delay: delay, loadTimeout: loadTimeout), library)
     }
@@ -241,7 +241,7 @@ struct SlideshowTests {
 }
 
 /// A server's slideshow: `count` photos named by index, with clips at the indexes given.
-final class FakeLibrary: Sendable {
+final class FakePhotoLibrary: Sendable {
     let count: Int
     let clips: Set<Int>
     private let starts = Mutex<[Int]>([])
