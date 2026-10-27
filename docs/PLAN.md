@@ -578,7 +578,49 @@ Not yet: the app icon, Top Shelf image and screenshots; the EULA's final wording
 
 #### 6b: colour themes, VoiceOver pass, localization import
 
-Not started. Localization comes from Wholphin's translations.
+- [x] Colour themes, ported from Wholphin's `ui/theme`: its eight themes (Purple, Blue, Green, Orange, Bold Blue, Black, Red, Brown, in its order and with its names), each with Wholphin's light and dark palettes (`AnemoneUI/Theme/Colors`, one file per theme, as Wholphin's `colors/` folder). Wholphin always shows the dark one (`MainActivity` passes `darkTheme = true`), and so does Anemone, which also keeps the system in dark mode; the light ones are kept for the iOS app. `Theme` turns a palette into roles named for what they're for, mapped the way Wholphin's own views use each colour (`border` for focus rings and the seek bar, `tertiary` for card progress, `WatchedIcon`'s badge, `FavoriteIndicator`'s red)
+- [x] `appTheme()` at the app's root puts the theme in the environment (`\.theme`), tints controls with its accent and keeps the app dark; `themeBackground()` fills the root with the theme's background. Both follow the setting, so the app changes as soon as it does
+- [x] Settings › Appearance: Wholphin's "Application Theme" (`appThemeColors`, purple by default), listed on the page with a swatch for each and a check on the one chosen, so picking one shows it at once. A value the app doesn't know reads as purple, as Wholphin reads `UNRECOGNIZED`
+- [x] The shared components use the theme: `MediaCard` (captions, placeholder, the progress bar, the watched, count and favourite badges, and a 6 pt ring in the focus colour over the system lift, Wholphin's 3 dp focus border), `PersonCard` (placeholder, captions, and a ring and glow in the focus colours on its own lift) and `ShapedArtwork`'s placeholder
+- [ ] The rest of the app's views (the directory agents; see "Using the theme" below)
+- [ ] VoiceOver pass
+- [ ] Localization import, from Wholphin's translations
+
+Unit tests check that each theme defines all 27 palette roles and all 32 view roles in both schemes, Wholphin's names, order, setting and a sample of its values, and the contrast of text against what it's drawn on: 4.5 to 1 (WCAG AA) for text, 3 to 1 for focus rings, the accent, progress and badges. Wholphin's own values fall short in a few places, kept as Wholphin has them and listed in `ThemeTests` with their ratios: some filled text pairs in purple, orange, bold blue and black (orange's `onPrimary` on `primary` is 2.2 to 1); the focus ring and accent on the page in purple, blue, bold blue, red and brown (1.5 to 2.9 to 1; tvOS's lift is the main sign of focus anyway); and orange's white check on its watched badge (2.5 to 1). Only the palettes' own text pairs are checked in the light schemes, which neither app shows.
+
+Tested live in the simulator against the local fixture server, with Anemone's player controls: each of the eight themes was picked in turn in Settings › Appearance, where the page's background and the check moved at once; after a relaunch, Home, Anemone Ten Minutes' page and the player overlay over it showed the theme picked. Home and the item page had the theme's background, the focused card its ring (bold blue's is hard to see, as its ratio says), artwork and people placeholders in its colours, and the system's buttons tinted with its accent: Play, focused, filled with it, with a label the system keeps readable (black on orange and black, white elsewhere). In purple, a focused person on the page lifted with a purple ring and glow. The overlay, not themed yet, looked the same in every theme. Each play stopped within 10 s, under Jellyfin's 5% resume mark, so the movie kept no resume position, and purple was put back at the end. Not verified live: the progress bar and the watched, count and favourite badges in each theme (no card on screen had them; the unit tests check their colours), the light schemes, which nothing shows, and an Apple TV set to light mode, which `appTheme()` keeps dark.
+
+Not yet: the theme in the rest of the app's views, including the player overlay (the directory agents', next).
+
+##### Using the theme
+
+For the agents theming the app's views next. Read the theme with `@Environment(\.theme) private var theme`. Its roles are shape styles, so they go straight into `.foregroundStyle(theme.secondaryText)`, `.fill(theme.progress)` or `.background(theme.cardBadge, in: .capsule)`; where an API wants a `Color` (`shadow(color:)`, `LinearGradient(colors:)`), use `.color`, as in `theme.scrim.color.opacity(0.6)`.
+
+| Role | For | Instead of |
+|---|---|---|
+| `background` | Behind a page. The root already draws it; a view only needs it when it covers the root, like a full-screen cover | `Color.black` behind pages |
+| `onBackground`, `secondaryText` | Titles and text on the page; captions, metadata and row subtitles | `.white`, `.primary` and `.secondary` text on the page |
+| `scrim` | Gradients and dimming over artwork: `theme.scrim.color.opacity(0.6)` | `.black.opacity(…)` over artwork |
+| `surface`, `onSurface` | Opaque panels, sheets and dialogs on the page | `.black.opacity(…)` panels |
+| `surfaceVariant`, `onSurfaceVariant` | Placeholders for missing artwork, quiet chips | `.quaternary` fills, `.tertiary` symbols |
+| `accent` | What's selected or current: a tab's underline, a chosen option's mark. It's also the app's tint, so `.tint` already is the accent | `.white` underlines and markers |
+| `highlight` | Text that marks the current choice where `accent` is too dark to read, like a jump bar's current letter | `.tint` on text |
+| `primary`, `onPrimary` | Filled buttons and their labels | |
+| `focusRing`, `focusGlow` | A ring around a focused card or tile (6 pt), and a glow under something that draws its own lift | White focus borders, black focus shadows |
+| `platter`, `onPlatter`; `focusedPlatter`, `onFocusedPlatter` | Custom focusable controls at rest and focused, as Wholphin's buttons: a quiet fill with light text, then light with dark text | `isFocused ? .white : .white.opacity(…)` and `isFocused ? .black : .white` |
+| `cardBadge`, `onCardBadge` | Counts and small labels over artwork | `.black.opacity(0.6)` with `.white` text |
+| `watchedBadge`, `onWatchedBadge`, `favorite` | The watched check and the favourite heart | `.white` checks, `.red` hearts |
+| `progress`, `progressTrack` | How much has been watched, on cards and pages | `.white` on `.black.opacity(0.5)` |
+| `seekPlayed`, `seekBuffered`, `seekTrack` | The player's seek bar | `.white`, `.white.opacity(0.25)` |
+| `error`, `onError`, `errorContainer`, `onErrorContainer` | Error text on the page, and filled error banners | `.red`, `.orange` |
+
+Don't hard-code a colour a theme should change: no `.white`, `.black`, `.red`, `.blue` or hex values for chrome. System buttons already follow the theme, since the root's tint colours tvOS's glass buttons (focused, they fill with the accent). If no role fits, add one to `Theme` with where Wholphin takes it from, rather than reaching into `theme.palette` in many places. Keep as they are:
+
+- the system's focus effects (`.hoverEffect(.highlight)`, the default button and list styles, parallax): the theme only changes colours. Inside a system list row or button that turns white when focused, leave text to the system's `.primary` and `.secondary`, which adapt; a fixed `secondaryText` there would be light grey on white;
+- system materials (`.regularMaterial`, glass) that blur what's behind them, such as the player's panels;
+- black behind video and photos, which is letterboxing, not chrome; the user's subtitle colours; artwork; Live TV's programme category colours, which Wholphin fixes too.
+
+A view hosted on its own, like the player overlay in a `UIHostingController`, doesn't inherit the environment: give its root `.appTheme()` (not `themeBackground()`, which would cover the video). To check a view in another theme without the Settings page, launch with `-appThemeColors oledBlack` (or `purple`, `blue`, `green`, `orange`, `boldBlue`, `red`, `brown`).
 
 Still to decide: whether Seerr ships in 1.0.
 
