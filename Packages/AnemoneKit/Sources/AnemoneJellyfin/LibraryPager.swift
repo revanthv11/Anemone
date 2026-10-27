@@ -19,6 +19,9 @@ public final class LibraryPager {
     public static let defaultPageSize = 100
 
     public let pageSize: Int
+    /// How many items the grid holds: those the first page counted, less any that pages loaded
+    /// since left out. Kept apart from the items, so the grid redraws only when it changes.
+    public private(set) var count = 0
     /// The most recent failure to load a page; cleared when a page loads.
     public private(set) var error: (any Error)?
     private var items: PagedItems<LibraryEntry>
@@ -31,16 +34,11 @@ public final class LibraryPager {
         items = PagedItems(pageSize: pageSize)
     }
 
-    /// How many items the grid holds: those the first page counted, less any that pages loaded
-    /// since left out.
-    public var count: Int {
-        items.count
-    }
-
     /// Loads the first page and the total count. Call once, before showing the grid.
     public func start() async throws {
         let first = try await loader(0, pageSize, true)
         items.start(first.items, counted: first.totalCount ?? first.items.count)
+        count = items.count
     }
 
     /// The item at `index`, or `nil` while its page is loading.
@@ -82,6 +80,9 @@ public final class LibraryPager {
         do {
             let loaded = try await task.value
             items.set(loaded, onPage: page)
+            if count != items.count {
+                count = items.count
+            }
             loads[page] = nil
             error = nil
             return loaded

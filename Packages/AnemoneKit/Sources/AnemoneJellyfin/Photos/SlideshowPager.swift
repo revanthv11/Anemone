@@ -15,6 +15,9 @@ public final class SlideshowPager {
     ) async throws -> SlideshowPage
 
     public let pageSize: Int
+    /// How many photos the slideshow holds: those the first page counted, less any that pages
+    /// loaded since left out.
+    public private(set) var count = 0
     private var items: PagedItems<SlideshowItem>
     @ObservationIgnored private var loads: [Int: Task<[SlideshowItem], any Error>] = [:]
     @ObservationIgnored private let loader: Loader
@@ -25,16 +28,11 @@ public final class SlideshowPager {
         items = PagedItems(pageSize: pageSize)
     }
 
-    /// How many photos the slideshow holds: those the first page counted, less any that pages
-    /// loaded since left out.
-    public var count: Int {
-        items.count
-    }
-
     /// Loads the first page and the total count. Call once, before showing anything.
     public func start() async throws {
         let first = try await loader(0, pageSize, true)
         items.start(first.items, counted: first.totalCount ?? first.items.count)
+        count = items.count
     }
 
     /// The photo at `index`, or `nil` while its page is loading.
@@ -83,6 +81,9 @@ public final class SlideshowPager {
         do {
             let loaded = try await task.value
             items.set(loaded, onPage: page)
+            if count != items.count {
+                count = items.count
+            }
             loads[page] = nil
             return loaded
         } catch {
