@@ -1,10 +1,133 @@
+import AnemoneCore
+import AnemoneJellyfin
+import OSLog
 import TVServices
+import UIKit
 
-/// Supplies the Top Shelf row shown above Anemone on the Apple TV home screen.
+private let log = Logger(subsystem: "com.revanthv11.anemone.topshelf", category: "TopShelf")
+
+/// Supplies the Top Shelf shown above Anemone when it's in the top row of the Apple TV home
+/// screen: Continue Watching and Next Up for the profile the app opens on, as Wholphin fills
+/// Android TV's Watch Next row. Selecting an item opens its page; Play plays it from where it
+/// was left off (`anemone://` links, handled in `App/DeepLinks`).
+///
+/// It reads the sign-ins the app shares through a Keychain access group (`SharedStorage`) and
+/// changes nothing on the server. It shows nothing when nobody is signed in, the profile is
+/// locked, or the server can't be reached; the app asks tvOS to load it again when that changes.
 final class ContentProvider: TVTopShelfContentProvider {
+    /// The completion-handler form: the content isn't `Sendable`, so the async override can't
+    /// return it under strict concurrency.
     override func loadTopShelfContent(completionHandler: @escaping ((any TVTopShelfContent)?) -> Void) {
-        // Continue Watching / Next Up arrive in Phase 5, once the app shares credentials
-        // with this extension through an App Group and a Keychain access group.
-        completionHandler(nil)
+        let reply = Reply(completionHandler)
+        Task {
+            guard let profile = await SignedInProfile.current() else {
+                reply.send(nil)
+                return
+            }
+            do {
+                let rows = try await profile.session.topShelfRows(options: profile.options)
+                reply.send(rows.isEmpty ? nil : Self.content(for: rows, of: profile))
+            } catch {
+                log.error("Couldn't load the rows: \(error, privacy: .public)")
+                reply.send(nil)
+            }
+        }
+    }
+
+    private static func content(for rows: [TopShelfRow], of profile: SignedInProfile) -> any TVTopShelfContent {
+        TVTopShelfSectionedContent(sections: rows.map { section(for: $0, of: profile) })
+    }
+
+    private static func section(
+        for row: TopShelfRow,
+        of profile: SignedInProfile,
+    ) -> TVTopShelfItemCollection<TVTopShelfSectionedItem> {
+        let collection = TVTopShelfItemCollection(items: row.items.map { item(for: $0, of: profile) })
+        collection.title = row.title
+        return collection
+    }
+
+    private static func item(for media: MediaItem, of profile: SignedInProfile) -> TVTopShelfSectionedItem {
+        let item = TVTopShelfSectionedItem(identifier: media.id)
+        item.title = media.topShelfTitle
+        // 16:9 art, as Wholphin's Watch Next row uses.
+        item.imageShape = .hdtv
+        if let image = media.thumbImage {
+            item.setImageURL(profile.session.imageURL(for: image, maxWidth: 640), for: .screenScale1x)
+            item.setImageURL(profile.session.imageURL(for: image, maxWidth: 1280), for: .screenScale2x)
+        }
+        item.playbackProgress = media.progress ?? 0
+        item.displayAction = TVTopShelfAction(url: profile.link(.item(id: media.id)))
+        item.playAction = TVTopShelfAction(url: profile.link(.play(id: media.id, position: nil)))
+        return item
+    }
+}
+
+/// The system's completion handler, which may be called from any thread once, carried into the
+/// task that loads the content.
+private final class Reply: @unchecked Sendable {
+    private let handler: ((any TVTopShelfContent)?) -> Void
+
+    init(_ handler: @escaping ((any TVTopShelfContent)?) -> Void) {
+        self.handler = handler
+    }
+
+    func send(_ content: (any TVTopShelfContent)?) {
+        handler(content)
+    }
+}
+
+/// The profile the app restores on launch, with a connection to its server.
+private struct SignedInProfile: Sendable {
+    let serverID: String
+    let userID: String
+    let session: JellyfinSession
+    let options: TopShelfOptions
+
+    /// `nil` unless the app's last profile is still signed in and not locked: the app wouldn't
+    /// open on a locked profile, so neither does the Top Shelf show its rows.
+    static func current() async -> SignedInProfile? {
+        guard let store = SharedStorage.extensionKeychain() else {
+            log.error("The build has no shared Keychain access group")
+            return nil
+        }
+        guard let accounts = AccountRepository(store: store).loadReadOnly() else {
+            log.info("No sign-ins shared by the app")
+            return nil
+        }
+        guard let last = accounts.lastSession,
+              let server = accounts.server(id: last.serverID),
+              let user = accounts.user(id: last.userID, on: server.id),
+              user.lock == .unlocked,
+              let token = user.accessToken
+        else {
+            log.info("Nobody the app would open on is signed in")
+            return nil
+        }
+        // The app's own identity, so the server sees one device.
+        let deviceName = await MainActor.run { UIDevice.current.name }
+        let identity = ClientIdentity(
+            deviceName: deviceName,
+            deviceID: accounts.deviceID,
+            appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0",
+        )
+        return SignedInProfile(
+            serverID: server.id,
+            userID: user.id,
+            session: JellyfinSession(serverURL: server.url, userID: user.id, accessToken: token, identity: identity),
+            options: SharedStorage.defaults.map(TopShelfOptions.init(defaults:)) ?? TopShelfOptions(),
+        )
+    }
+
+    /// A link that opens on this profile, even if the app has switched to another since.
+    func link(_ action: DeepLink.Action) -> URL {
+        DeepLink(action, serverID: serverID, userID: userID).url
+    }
+}
+
+private extension MediaItem {
+    /// The series and episode for episodes ("Pioneer One · S1:E3"), otherwise the name.
+    var topShelfTitle: String {
+        [displayTitle, episodeLabel].compactMap(\.self).joined(separator: " · ")
     }
 }
