@@ -34,7 +34,10 @@ public struct LiveTVGuide: Hashable, Sendable {
     public func row(channelID: String, programs: [LiveTVProgram]) -> [LiveTVProgram] {
         var row: [LiveTVProgram] = []
         var cursor = start
-        for program in programs.sorted(by: { $0.start < $1.start }) where program.end > cursor {
+        // Like the cells, the row leaves out a programme without length.
+        for program in programs.sorted(by: { $0.start < $1.start })
+            where program.end > cursor && program.end > program.start
+        {
             if program.start > cursor {
                 row += placeholders(channelID: channelID, from: cursor, to: min(program.start, end))
             }

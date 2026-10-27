@@ -69,18 +69,6 @@ extension BrowseModel {
 }
 
 extension LiveTVProgram {
-    /// "8:00 – 9:30 PM", with the weekday when it isn't today, as Wholphin's guide shows times.
-    func timeRange(now: Date = .now) -> String {
-        let calendar = Calendar.current
-        // The interval style shares the AM or PM ("8:00 – 9:30 PM") but adds dates across
-        // midnight, so those get the two times on their own.
-        let range = calendar.isDate(start, inSameDayAs: end)
-            ? (start ..< end).formatted(Date.IntervalFormatStyle(date: .omitted, time: .shortened))
-            : [start, end].map { $0.formatted(date: .omitted, time: .shortened) }.joined(separator: " – ")
-        guard !calendar.isDate(start, inSameDayAs: now) else { return range }
-        return "\(start.formatted(.dateTime.weekday(.abbreviated))) \(range)"
-    }
-
     /// Wholphin's quick details: the times, then the length, the time left while it airs, the
     /// episode and the rating.
     func quickDetails(now: Date = .now) -> String {

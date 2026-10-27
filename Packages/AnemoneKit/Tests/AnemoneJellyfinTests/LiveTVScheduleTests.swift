@@ -14,6 +14,7 @@ struct LiveTVScheduleTests: LiveTVServerTesting {
             case "/LiveTv/Recordings": Self.recordings
             case "/LiveTv/Timers": Self.timers
             case "/LiveTv/SeriesTimers": Self.seriesTimers
+            case "/LiveTv/Timers/t9": Self.timerOfRecordingWithoutTimes
             default: nil
             }
         }
@@ -25,7 +26,7 @@ struct LiveTVScheduleTests: LiveTVServerTesting {
 
         let schedule = try await session(host: "active.test").liveTVSchedule()
 
-        #expect(schedule.active.map(\.id) == ["r1"])
+        #expect(schedule.active.map(\.id) == ["r1", "r2", "r3"])
         let recording = schedule.active[0].program
         #expect(recording.id == "p1")
         #expect(recording.name == "Now")
@@ -38,6 +39,25 @@ struct LiveTVScheduleTests: LiveTVServerTesting {
         #expect(query["isInProgress"] == "true")
         #expect(query["limit"] == "100")
         #expect(query["userId"] == "u1")
+        // Only a recording that came without times asks for its timer.
+        #expect(sent.all.filter { $0.key.hasPrefix("/LiveTv/Timers/") }.map(\.key) == ["/LiveTv/Timers/t9"])
+    }
+
+    @Test func `a recording under way without times is listed with its timer's, or its own length`() async throws {
+        _ = registerSchedule(host: "untimed.test")
+
+        let active = try await session(host: "untimed.test").liveTVSchedule().active
+
+        let fromTimer = try #require(active.first { $0.id == "r2" }).program
+        #expect(fromTimer.start == Self.date("2026-10-26T10:30:00Z"))
+        #expect(fromTimer.end == Self.date("2026-10-26T11:00:00Z"))
+        #expect(fromTimer.channelID == "c9")
+        #expect(fromTimer.timerID == "t9")
+        let fromLength = try #require(active.first { $0.id == "r3" }).program
+        #expect(fromLength.start == Self.date("2026-10-26T10:00:00Z"))
+        #expect(fromLength.duration == .seconds(1200))
+        // One with neither is left out, and logged.
+        #expect(!active.contains { $0.id == "r4" })
     }
 
     @Test func `scheduled recordings come from the timers, then the series set to record`() async throws {
@@ -94,13 +114,25 @@ struct LiveTVScheduleTests: LiveTVServerTesting {
         ])
     }
 
-    /// One recording under way, and one the server sent without times, which isn't listed.
+    private static func date(_ text: String) -> Date? {
+        try? Date(text, strategy: .iso8601)
+    }
+
+    /// One recording under way; one the server sent without times but with its timer; one with
+    /// its start and length but no end; and one with nothing to go on, which isn't listed.
     private static let recordings = MockServer.Reply.json(#"""
     {"Items":[{"Id":"r1","Name":"Now","Type":"Recording","TimerId":"t1","SeriesTimerId":"s1",
       "ProgramId":"p1","ChannelName":"Anemone One","IsSeries":true,"EpisodeTitle":"Stripes",
       "Status":"InProgress","ImageTags":{"Primary":"art"},
       "StartDate":"2026-10-26T10:00:00.0000000Z","EndDate":"2026-10-26T11:00:00.0000000Z"},
-     {"Id":"r2","Name":"No times"}]}
+     {"Id":"r2","Name":"No times","TimerId":"t9"},
+     {"Id":"r3","Name":"Own length","StartDate":"2026-10-26T10:00:00.0000000Z","RunTimeTicks":12000000000},
+     {"Id":"r4","Name":"Nothing to go on"}]}
+    """#)
+
+    private static let timerOfRecordingWithoutTimes = MockServer.Reply.json(#"""
+    {"Id":"t9","ChannelId":"c9","Name":"No times","Status":"InProgress",
+     "StartDate":"2026-10-26T10:30:00.0000000Z","EndDate":"2026-10-26T11:00:00.0000000Z"}
     """#)
 
     /// A programme's timer, one set by time alone, and one with nothing to show.
