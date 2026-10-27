@@ -1,6 +1,6 @@
+import Foundation
 import os
 #if os(tvOS) || os(iOS)
-    import Foundation
     import Libmpv
     import QuartzCore
 
@@ -52,24 +52,31 @@ import os
             mpv_set_property_string(handle.mpv, name, value)
         }
 
-        func command(_ arguments: [String]) {
-            guard !isDestroyed else { return }
+        @discardableResult
+        func command(_ arguments: [String]) -> Bool {
+            guard !isDestroyed else { return false }
             let status = Self.withCStrings(arguments) { mpv_command(handle.mpv, $0) }
             if status < 0 {
                 Logger.mpv.warning("\(arguments.first ?? "", privacy: .public): \(Self.describe(status))")
             }
+            return status >= 0
         }
 
-        /// `loadfile` answers with the new entry's `playlist_entry_id` (mpv's input.rst).
-        func loadFile(_ arguments: [String]) -> Int64? {
-            guard !isDestroyed else { return nil }
+        /// `loadfile` answers with the new entry's `playlist_entry_id` (mpv's input.rst). A load
+        /// libmpv took without saying which entry it made still plays (see `MPVLoad`).
+        func loadFile(_ arguments: [String]) -> MPVLoadResult {
+            guard !isDestroyed else { return .refused }
             var result = mpv_node()
             let status = Self.withCStrings(arguments) { mpv_command_ret(handle.mpv, $0, &result) }
             guard status >= 0 else {
                 Logger.mpv.warning("loadfile: \(Self.describe(status), privacy: .public)")
-                return nil
+                return .refused
             }
             defer { mpv_free_node_contents(&result) }
+            return .started(entry: Self.entryID(in: result))
+        }
+
+        private static func entryID(in result: mpv_node) -> Int64? {
             guard result.format == MPV_FORMAT_NODE_MAP, let map = result.u.list?.pointee else { return nil }
             for index in 0 ..< Int(map.num) {
                 let value = map.values[index]
@@ -122,6 +129,10 @@ import os
         private let queue = DispatchQueue(label: "mpv.events", qos: .userInitiated)
         /// Only touched on `queue`.
         private var isDestroyed = false
+        /// The playlist entry libmpv is on, from its start-file event to its end-file event, which
+        /// the events between them, such as a playback restart, are about but don't name. Only
+        /// touched on `queue`, where libmpv's events arrive in the order it sent them.
+        private var playing: Int64?
 
         init(mpv: OpaquePointer, events: AsyncStream<MPVEvent>.Continuation) {
             self.mpv = mpv
@@ -155,26 +166,41 @@ import os
 
         private func drain() {
             while !isDestroyed, let event = mpv_wait_event(mpv, 0)?.pointee, event.event_id != MPV_EVENT_NONE {
-                if let converted = Self.convert(event) {
+                if let converted = convert(event) {
                     events.yield(converted)
                 }
             }
         }
 
-        private static func convert(_ event: mpv_event) -> MPVEvent? {
+        private func convert(_ event: mpv_event) -> MPVEvent? {
             switch event.event_id {
             case MPV_EVENT_START_FILE:
                 guard let start = event.data?.assumingMemoryBound(to: mpv_event_start_file.self).pointee else {
                     return nil
                 }
+                playing = start.playlist_entry_id
                 return .startFile(entry: start.playlist_entry_id)
+            case MPV_EVENT_FILE_LOADED:
+                return playing.map { .fileLoaded(entry: $0) }
+            case MPV_EVENT_SEEK:
+                return playing.map { .seek(entry: $0) }
             case MPV_EVENT_PLAYBACK_RESTART:
-                return .playbackRestart
+                return playing.map { .playbackRestart(entry: $0) }
             case MPV_EVENT_END_FILE:
                 guard let end = event.data?.assumingMemoryBound(to: mpv_event_end_file.self).pointee else {
                     return nil
                 }
-                return .endFile(entry: end.playlist_entry_id, endReason(of: end))
+                if playing == end.playlist_entry_id {
+                    playing = nil
+                }
+                return .endFile(entry: end.playlist_entry_id, Self.endReason(of: end))
+            default:
+                return Self.convertOther(event)
+            }
+        }
+
+        private static func convertOther(_ event: mpv_event) -> MPVEvent? {
+            switch event.event_id {
             case MPV_EVENT_PROPERTY_CHANGE:
                 guard let property = event.data?.assumingMemoryBound(to: mpv_event_property.self).pointee else {
                     return nil
@@ -190,11 +216,12 @@ import os
             }
         }
 
-        /// libmpv's warnings and errors, in debug builds, for the console.
+        /// libmpv's warnings and errors, in debug builds, for the console, without the tokens in
+        /// the stream and subtitle URLs they can quote.
         private static func log(_ event: mpv_event) {
             guard let message = event.data?.assumingMemoryBound(to: mpv_event_log_message.self).pointee else { return }
             let prefix = String(cString: message.prefix)
-            let text = String(cString: message.text)
+            let text = MPVLog.redacted(String(cString: message.text))
             Logger.mpv.warning("[\(prefix, privacy: .public)] \(text, privacy: .public)")
         }
 
@@ -204,7 +231,12 @@ import os
                 .endOfFile
             case MPV_END_FILE_REASON_ERROR:
                 .failed(LibMPVClient.describe(end.error))
+            case MPV_END_FILE_REASON_QUIT:
+                .quit
+            case MPV_END_FILE_REASON_REDIRECT:
+                .redirected(next: end.playlist_insert_num_entries > 0 ? end.playlist_insert_id : nil)
             default:
+                // STOP, and reasons newer than this code, which libmpv says to treat as unknown.
                 .stopped
             }
         }
@@ -232,4 +264,16 @@ import os
 extension Logger {
     /// libmpv's own messages and what the engine notes about them, in debug builds.
     static let mpv = Logger(subsystem: "com.revanthv11.anemone", category: "mpv")
+}
+
+enum MPVLog {
+    /// `text` with the values of tokens in URL queries, such as Jellyfin's `ApiKey`, replaced,
+    /// since libmpv's messages quote the stream and subtitle URLs it fails to open.
+    static func redacted(_ text: String) -> String {
+        text.replacingOccurrences(
+            of: #"(?i)\b(api_?key|access_?token|token)=[^&\s'"]+"#,
+            with: "$1=<redacted>",
+            options: .regularExpression,
+        )
+    }
 }
