@@ -31,6 +31,12 @@ struct Reloading {
         asksAgain = false
     }
 
+    /// The stream playing directly, or directly streamed, failed: the retry is a transcode, and
+    /// so is a reload that comes before it, rather than the same stream once more.
+    mutating func directFailed() {
+        allowsDirect = false
+    }
+
     /// `TrackSelection`, which reloads for picks, put every pick so far in the request being
     /// prepared, so a reload one of them asked for meanwhile needn't ask the server again.
     mutating func includesPicks() {
