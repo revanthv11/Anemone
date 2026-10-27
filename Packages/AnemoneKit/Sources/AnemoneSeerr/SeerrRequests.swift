@@ -70,7 +70,14 @@
         ///
         /// Fixed while porting: Wholphin reads only the first page, at Seerr's default of 10
         /// requests, so a user with more never sees the older ones. `SeerrRequestList` reads on.
-        func requests(skip: Int = 0, take: Int = requestsPageSize) async throws -> SeerrRequestsPage {
+        ///
+        /// - Parameter known: titles found before, by `DiscoverItem.id`, which aren't looked up
+        ///   again. What the server has of one, and where, are taken from its request instead.
+        func requests(
+            skip: Int = 0,
+            take: Int = requestsPageSize,
+            known: [DiscoverItem.ID: DiscoverItem] = [:],
+        ) async throws -> SeerrRequestsPage {
             struct Wanted {
                 let request: SeerrRequest
                 let tmdbID: Int
@@ -82,15 +89,23 @@
             // Seerr counts every request the user may see. Without that count, a full page may
             // have more after it.
             let hasMore = !requests.isEmpty && (page.pageInfo?.results.map { end < $0 } ?? (requests.count >= take))
+            var found: [Int: SeerrRequestedItem] = [:]
             let wanted = requests.compactMap { request -> Wanted? in
                 guard let tmdbID = request.media?.tmdbId,
                       let kind = SeerrMediaKind(mediaType: request._type), kind != .person
                 else { return nil }
-                return Wanted(request: SeerrRequest(request), tmdbID: tmdbID, kind: kind)
+                let wanted = Wanted(request: SeerrRequest(request), tmdbID: tmdbID, kind: kind)
+                if let title = known[DiscoverItem.id(kind: kind, tmdbID: tmdbID)] {
+                    found[wanted.request.id] = SeerrRequestedItem(
+                        request: wanted.request,
+                        item: title.updated(from: request.media, request: wanted.request, user: user.id),
+                    )
+                }
+                return wanted
             }
-            var found: [Int: SeerrRequestedItem] = [:]
+            let unknown = wanted.filter { found[$0.request.id] == nil }
             try await withThrowingTaskGroup(of: SeerrRequestedItem?.self) { group in
-                var next = wanted.makeIterator()
+                var next = unknown.makeIterator()
                 func addNext() {
                     guard let wanted = next.next() else { return }
                     group.addTask {
@@ -123,13 +138,19 @@
         /// Asks for a series' seasons, in 4K or not. When the user already has a pending request
         /// at that quality, it's changed to these seasons, as Wholphin does, rather than adding a
         /// second one.
+        ///
+        /// - Parameter seasons: the seasons ticked among those `details` offers at that quality
+        ///   (`isRequestable`). A season of the user's pending request that isn't offered, and so
+        ///   couldn't be unticked, stays in the request: only unticking takes one out.
         func requestSeries(_ details: DiscoverDetails, seasons: [Int], is4K: Bool) async throws {
             if let pending = details.requests.first(where: {
                 $0.status == .pending && $0.requestedBy == user.id && $0.is4K == is4K
             }) {
+                let offered = (is4K ? details.seasons4K : details.seasons).filter(\.isRequestable).map(\.number)
+                let kept = Set(pending.seasons.keys).subtracting(offered)
                 let body = Operations.PutRequestRequestId.Input.Body.JsonPayload(
                     mediaType: .tv,
-                    seasons: seasons,
+                    seasons: kept.union(seasons).sorted(),
                     is4k: is4K,
                 )
                 let output = try await client.putRequestRequestId(
@@ -217,6 +238,21 @@
         }
     }
 
+    extension DiscoverItem {
+        /// A title found before, with what the server has of it, and where, as its request's
+        /// `media` now says. A series counts that request as `series(_:)` counts the user's own.
+        func updated(from media: Components.Schemas.MediaInfo?, request: SeerrRequest, user: Int) -> DiscoverItem {
+            guard let media else { return self }
+            var item = self
+            item.availability = SeerrAvailability(status: media.status)
+            if kind == .series {
+                item.availability = SeerrRequest.availability(item.availability, requests: [request], user: user)
+            }
+            item.jellyfinItemID = media.jellyfinItemID
+            return item
+        }
+    }
+
     /// A season as Seerr lists it: its number, and what the server has of it.
     struct SeasonFacts {
         var number: Int
@@ -247,6 +283,13 @@
         /// Each season's availability, request status and whether it can be requested, at one
         /// quality. Ported from Wholphin's `updateSeasonStatus`.
         ///
+        /// Fixed while porting: in Wholphin, whichever request for a season comes last decides
+        /// whether the user may change it, so another user's request, or a declined one, listed
+        /// after the user's own pending request locks that season, and changing the request then
+        /// drops it. The user's own pending request wins for its seasons, wherever it's listed;
+        /// for other seasons, anyone else's request holds the season unless the user's own was
+        /// declined, whatever the order.
+        ///
         /// - Parameters:
         ///   - seasons: the series' seasons from TMDB, which set the list and its order.
         ///   - known: the seasons Seerr has records of, whose availability wins when higher.
@@ -267,19 +310,9 @@
                     availability[season.number] = status
                 }
             }
-            var requestStatus: [Int: SeerrRequestStatus] = [:]
-            var ownEditable: [Int: Bool] = [:]
-            for request in requests where request.is4K == is4K {
-                for (number, status) in request.seasons {
-                    if status > requestStatus[number, default: .unknown] {
-                        requestStatus[number] = status
-                    }
-                    ownEditable[number] = request.requestedBy == user
-                        && (request.status == .pending || request.status == .declined)
-                }
-            }
+            let requested = Requested(requests.filter { $0.is4K == is4K }, user: user)
             return seasons.map { season in
-                let status = requestStatus[season.number, default: .unknown]
+                let status = requested.status[season.number, default: .unknown]
                 let shown: SeerrAvailability = switch status {
                 case .pending: .pending
                 case .approved: .processing
@@ -293,8 +326,37 @@
                     episodeCount: season.episodeCount,
                     availability: shown,
                     requestStatus: status,
-                    isRequestable: ownEditable[season.number] ?? requestable,
+                    isRequestable: requested.own.contains(season.number)
+                        || (requested.mayAskAgain[season.number] ?? requestable),
+                    isInOwnRequest: requested.own.contains(season.number),
                 )
+            }
+        }
+
+        /// What a series' requests at one quality say of each season.
+        private struct Requested {
+            /// The furthest any request for it has got.
+            var status: [Int: SeerrRequestStatus] = [:]
+            /// The seasons of the user's own pending request.
+            var own: Set<Int> = []
+            /// For seasons in other requests, whether the user may ask for them again.
+            var mayAskAgain: [Int: Bool] = [:]
+
+            init(_ requests: [SeerrRequest], user: Int) {
+                for request in requests {
+                    let isOwn = request.requestedBy == user
+                    for (number, status) in request.seasons {
+                        if status > self.status[number, default: .unknown] {
+                            self.status[number] = status
+                        }
+                        if isOwn, request.status == .pending {
+                            own.insert(number)
+                        } else {
+                            mayAskAgain[number] = mayAskAgain[number, default: true]
+                                && isOwn && request.status == .declined
+                        }
+                    }
+                }
             }
         }
     }

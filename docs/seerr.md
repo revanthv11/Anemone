@@ -60,7 +60,7 @@ A password sign-in keeps Seerr's session cookie in memory. When Seerr turns a re
 
 ## Trying it without a Seerr server
 
-DEBUG builds launched with `-seerrMock YES` sign in to a made-up server inside the app (`App/Seerr/SeerrDebugServer.swift`), as if the plugin had set it up. `-seerrMock url` has the plugin give only its address, for the add page, `-seerrMock failing` has its sign-in turned down, for Retry, `-seerrMock lapsing` signs in with a password whose first session lapses as soon as it's used, so Anemone has to sign in again, and `-seerrMock many` adds 45 requests, so the Requests page reads three pages of them.
+DEBUG builds launched with `-seerrMock YES` sign in to a made-up server inside the app (`App/Seerr/SeerrDebugServer.swift`), as if the plugin had set it up. `-seerrMock url` has the plugin give only its address, for the add page, `-seerrMock failing` has its sign-in turned down, for Retry, `-seerrMock lapsing` signs in with a password whose first session lapses as soon as it's used, so Anemone has to sign in again, `-seerrMock many` adds 45 requests, so the Requests page reads three pages of them, and `-seerrMock shared` puts Harbor Town's season 2 in the user's pending request and in another user's approved request listed after it, so asking for more seasons has to keep season 2 in the user's request.
 
 ## CI
 

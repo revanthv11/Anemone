@@ -97,6 +97,10 @@
 
         /// Unique in a row that mixes movies and series, unlike the TMDB ID.
         public var id: String {
+            Self.id(kind: kind, tmdbID: tmdbID)
+        }
+
+        static func id(kind: SeerrMediaKind, tmdbID: Int) -> String {
             "\(kind.rawValue)-\(tmdbID)"
         }
 
@@ -119,6 +123,9 @@
         /// Whether it can be asked for now: it isn't on the server or on its way, or the user's own
         /// request for it is still pending or was declined.
         public var isRequestable: Bool
+        /// Whether the user's own pending request at this quality asks for it. Asking again
+        /// changes that request, so these seasons start ticked, and leave it only when unticked.
+        public var isInOwnRequest: Bool
 
         public var id: Int {
             number
@@ -131,6 +138,7 @@
             availability: SeerrAvailability = .unknown,
             requestStatus: SeerrRequestStatus = .unknown,
             isRequestable: Bool = true,
+            isInOwnRequest: Bool = false,
         ) {
             self.number = number
             self.name = name
@@ -138,6 +146,7 @@
             self.availability = availability
             self.requestStatus = requestStatus
             self.isRequestable = isRequestable
+            self.isInOwnRequest = isInOwnRequest
         }
     }
 

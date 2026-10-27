@@ -63,6 +63,50 @@
             #expect(sent.json["is4k"] as? Bool == false)
         }
 
+        /// A series with four seasons: the first on the server; the second and third in the
+        /// user's (id 7) pending request, with another user's approved request for the second and
+        /// a declined one for the third listed after it; the fourth not asked for. The user's
+        /// request also has a fifth season TMDB doesn't list.
+        private static let sharedSeasons = #"""
+        {"id":1399,"name":"Thrones",
+         "seasons":[{"seasonNumber":1},{"seasonNumber":2},{"seasonNumber":3},{"seasonNumber":4}],
+         "mediaInfo":{"status":4,"seasons":[{"seasonNumber":1,"status":5}],
+           "requests":[
+             {"id":42,"status":1,"is4k":false,"requestedBy":{"id":7},
+              "seasons":[{"seasonNumber":2,"status":1},{"seasonNumber":3,"status":1},
+                         {"seasonNumber":5,"status":1}]},
+             {"id":43,"status":2,"is4k":false,"requestedBy":{"id":8},"seasons":[{"seasonNumber":2,"status":2}]},
+             {"id":44,"status":3,"is4k":false,"requestedBy":{"id":9},"seasons":[{"seasonNumber":3,"status":3}]}]}}
+        """#
+
+        @Test func `changing a request keeps the seasons the user didn't untick`() async throws {
+            let host = "shared.seerr.test"
+            let seerr = try await connection(to: host) { request in
+                switch (request.method, request.path) {
+                case ("GET", "/api/v1/tv/1399"): .json(Self.sharedSeasons)
+                case ("PUT", "/api/v1/request/42"): .json(#"{"id":42,"status":1}"#)
+                default: nil
+                }
+            }
+            let details = try await seerr.series(1399)
+            // The user's own seasons can still be changed, and start ticked, whatever else asks
+            // for them.
+            #expect(details.seasons.map(\.isRequestable) == [false, true, true, true])
+            let ticked = details.seasons.filter(\.isInOwnRequest).map(\.number)
+            #expect(ticked == [2, 3])
+
+            try await seerr.requestSeries(details, seasons: ticked + [4], is4K: false)
+            let added = try #require(SeerrMockServer.requests(to: host).last)
+            #expect(added.method == "PUT")
+            #expect(added.path == "/api/v1/request/42")
+            // The fifth season wasn't offered, so it couldn't be unticked: it stays.
+            #expect(added.json["seasons"] as? [Int] == [2, 3, 4, 5])
+
+            try await seerr.requestSeries(details, seasons: [2], is4K: false)
+            let unticked = try #require(SeerrMockServer.requests(to: host).last)
+            #expect(unticked.json["seasons"] as? [Int] == [2, 5])
+        }
+
         @Test func `asking for a series in 4K makes a new request`() async throws {
             let seerr = try await connection(to: "new4k.seerr.test") { request in
                 switch (request.method, request.path) {
@@ -176,6 +220,37 @@
             #expect(sent?.query == ["take": "20", "skip": "0"])
         }
 
+        @Test func `a title found before isn't looked up again, and its request says where it is`() async throws {
+            let host = "known.seerr.test"
+            let seerr = try await connection(to: host) { request in
+                switch request.path {
+                case "/api/v1/request":
+                    .json(#"""
+                    {"pageInfo":{"page":1,"pages":1,"results":2},"results":[
+                      {"id":2,"status":2,"type":"tv","requestedBy":{"id":7},
+                       "media":{"tmdbId":1399,"status":5,"jellyfinMediaId":"9bd5926326d651153928e0d11c6ee7cb"}},
+                      {"id":1,"status":1,"type":"movie","media":{"tmdbId":550,"status":2},"requestedBy":{"id":7}}
+                    ]}
+                    """#)
+                case "/api/v1/movie/550":
+                    .json(#"{"id":550,"title":"Fight Club"}"#)
+                default:
+                    .status(404)
+                }
+            }
+            // Looked up while Seerr didn't have it yet.
+            let thrones = DiscoverItem(tmdbID: 1399, kind: .series, title: "Thrones", availability: .pending)
+
+            let page = try await seerr.requests(known: [thrones.id: thrones])
+
+            #expect(page.items.map(\.item.title) == ["Thrones", "Fight Club"])
+            #expect(page.items.first?.item.availability == .available)
+            #expect(page.items.first?.item.jellyfinItemID == "9bd5926326d651153928e0d11c6ee7cb")
+            let paths = SeerrMockServer.requests(to: host).map(\.path)
+            #expect(!paths.contains("/api/v1/tv/1399"))
+            #expect(paths.contains("/api/v1/movie/550"))
+        }
+
         @Test func `without Seerr's count, a full page of requests may have more`() async throws {
             let seerr = try await connection(to: "uncounted.seerr.test") { request in
                 switch request.path {
@@ -226,6 +301,33 @@
 
             #expect(seasons.first?.availability == .processing)
             #expect(seasons.first?.isRequestable == false)
+        }
+
+        @Test func `the user's own pending request keeps its seasons whatever is listed after it`() {
+            let own = SeerrRequest(id: 1, status: .pending, requestedBy: 7, seasons: [1: .pending, 2: .pending])
+            let approved = SeerrRequest(id: 2, status: .approved, requestedBy: 8, seasons: [1: .approved])
+            let declined = SeerrRequest(id: 3, status: .declined, requestedBy: 8, seasons: [2: .declined])
+            let facts = [SeasonFacts(number: 1), SeasonFacts(number: 2), SeasonFacts(number: 3)]
+
+            for requests in [[own, approved, declined], [approved, declined, own]] {
+                let seasons = SeerrSeason.seasons(facts, known: [], requests: requests, user: 7, is4K: false)
+
+                #expect(seasons.map(\.isRequestable) == [true, true, true])
+                #expect(seasons.map(\.isInOwnRequest) == [true, true, false])
+            }
+        }
+
+        @Test func `another user's request holds a season unless the user's own was declined, in any order`() {
+            let declined = SeerrRequest(id: 1, status: .declined, requestedBy: 7, seasons: [1: .declined, 2: .declined])
+            let others = SeerrRequest(id: 2, status: .pending, requestedBy: 8, seasons: [2: .pending])
+            let facts = [SeasonFacts(number: 1), SeasonFacts(number: 2)]
+
+            for requests in [[declined, others], [others, declined]] {
+                let seasons = SeerrSeason.seasons(facts, known: [], requests: requests, user: 7, is4K: false)
+
+                #expect(seasons.map(\.isRequestable) == [true, false])
+                #expect(seasons.map(\.isInOwnRequest) == [false, false])
+            }
         }
 
         @Test func `4K requests only count for 4K seasons`() {

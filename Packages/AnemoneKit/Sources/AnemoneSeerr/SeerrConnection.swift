@@ -1,7 +1,6 @@
 #if ANEMONE_SEERR
     import Foundation
     import OpenAPIRuntime
-    import OpenAPIURLSession
 
     /// A signed-in connection to a Seerr server: the user, what the server allows, and the
     /// requests Anemone makes. Ported from Wholphin's `SeerrApi`, `SeerrServerRepository` (signing
@@ -37,7 +36,8 @@
             configuration: URLSessionConfiguration = .ephemeral,
             renewal: Renewal? = nil,
         ) async throws -> SeerrConnection {
-            let transport = URLSessionTransport.seerr(configuration, timeout: timeout)
+            // Kept by the connection and its sign-ins again; closed once the connection has gone.
+            let transport = SeerrTransport(to: serverURL, configuration, timeout: timeout)
             let signing = SeerrSigning(apiKey: credentials.apiKey)
             let client = Client(serverURL: serverURL, signing: signing, transport: transport)
             try await logIn(client, with: credentials)
@@ -140,12 +140,13 @@
         }
 
         /// Whether a Seerr server answers at `url`. Waits less than other requests, as Wholphin's
-        /// `testConnection` does, since most guessed addresses don't answer.
+        /// `testConnection` does, since most guessed addresses don't answer. Its session closes
+        /// as soon as the answer is in.
         static func isSeerr(at url: URL, _ configuration: URLSessionConfiguration) async -> Bool {
             let client = Client(
                 serverURL: url,
                 signing: SeerrSigning(apiKey: nil),
-                transport: .seerr(configuration, timeout: 6),
+                transport: SeerrTransport(to: url, configuration, timeout: 6),
             )
             do {
                 _ = try await client.getSettingsPublic().ok.body.json
