@@ -81,12 +81,17 @@ public protocol MusicRemote: AnyObject {
             MPNowPlayingInfoCenter.default().nowPlayingInfo = info
         }
 
+        /// Takes the commands away as well as their targets, so the system stops offering
+        /// controls that nothing answers.
         public func detach() {
             for (command, target) in targets {
                 command.removeTarget(target)
+                command.isEnabled = false
             }
             targets = []
+            player = nil
             artworkTask?.cancel()
+            artworkTask = nil
             artwork = nil
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         }
