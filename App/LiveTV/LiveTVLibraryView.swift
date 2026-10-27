@@ -56,8 +56,11 @@ struct LiveTVLibraryView: View {
         VStack(alignment: .leading, spacing: 24) {
             tabBar
                 .padding(.horizontal, LiveTVLayout.horizontalInset)
+            // No taller than the room under the tabs: a tab whose content asks for more runs off
+            // the bottom rather than making the page taller than the screen, which tvOS centres,
+            // pushing the tabs up under the sidebar's title.
             content
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .frame(maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
         }
         .overlay(alignment: .bottom) {
             if let notice {
