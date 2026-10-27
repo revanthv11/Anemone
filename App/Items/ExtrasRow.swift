@@ -82,8 +82,10 @@ extension View {
     /// Loads `extras` for the item `id` names, and again whenever it changes. What can't be
     /// loaded is left out, as Wholphin does, though a revoked token still sends Home to sign-in.
     ///
-    /// When the item changes, as when focus moves along a season's episodes, the old item's extras
-    /// go at once, and the new ones are asked for once focus has settled.
+    /// The first item's extras are asked for at once. When the item changes after that, as when
+    /// focus moves along a season's episodes, the old item's extras go at once, and the new ones
+    /// are asked for only once the item has stayed for 300 ms, so moving along the row doesn't
+    /// send a request per card.
     func itemExtras(_ extras: Binding<ItemExtras>, of id: MediaItem.ID?) -> some View {
         modifier(ItemExtrasLoader(extras: extras, id: id))
     }
@@ -94,6 +96,8 @@ private struct ItemExtrasLoader: ViewModifier {
     let id: MediaItem.ID?
 
     @Environment(BrowseModel.self) private var browse
+    /// Set once extras have been asked for, so later items wait for focus to settle.
+    @State private var hasAsked = false
 
     func body(content: Content) -> some View {
         content
@@ -105,8 +109,16 @@ private struct ItemExtrasLoader: ViewModifier {
                 guard extras.itemID != id else { return }
                 if extras.itemID != nil {
                     extras = ItemExtras()
-                    try? await Task.sleep(for: .milliseconds(300))
                 }
+                if hasAsked {
+                    do {
+                        try await Task.sleep(for: .milliseconds(300))
+                    } catch {
+                        // The item changed again first; its own task asks instead.
+                        return
+                    }
+                }
+                hasAsked = true
                 let session = browse.session
                 let loaded = await browse.optional(attempt { try await session.itemExtras(id: id) })
                 // A newer item replaced this one meanwhile.
