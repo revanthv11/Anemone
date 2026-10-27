@@ -114,12 +114,6 @@ final class LibraryGridSpikeUITests: XCTestCase {
 
     // MARK: Helpers
 
-    private func press(_ button: XCUIRemote.Button, times: Int = 1) {
-        for _ in 0 ..< times {
-            XCUIRemote.shared.press(button)
-        }
-    }
-
     private func focusedID(_ app: XCUIApplication) -> String {
         let focused = app.descendants(matching: .any).element(matching: NSPredicate(format: "hasFocus == true"))
         guard focused.exists else { return "none" }
@@ -170,13 +164,6 @@ final class LibraryGridSpikeUITests: XCTestCase {
         let start = Date()
         work()
         return String(format: "%.1f s", Date().timeIntervalSince(start))
-    }
-
-    private func attachScreenshot(_ app: XCUIApplication, name: String) {
-        let attachment = XCTAttachment(screenshot: app.screenshot())
-        attachment.name = name
-        attachment.lifetime = .keepAlways
-        add(attachment)
     }
 }
 

@@ -3,11 +3,6 @@ import JellyfinAPI
 
 /// What each kind of library's grid shows, following Wholphin's per-type library pages.
 public extension Library {
-    /// Live TV gets a guide instead, in Phase 5.
-    var hasGrid: Bool {
-        kind != .liveTV
-    }
-
     var sortFields: [LibrarySort.Field] {
         switch kind {
         case .shows:

@@ -15,7 +15,7 @@ struct MoviePage: View {
     @State private var memory = RowMemory()
     @State private var similar: [ItemDetails] = []
     @State private var alert: ItemAlert?
-    @State private var playback: PlaybackController?
+    @State private var playback: PlaybackRequest?
 
     var body: some View {
         ScrollViewReader { scroller in

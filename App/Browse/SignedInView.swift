@@ -2,12 +2,13 @@ import AnemoneCore
 import AnemoneJellyfin
 import SwiftUI
 
-/// The signed-in app: a sidebar with Home, Search, the user's libraries and Settings, in place
-/// of Wholphin's navigation drawer.
+/// The signed-in app: a sidebar with Home, Search, Favorites, the user's libraries and Settings,
+/// in place of Wholphin's navigation drawer, which also puts Favorites before the libraries.
 struct SignedInView: View {
     enum Destination: Hashable {
         case home
         case search
+        case favorites
         case library(Library.ID)
         case moreLibraries
         case settings
@@ -33,6 +34,11 @@ struct SignedInView: View {
             }
             Tab("Search", systemImage: "magnifyingglass", value: Destination.search, role: .search) {
                 PlaceholderPage(title: "Search", message: "Search arrives later in Phase 2.")
+            }
+            if FavoritesPage.isAvailable {
+                Tab("Favorites", systemImage: "heart", value: Destination.favorites) {
+                    FavoritesPage()
+                }
             }
             // Hidden until the libraries load, so the sidebar never shows an empty heading.
             if !browse.libraries.isEmpty {
@@ -61,50 +67,8 @@ struct SignedInView: View {
     }
 }
 
-/// Switching and locking profiles, and signing out.
-private struct SettingsView: View {
-    let server: SavedServer
-    let user: SavedUser
-
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 32) {
-                Text("Settings")
-                    .font(.largeTitle.bold())
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Signed in as \(user.name)")
-                        .font(.title3)
-                        .accessibilityIdentifier("settings.signedInAs")
-                    Text("\(server.name) · Jellyfin \(server.version)")
-                        .foregroundStyle(.secondary)
-                }
-                VStack(alignment: .leading, spacing: 20) {
-                    Button("Switch user") {
-                        model.switchUser()
-                    }
-                    NavigationLink("Profile lock") {
-                        ProfileLockView(user: user)
-                    }
-                    NavigationLink("Sidebar") {
-                        SidebarSettingsView()
-                    }
-                    Button("Sign out") {
-                        model.signOut()
-                    }
-                    .accessibilityIdentifier("settings.signOut")
-                }
-                .padding(.top, 20)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .padding(80)
-        }
-    }
-}
-
 /// A tab whose real screen comes in a later phase.
-private struct PlaceholderPage: View {
+struct PlaceholderPage: View {
     let title: String
     let message: String
 
