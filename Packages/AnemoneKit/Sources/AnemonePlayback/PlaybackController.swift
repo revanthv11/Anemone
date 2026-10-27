@@ -31,6 +31,11 @@ public final class PlaybackController: Identifiable {
     /// Whether the player closed. Nothing plays after that, so features can stop what they're
     /// doing when they hear `stopped`, or in `whenStopped(_:)`.
     @ObservationIgnored public private(set) var isStopped = false
+    /// Counts the entries started, from 1 for the first: another entry, or the same one started
+    /// again, gets the next number, while a retry as a transcode or a reload keeps it. Features
+    /// keep what they know of an entry, such as segments already skipped, by it, so a retry is
+    /// told from another entry however earlier entries went.
+    @ObservationIgnored public private(set) var entryNumber = 0
 
     public var hasEnded: Bool {
         if case .ended = state {
@@ -111,7 +116,11 @@ public final class PlaybackController: Identifiable {
         if let intros, let found = try? await intros(queue.current), !isStopped {
             queue.insertBeforeCurrent(found)
         }
+        // Closed while the intros were looked up: nothing more is looked up or loaded, as a task
+        // started now would outlive `stop()`, which cancels what's running when it's called.
+        guard !isStopped else { return }
         loadFollowing()
+        entryNumber += 1
         await load(allowsDirect: true, from: queue.current.startPosition, as: beginLoad())
     }
 
@@ -140,13 +149,15 @@ public final class PlaybackController: Identifiable {
 
     /// Plays another entry from its start position, after ending the current one's session.
     /// With `markingCurrentPlayed`, that session ends at the current entry's end rather than
-    /// where it is, so the server marks it played, as when Up Next moves on during the credits.
+    /// where it is, so the server marks it played, as when moving on from the credits
+    /// (`hasReachedCredits`) with Up Next, Next or the queue row.
     public func play(entryAt index: Int, markingCurrentPlayed: Bool = false) {
         guard !isStopped, queue.entries.indices.contains(index) else { return }
         let position = markingCurrentPlayed ? engine.duration ?? currentPosition : currentPosition
         stopWatching()
         engine.pause()
         queue.currentIndex = index
+        entryNumber += 1
         stream = nil
         reloading.startEntry()
         state = .loading
@@ -157,10 +168,20 @@ public final class PlaybackController: Identifiable {
         }
     }
 
-    /// Plays `queue.next`, passing over intros; does nothing at the end of the queue.
+    /// Plays `queue.next`, passing over intros; does nothing at the end of the queue. From the
+    /// credits, the entry is marked played, as when Up Next moves on from them.
     public func playNext() {
         guard let index = queue.nextIndex else { return }
-        play(entryAt: index)
+        play(entryAt: index, markingCurrentPlayed: hasReachedCredits)
+    }
+
+    /// Whether the entry playing is at or past its credits, where `SegmentSkipping` has them
+    /// start, now. Moving on from there to another entry ends this one as played, however it's
+    /// done, since only the credits are left: Jellyfin marks an entry played past 90% by
+    /// default, which credits often start before.
+    public var hasReachedCredits: Bool {
+        guard !queue.current.isIntro, let start = feature(SegmentSkipping.self)?.creditsStart else { return false }
+        return currentPosition >= start
     }
 
     /// Closes the player, as at the end of the queue; for features such as pass-out protection.

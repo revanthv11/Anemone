@@ -249,6 +249,8 @@ extension UpNextHarness {
         passOutCount: Int = 0,
         testCreditsStart: Duration? = nil,
         others: [any PlaybackFeature] = [],
+        positionInterval: Duration = .milliseconds(10),
+        streams: FakeStreams = FakeStreams(),
     ) throws -> (PlaybackController, UpNext) {
         var queue = try #require(PlaybackQueue(entries: ids.map { .item($0) }))
         queue.skippedCount = skipped
@@ -268,8 +270,8 @@ extension UpNextHarness {
             request: PlaybackRequest(queue: queue),
             engine: engine,
             features: others + [log, upNext],
-            positionInterval: .milliseconds(10),
-            loadStream: FakeStreams().load,
+            positionInterval: positionInterval,
+            loadStream: streams.load,
         )
         return (playback, upNext)
     }
