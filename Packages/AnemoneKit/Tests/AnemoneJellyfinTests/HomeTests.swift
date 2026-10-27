@@ -292,6 +292,33 @@ struct HomeRowKindTests {
         #expect(sent.query["years"] == "1999,2000")
     }
 
+    @Test func `a get items row reads premiere dates as Wholphin writes them`() async throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        let mayDay = try #require(calendar.date(from: DateComponents(year: 2024, month: 5, day: 1)))
+        let server = HomeServer("home-getitems-dates.test") { path, _ in
+            switch path {
+            case "/UserViews": .json(HomeFixtures.views)
+            case "/Items": .homeItems(HomeFixtures.movie())
+            default: nil
+            }
+        }
+        var filter = HomeGetItemsFilter()
+        // kotlinx's LocalDateTime leaves out zero seconds.
+        filter.minPremiereDate = "2024-05-01T00:00"
+        filter.maxPremiereDate = "2024-05-31T23:59:59.5"
+
+        _ = try await server.session().home(rows: [HomeRowConfig(.getItems(name: "May", filter: filter))])
+
+        #expect(HomeGetItemsFilter.date("2024-05-01T00:00") == mayDay)
+        #expect(HomeGetItemsFilter.date("2024-05-01T00:00:00") == mayDay)
+        #expect(HomeGetItemsFilter.date("2024-05-01T00:00:00Z") == Date(timeIntervalSince1970: 1_714_521_600))
+        #expect(HomeGetItemsFilter.date("May 1") == nil)
+        let sent = try #require(server.requests(to: "/Items").first)
+        #expect(sent.query["minPremiereDate"] != nil)
+        #expect(sent.query["maxPremiereDate"] != nil)
+    }
+
     @Test func `a custom endpoint gets the user, query and headers, and must be on the server`() async throws {
         let server = HomeServer("home-custom.test") { path, _ in
             switch path {
