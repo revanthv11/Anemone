@@ -40,6 +40,8 @@ struct DeleteButton: View {
         defer { isDeleting = false }
         do {
             try await browse.session.deleteItem(id: item.id)
+            // So the pages behind this one, Home and the rest, drop it before Back shows them.
+            browse.noteDeleted(item.id)
             if let deleted {
                 deleted()
             } else {

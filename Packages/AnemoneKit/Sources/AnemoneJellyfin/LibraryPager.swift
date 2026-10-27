@@ -37,7 +37,11 @@ public final class LibraryPager {
     /// Loads the first page and the total count. Call once, before showing the grid.
     public func start() async throws {
         let first = try await loader(0, pageSize, true)
-        items.start(first.items, counted: first.totalCount ?? first.items.count)
+        items.start(
+            first.items,
+            counted: first.totalCount ?? first.items.count,
+            keepsRemovedPlaces: first.keepsDeletedPlaces,
+        )
         count = items.count
     }
 
@@ -65,6 +69,14 @@ public final class LibraryPager {
         return item(at: index)
     }
 
+    /// Takes items deleted from the app out of the grid, which closes up around them without
+    /// loading again: the pages still to come are asked for from where the loader's list now has
+    /// them (`LibraryPage.keepsDeletedPlaces`). Episodes of a deleted series go with it.
+    public func remove(_ deleted: Set<MediaItem.ID>) {
+        guard items.remove(where: { $0.item.wasDeleted(in: deleted) }) > 0 else { return }
+        count = items.count
+    }
+
     /// Fetches a page unless it's loaded or on its way. Callers wait without owning the request,
     /// so a card scrolling away doesn't cancel a page other cards need.
     @discardableResult
@@ -73,8 +85,9 @@ public final class LibraryPager {
             return loaded
         }
         guard items.hasPage(page) else { return [] }
+        let startIndex = items.startIndex(ofPage: page)
         let task = loads[page] ?? Task { [loader, pageSize] in
-            try await loader(page * pageSize, pageSize, false).items
+            try await loader(startIndex, pageSize, false).items
         }
         loads[page] = task
         do {

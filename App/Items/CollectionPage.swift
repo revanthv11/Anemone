@@ -90,6 +90,10 @@ struct CollectionPage: View {
         .pageTask(id: display?.query) {
             await loadItems()
         }
+        // Gone at once after Back from a deleted item, before the reload above lands.
+        .onItemsDeleted { deleted in
+            items?.removeAll { $0.item.wasDeleted(in: deleted) }
+        }
     }
 
     private func loadItems() async {

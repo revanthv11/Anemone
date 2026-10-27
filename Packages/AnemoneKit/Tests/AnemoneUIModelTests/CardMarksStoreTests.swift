@@ -107,4 +107,18 @@ struct CardMarksStoreTests {
         let caughtUp = CardMarks(badges: CardBadges(isPlayed: true, unplayedCount: 0))
         #expect(store.savedMarks(for: "s1", given: caughtUp) == nil)
     }
+
+    @Test func `a page catching up hears only of the deletions since it last heard`() {
+        let store = CardMarksStore()
+        #expect(store.deletions(since: 0).isEmpty)
+
+        store.recordDeletion(of: "m1")
+        store.recordDeletion(of: "m2")
+
+        #expect(store.deletedIDs == ["m1", "m2"])
+        // A page covered by both deletions hears of both at once when it next updates.
+        #expect(store.deletions(since: 0) == ["m1", "m2"])
+        #expect(store.deletions(since: 1) == ["m2"])
+        #expect(store.deletions(since: 2).isEmpty)
+    }
 }

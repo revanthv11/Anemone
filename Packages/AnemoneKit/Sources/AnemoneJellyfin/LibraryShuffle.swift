@@ -78,7 +78,12 @@ public extension JellyfinSession {
         }
         return { startIndex, limit, includeTotalCount in
             let page = try await shuffled.page(startIndex: startIndex, limit: limit)
-            return LibraryPage(items: page.items, totalCount: includeTotalCount ? page.count : nil)
+            // The order keeps a deleted title's ID; its page leaves the title out, by ID.
+            return LibraryPage(
+                items: page.items,
+                totalCount: includeTotalCount ? page.count : nil,
+                keepsDeletedPlaces: true,
+            )
         }
     }
 

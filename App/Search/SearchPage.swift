@@ -85,6 +85,8 @@ struct SearchPage: View {
         .pageTask(id: run) {
             await perform(run)
         }
+        // Gone at once after Back from a deleted result, before the search above runs again.
+        .onItemsDeleted { search.results.remove($0) }
         .onChange(of: focus) { old, new in
             holdFocus(from: old, to: new)
             // Noted as focus leaves a row rather than on every move along it, which would redraw
