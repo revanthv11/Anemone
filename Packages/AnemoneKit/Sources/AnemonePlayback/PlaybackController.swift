@@ -40,30 +40,33 @@ public final class PlaybackController: Identifiable {
         }
     }
 
-    @ObservationIgnored private let features: [any PlaybackFeature]
-    @ObservationIgnored private let loadStream: StreamLoader
-    /// Finds the rest of the queue once the first entry is loading; see `PlaybackRequest`.
-    @ObservationIgnored private var following: PlaybackRequest.Following?
-    @ObservationIgnored private var followingLoad: Task<Void, Never>?
-    /// Finds what plays before the first entry; see `PlaybackRequest`.
-    @ObservationIgnored private var intros: PlaybackRequest.Intros?
+    // Loading streams and following the engine, in `PlaybackController+Loading.swift` and
+    // `PlaybackController+Engine.swift`, share these.
+    @ObservationIgnored let features: [any PlaybackFeature]
+    @ObservationIgnored let loadStream: StreamLoader
     /// How often features hear where playback is.
-    @ObservationIgnored private let positionInterval: Duration
+    @ObservationIgnored let positionInterval: Duration
     /// What's loaded in the engine.
     @ObservationIgnored var stream: PlaybackStream?
     /// What `reload()` keeps for the current entry, in `Tracks/Reloading.swift`.
     @ObservationIgnored var reloading = Reloading()
     /// Whether the loaded stream's play session is open, so features hear `stopped` once.
-    @ObservationIgnored private var isSessionOpen = false
-    /// The last session's `stopped`, which a later stop waits for.
-    @ObservationIgnored private var sessionEnding: Task<Void, Never>?
+    @ObservationIgnored var isSessionOpen = false
     /// Counts loads, so a load that a newer one replaced is dropped.
-    @ObservationIgnored private var loads = 0
+    @ObservationIgnored var loads = 0
     /// Tasks following the loaded stream, cancelled when it's replaced or playback stops.
-    @ObservationIgnored private var watchers: [Task<Void, Never>] = []
+    @ObservationIgnored var watchers: [Task<Void, Never>] = []
     @ObservationIgnored var status = PlayerStatus.paused
     @ObservationIgnored var isUnderWay = false
-    @ObservationIgnored private var wasPaused = false
+    @ObservationIgnored var wasPaused = false
+
+    /// Finds the rest of the queue once the first entry is loading; see `PlaybackRequest`.
+    @ObservationIgnored private var following: PlaybackRequest.Following?
+    @ObservationIgnored private var followingLoad: Task<Void, Never>?
+    /// Finds what plays before the first entry; see `PlaybackRequest`.
+    @ObservationIgnored private var intros: PlaybackRequest.Intros?
+    /// The last session's `stopped`, which a later stop waits for.
+    @ObservationIgnored private var sessionEnding: Task<Void, Never>?
     @ObservationIgnored private var hasStarted = false
     /// What features asked to do once the player closes; see `whenStopped(_:)`.
     @ObservationIgnored private var stopActions: [@MainActor () -> Void] = []
@@ -187,109 +190,6 @@ public final class PlaybackController: Identifiable {
         }
     }
 
-    func beginLoad() -> Int {
-        reloading.isAsking = true
-        loads += 1
-        return loads
-    }
-
-    func load(allowsDirect: Bool, from position: Duration?, as attempt: Int) async {
-        guard !isStopped else { return }
-        let entry = queue.current
-        // A new entry may need the other engine, as with "Prefer MPV"; a retry keeps it.
-        if stream == nil, let engine = engine as? any PerEntryEngine {
-            await engine.prepare(for: entry)
-            guard !isStopped, attempt == loads else { return }
-        }
-        reloading.asks(allowsDirect: allowsDirect)
-        var request = StreamRequest(itemID: entry.itemID, allowsDirect: allowsDirect, profile: engine.deviceProfile)
-        // The version a retry or a reload keeps.
-        request.mediaSourceID = stream?.mediaSourceID
-        for feature in features {
-            await feature.prepare(&request)
-        }
-        guard !isStopped, attempt == loads else { return }
-        do {
-            let stream = try await loadStream(request)
-            guard !isStopped, attempt == loads, !reloading.asksAgain else {
-                // Features never hear of a stream nothing plays, so a live stream it opened is closed here.
-                await feature(LiveStreamClosing.self)?.discard(stream)
-                // A reload that came meanwhile asks again.
-                guard !isStopped, attempt == loads else { return }
-                return await load(allowsDirect: allowsDirect, from: position, as: attempt)
-            }
-            await play(stream, entry, from: position)
-        } catch {
-            guard !isStopped, attempt == loads else { return }
-            reloading.isAsking = false
-            // An intro the server won't offer is passed over (Phase 5c).
-            if let afterIntro = queue.afterIntroIndex {
-                return play(entryAt: afterIntro)
-            }
-            state = .failed(error)
-            await publish(.failed(error))
-        }
-    }
-
-    private func play(_ stream: PlaybackStream, _ entry: PlaybackQueue.Entry, from position: Duration?) async {
-        self.stream = stream
-        status = .paused
-        isUnderWay = false
-        wasPaused = false
-        reloading.answered(startingAt: position ?? .zero)
-        let events = engine.load(stream.url, from: position, metadata: entry.metadata)
-        isSessionOpen = true
-        await publish(reloading.hasReloaded ? .reloaded(stream) : .loaded(stream, entry))
-        follow(events)
-    }
-
-    /// Wholphin's `onPlayerError`: a file that won't direct play or direct stream gets another
-    /// try as a transcode, from where it stopped. A transcode that fails is an error.
-    private func failed(_ error: any Error) async {
-        guard !isStopped, let stream else { return }
-        stopWatching()
-        let attempt = loads
-        await publish(.failed(error))
-        // Unless a feature moved on meanwhile.
-        guard !isStopped, attempt == loads else { return }
-        guard stream.method != .transcode else {
-            if let afterIntro = queue.afterIntroIndex {
-                play(entryAt: afterIntro)
-            } else {
-                state = .failed(error)
-            }
-            return
-        }
-        let position = currentPosition
-        // Nothing plays until the transcode is ready and at the position, as when an entry loads.
-        engine.pause()
-        state = .loading
-        let retry = beginLoad()
-        // The failed session ends before the transcode's starts.
-        await endSession(at: position)
-        await load(allowsDirect: false, from: position > .zero ? position : queue.current.startPosition, as: retry)
-    }
-
-    private func finished() async {
-        guard !isStopped else { return }
-        // An intro plays straight into what follows, as in Wholphin: features don't hear it end,
-        // so Up Next doesn't offer what's next.
-        if let afterIntro = queue.afterIntroIndex {
-            return play(entryAt: afterIntro)
-        }
-        stopWatching()
-        let attempt = loads
-        await publish(.ended)
-        // A feature played another entry, as Up Next does.
-        guard !isStopped, attempt == loads else { return }
-        if closesAtEnd {
-            state = .ended
-        }
-        if let duration = engine.duration {
-            await endSession(at: duration)
-        }
-    }
-
     /// Ends the loaded stream's play session, if it's open, and waits until features have heard.
     /// Runs on its own, so a stop report isn't cancelled with whatever asked for it.
     func endSession(at position: Duration) async {
@@ -304,7 +204,7 @@ public final class PlaybackController: Identifiable {
         await sessionEnding?.value
     }
 
-    private func publish(_ event: PlaybackEvent) async {
+    func publish(_ event: PlaybackEvent) async {
         for feature in features {
             await feature.handle(event, in: self)
         }
@@ -314,85 +214,7 @@ public final class PlaybackController: Identifiable {
         reloading.pendingStart ?? engine.currentTime
     }
 
-    private var progress: PlaybackProgress {
+    var progress: PlaybackProgress {
         PlaybackProgress(position: currentPosition, isPaused: status == .paused)
-    }
-
-    func stopWatching() {
-        watchers.forEach { $0.cancel() }
-        watchers = []
-    }
-}
-
-/// Following the engine.
-private extension PlaybackController {
-    func follow(_ events: AsyncStream<PlayerEvent>) {
-        stopWatching()
-        watchers = [
-            Task { [weak self] in
-                for await event in events {
-                    // Cancelled, it still gets what the replaced stream buffered, such as its pause.
-                    guard let self, !Task.isCancelled else { return }
-                    switch event {
-                    case .ready:
-                        ready()
-                        // An engine already playing when the stream loaded doesn't report it again.
-                        if status == .playing {
-                            await changed(to: .playing)
-                        }
-                    case let .status(status):
-                        await changed(to: status)
-                    case .ended:
-                        // On their own, so the watchers they stop don't cancel what features do.
-                        Task { await finished() }
-                        return
-                    case let .failed(error):
-                        Task { await failed(error) }
-                        return
-                    }
-                }
-            },
-        ]
-    }
-
-    func ready() {
-        reloading.pendingStart = nil
-        guard !isStopped else { return }
-        state = .playing
-        guard !reloading.staysPaused else { return }
-        engine.play()
-    }
-
-    /// Like Wholphin: playback counts as started once it's under way, and after that, pausing
-    /// and resuming are worth telling features about. Not before the stream is ready: until then
-    /// it may still be on its way to the start position.
-    func changed(to status: PlayerStatus) async {
-        self.status = status
-        guard isUnderWay else {
-            guard status == .playing, case .playing = state else { return }
-            isUnderWay = true
-            reloading.staysPaused = false
-            await publish(.started(progress))
-            // Unless the stream was replaced meanwhile.
-            guard !Task.isCancelled else { return }
-            watchers.append(Task { [weak self] in
-                await self?.tellPosition()
-            })
-            return
-        }
-        guard status != .waiting else { return }
-        let isPaused = status == .paused
-        if isPaused != wasPaused {
-            wasPaused = isPaused
-            await publish(isPaused ? .paused(progress) : .resumed(progress))
-        }
-    }
-
-    func tellPosition() async {
-        while !Task.isCancelled {
-            try? await Task.sleep(for: positionInterval)
-            guard !Task.isCancelled else { return }
-            await publish(.position(progress))
-        }
     }
 }
