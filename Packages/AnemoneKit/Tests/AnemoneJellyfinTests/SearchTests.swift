@@ -78,6 +78,17 @@ struct SearchTests {
         #expect(results.map(\.id) == ["s1", "m1", "e1"])
     }
 
+    @Test func `combined results with no kinds ask for nothing`() async throws {
+        let sent = register(host: "search-no-kinds.test", path: "/Items", reply: .items(
+            #"{"Id":"m1","Name":"Night","Type":"Movie"}"#,
+        ))
+
+        let results = try await session(host: "search-no-kinds.test").search("night", forAll: [])
+
+        #expect(sent.request == nil)
+        #expect(results.isEmpty)
+    }
+
     @Test func `suggestions for a kind are the items with the newest content`() async throws {
         let sent = register(host: "search-latest.test", path: "/Items", reply: .items(
             #"{"Id":"c1","Name":"Box","Type":"BoxSet","ChildCount":3}"#,
@@ -134,6 +145,16 @@ struct SearchTests {
         #expect(SearchRelevance.score(name: "King Lear", kind: .movie, query: "/LEAR/") == 401)
         #expect(SearchRelevance.score(name: "King Lear", kind: .movie, query: "/LEAR/i") == 251)
         #expect(SearchRelevance.score(name: "King Lear", kind: .movie, query: "/[/") == 401)
+    }
+
+    @Test func `sorts by a regular expression`() {
+        let items = ["Queen Lear", "King Lear", "Lear King"].enumerated().map { index, name in
+            ItemDetails(item: MediaItem(id: "m\(index)", name: name, kind: .movie))
+        }
+
+        #expect(SearchRelevance.sorted(items, for: "/^k/").map(\.item.name) == ["King Lear", "Queen Lear", "Lear King"])
+        // A pattern that doesn't compile matches nothing, so the server's order stays.
+        #expect(SearchRelevance.sorted(items, for: "/[/").map(\.item.name) == ["Queen Lear", "King Lear", "Lear King"])
     }
 
     // MARK: Kinds

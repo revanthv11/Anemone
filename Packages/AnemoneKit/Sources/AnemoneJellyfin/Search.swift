@@ -108,9 +108,11 @@ public extension JellyfinSession {
     }
 
     /// Wholphin's combined results: one query for all the kinds at once, most relevant first.
+    /// No kinds finds nothing, without asking: an item query without types would match every type.
     func search(_ term: String, forAll kinds: [SearchKind], limit: Int = SearchKind.resultLimit) async throws
         -> [ItemDetails]
     {
+        guard !kinds.isEmpty else { return [] }
         let parameters = searchParameters(term, kinds: kinds, limit: limit)
         let items = try await send(Paths.getItems(parameters: parameters)).items ?? []
         return SearchRelevance.sorted(items.compactMap(ItemDetails.init), for: term)
@@ -159,12 +161,47 @@ public extension JellyfinSession {
 /// expression. Within each band, series come first, then movies, collections and episodes.
 public enum SearchRelevance {
     public static func score(name: String?, kind: MediaItem.Kind, query: String) -> Int {
-        guard let name = name?.lowercased() else { return Int.max }
-        if let (pattern, ignoresCase) = regex(in: query) {
-            return regexScore(name, pattern: pattern, ignoresCase: ignoresCase) + typeBonus(kind)
+        Matcher(query).score(name: name, kind: kind)
+    }
+
+    /// `items` best match first; equal scores keep the server's order. The query is prepared
+    /// once for all of them, so a regular expression is compiled once, not for every item.
+    public static func sorted(_ items: [ItemDetails], for query: String) -> [ItemDetails] {
+        let matcher = Matcher(query)
+        return items.enumerated()
+            .map { (score: matcher.score(name: $0.element.item.name, kind: $0.element.item.kind), $0) }
+            .sorted { ($0.score, $0.1.offset) < ($1.score, $1.1.offset) }
+            .map(\.1.element)
+    }
+
+    /// A query ready to score names with: lowercased text, or a compiled regular expression.
+    private enum Matcher {
+        case text(String)
+        /// `nil` when the pattern doesn't compile, which matches nothing.
+        case regex(Regex<AnyRegexOutput>?)
+
+        init(_ query: String) {
+            if let (pattern, ignoresCase) = SearchRelevance.regex(in: query) {
+                self = .regex((try? Regex(pattern))?.ignoresCase(ignoresCase))
+            } else {
+                self = .text(query.lowercased())
+            }
         }
-        let query = query.lowercased()
-        let band = if name == query {
+
+        func score(name: String?, kind: MediaItem.Kind) -> Int {
+            guard let name = name?.lowercased() else { return Int.max }
+            let band = switch self {
+            case let .text(query):
+                SearchRelevance.band(name, query: query)
+            case let .regex(regex):
+                (try? regex?.firstMatch(in: name)) != nil ? 250 : 400
+            }
+            return band + typeBonus(kind)
+        }
+    }
+
+    private static func band(_ name: String, query: String) -> Int {
+        if name == query {
             0
         } else if name.hasPrefix(query) {
             100
@@ -175,15 +212,6 @@ public enum SearchRelevance {
         } else {
             fuzzyScore(name, query)
         }
-        return band + typeBonus(kind)
-    }
-
-    /// `items` best match first; equal scores keep the server's order.
-    public static func sorted(_ items: [ItemDetails], for query: String) -> [ItemDetails] {
-        items.enumerated()
-            .map { (score: score(name: $0.element.item.name, kind: $0.element.item.kind, query: query), $0) }
-            .sorted { ($0.score, $0.1.offset) < ($1.score, $1.1.offset) }
-            .map(\.1.element)
     }
 
     /// The pattern of a `/pattern/` or `/pattern/i` query.
@@ -196,11 +224,6 @@ public enum SearchRelevance {
             return (String(query.dropFirst().dropLast()), false)
         }
         return nil
-    }
-
-    private static func regexScore(_ name: String, pattern: String, ignoresCase: Bool) -> Int {
-        guard let regex = try? Regex(pattern) else { return 400 }
-        return (try? regex.ignoresCase(ignoresCase).firstMatch(in: name)) != nil ? 250 : 400
     }
 
     private static func fuzzyScore(_ name: String, _ query: String) -> Int {
