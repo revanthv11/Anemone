@@ -14,31 +14,27 @@ struct AutoplaySettingsPage: View {
     var body: some View {
         List {
             Section {
-                Picker("Show Up Next", selection: $timing) {
-                    Text("At the end").tag(UpNextTiming.endOfPlayback)
-                    Text("During the credits").tag(UpNextTiming.duringCredits)
-                }
-                .accessibilityIdentifier("autoplay.timing")
+                ChoiceRow(title: "Show Up Next", selection: $timing, choices: UpNextTiming.allCases, name: \.title)
+                    .accessibilityIdentifier("autoplay.timing")
             } footer: {
                 Text("During the credits needs the server to know where they start; otherwise it shows at the end.")
             }
             Section {
                 Toggle("Autoplay next", isOn: $autoPlayNext)
                     .accessibilityIdentifier("autoplay.enabled")
-                Picker("Countdown", selection: $countdown) {
-                    ForEach(Self.countdowns, id: \.self) { seconds in
-                        Text(seconds == 0 ? "Immediate" : "\(seconds) seconds").tag(seconds)
-                    }
+                ChoiceRow(title: "Countdown", selection: $countdown, choices: Self.countdowns) { seconds in
+                    seconds == 0 ? "Immediate" : "\(seconds) seconds"
                 }
                 .disabled(!autoPlayNext)
                 .accessibilityIdentifier("autoplay.countdown")
             }
             Section {
-                Picker("Ask \"Still watching?\"", selection: $passOutCount) {
-                    ForEach(Self.passOutCounts, id: \.self) { count in
-                        Text(Self.passOutText(count)).tag(count)
-                    }
-                }
+                ChoiceRow(
+                    title: "Ask \"Still watching?\"",
+                    selection: $passOutCount,
+                    choices: Self.passOutCounts,
+                    name: Self.passOutText,
+                )
                 .disabled(!autoPlayNext)
                 .accessibilityIdentifier("autoplay.stillWatching")
             } footer: {
@@ -58,6 +54,60 @@ struct AutoplaySettingsPage: View {
         case 0: "Never"
         case 1: "After 1 autoplay"
         default: "After \(count) autoplays"
+        }
+    }
+}
+
+/// A setting with its current choice, opening a page of the choices, like the rows in Skip
+/// Segments. A `Picker` in a list is segmented on tvOS, which hides its title.
+private struct ChoiceRow<Value: Hashable>: View {
+    let title: String
+    @Binding var selection: Value
+    let choices: [Value]
+    let name: (Value) -> String
+
+    var body: some View {
+        NavigationLink {
+            Choices(title: title, selection: $selection, choices: choices, name: name)
+        } label: {
+            LabeledContent(title, value: name(selection))
+        }
+    }
+}
+
+/// Choosing goes back to the list.
+private struct Choices<Value: Hashable>: View {
+    let title: String
+    @Binding var selection: Value
+    let choices: [Value]
+    let name: (Value) -> String
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        List(choices, id: \.self) { choice in
+            Button {
+                selection = choice
+                dismiss()
+            } label: {
+                HStack {
+                    Text(name(choice))
+                    Spacer()
+                    if choice == selection {
+                        Image(systemName: "checkmark")
+                    }
+                }
+            }
+        }
+        .navigationTitle(title)
+    }
+}
+
+private extension UpNextTiming {
+    var title: String {
+        switch self {
+        case .endOfPlayback: "At the end"
+        case .duringCredits: "During the credits"
         }
     }
 }
