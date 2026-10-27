@@ -30,7 +30,7 @@ public final class PlaybackController: Identifiable {
     public var closesAtEnd = true
     public let engine: any PlayerEngine
     /// Whether the player closed. Nothing plays after that, so features can stop what they're
-    /// doing when they hear `stopped`.
+    /// doing when they hear `stopped`, or in `whenStopped(_:)`.
     @ObservationIgnored public private(set) var isStopped = false
 
     public var hasEnded: Bool {
@@ -62,6 +62,8 @@ public final class PlaybackController: Identifiable {
     @ObservationIgnored private var isUnderWay = false
     @ObservationIgnored private var wasPaused = false
     @ObservationIgnored private var hasStarted = false
+    /// What features asked to do once the player closes; see `whenStopped(_:)`.
+    @ObservationIgnored private var stopActions: [@MainActor () -> Void] = []
 
     /// A player for `request` on `session`'s server, with the features every player gets.
     public convenience init(session: JellyfinSession, request: PlaybackRequest) {
@@ -132,12 +134,25 @@ public final class PlaybackController: Identifiable {
         stopWatching()
         engine.stop()
         await endSession(at: position)
+        let actions = stopActions
+        stopActions = []
+        actions.forEach { $0() }
+    }
+
+    /// Has `action` run once the player closes, after features have heard the last `stopped`; at
+    /// once if it has closed. For a feature still busy after its entry's session ended, such as
+    /// Up Next counting down over the last frame: no `stopped` comes when the player closes then.
+    public func whenStopped(_ action: @escaping @MainActor () -> Void) {
+        guard !isStopped else { return action() }
+        stopActions.append(action)
     }
 
     /// Plays another entry from its start position, after ending the current one's session.
-    public func play(entryAt index: Int) {
+    /// With `markingCurrentPlayed`, that session ends at the current entry's end rather than
+    /// where it is, so the server marks it played, as when Up Next moves on during the credits.
+    public func play(entryAt index: Int, markingCurrentPlayed: Bool = false) {
         guard !isStopped, queue.entries.indices.contains(index) else { return }
-        let position = currentPosition
+        let position = markingCurrentPlayed ? engine.duration ?? currentPosition : currentPosition
         stopWatching()
         engine.pause()
         queue.currentIndex = index

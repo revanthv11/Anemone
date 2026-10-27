@@ -6,19 +6,29 @@ import JellyfinAPI
 public struct PlayableItems: Hashable, Sendable {
     public var items: [ItemDetails]
     public var skippedCount: Int
+    /// How many more items there were than a queue holds (`JellyfinSession.queueLimit`), left out
+    /// at the end.
+    public var overLimitCount: Int
 
-    public init(items: [ItemDetails], skippedCount: Int = 0) {
+    public init(items: [ItemDetails], skippedCount: Int = 0, overLimitCount: Int = 0) {
         self.items = items
         self.skippedCount = skippedCount
+        self.overLimitCount = overLimitCount
     }
 
     /// The kinds the video player plays.
     public static let videoKinds: Set<MediaItem.Kind> = [.movie, .episode, .video, .musicVideo]
 
-    init(_ dtos: [BaseItemDto]?) {
-        let items = (dtos ?? []).filter(\.isAvailable).compactMap(ItemDetails.init)
+    /// - Parameter total: how many items the server has for the query, when it asked for fewer.
+    init(_ dtos: [BaseItemDto]?, total: Int? = nil) {
+        let found = dtos ?? []
+        let items = found.filter(\.isAvailable).compactMap(ItemDetails.init)
         let videos = items.filter { Self.videoKinds.contains($0.item.kind) }
-        self.init(items: videos, skippedCount: items.count - videos.count)
+        self.init(
+            items: videos,
+            skippedCount: items.count - videos.count,
+            overLimitCount: max(0, (total ?? found.count) - found.count),
+        )
     }
 }
 
@@ -32,7 +42,9 @@ public extension JellyfinSession {
     /// Series Play, like Wholphin's: the episode next up (the one to resume, or the one after the
     /// last watched), or the first episode when there's none, then the episodes after it in
     /// order across seasons, without the specials. Jellyfin's next up can be a special the server
-    /// places between seasons; Play starts at the regular episode after it instead.
+    /// places between seasons; Play starts at the regular episode after it instead. A special
+    /// next up after the last season plays, with any specials after it, as in Wholphin, rather
+    /// than the series starting over.
     func seriesQueue(seriesID: MediaItem.ID) async throws -> [ItemDetails] {
         let parameters = Paths.GetNextUpParameters(
             userID: userID,
@@ -42,9 +54,13 @@ public extension JellyfinSession {
             enableUserData: true,
         )
         if let nextUp = try await send(Paths.getNextUp(parameters: parameters)).items?.first?.id {
-            let episodes = try await orderedEpisodes(ofSeries: seriesID, from: nextUp).filter { !$0.isSpecial }
-            if !episodes.isEmpty {
-                return episodes
+            let fromNextUp = try await orderedEpisodes(ofSeries: seriesID, from: nextUp)
+            let regular = fromNextUp.filter { !$0.isSpecial }
+            if !regular.isEmpty {
+                return regular
+            }
+            if !fromNextUp.isEmpty {
+                return fromNextUp
             }
         }
         return try await episodes(ofSeries: seriesID, from: nil)
@@ -91,7 +107,11 @@ public extension JellyfinSession {
 
     /// Play or Shuffle for a collection: everything in it that plays, with the episodes of any
     /// series in it, like Wholphin. In the order and with the filters its page shows, as
-    /// Wholphin's Play takes them, or at random.
+    /// Wholphin's Play takes them, or at random. Up to `queueLimit` items, as in Wholphin, which
+    /// leaves out the rest without a word; this counts them, so the player can say so.
+    ///
+    /// In the collection's own order, the page's order is followed item by item: asked for
+    /// everything in the collection at once, as Wholphin asks, the server sorts by name instead.
     func collectionQueue(
         id: MediaItem.ID,
         shuffled: Bool,
@@ -100,11 +120,12 @@ public extension JellyfinSession {
     ) async throws -> PlayableItems {
         let collection = Library(id: id, name: "", kind: .collections)
         var parameters = LibraryQuery(library: collection, sort: sort, filter: filter).itemsParameters(userID: userID)
+        let followsPage = !shuffled && sort.field == .default
         if shuffled {
             parameters.sortBy = [.random]
             parameters.sortOrder = nil
-        } else if sort.field == .default {
-            // The collection's own order, as its page asks for it.
+        } else if followsPage {
+            // Keeps each series' episodes in order.
             parameters.sortBy = [.default]
             parameters.sortOrder = [sort.direction == .ascending ? .ascending : .descending]
         }
@@ -112,10 +133,18 @@ public extension JellyfinSession {
         parameters.isRecursive = true
         parameters.filters = [.isNotFolder]
         parameters.excludeLocationTypes = [.virtual]
-        parameters.limit = Self.queueLimit
+        // All of them when they're put in the page's order, which picks the first 100.
+        parameters.limit = followsPage ? nil : Self.queueLimit
+        parameters.enableTotalRecordCount = true
         parameters.fields = Self.queueFields
         parameters.enableUserData = true
-        return try await PlayableItems(send(Paths.getItems(parameters: parameters)).items)
+        let found = try await send(Paths.getItems(parameters: parameters))
+        guard followsPage, let items = found.items else {
+            return PlayableItems(found.items, total: found.totalRecordCount)
+        }
+        let shown = try await collectionItems(id: id, sort: sort, filter: filter).map(\.id)
+        let ordered = Self.ordered(items, like: shown)
+        return PlayableItems(Array(ordered.prefix(Self.queueLimit)), total: ordered.count)
     }
 
     /// Play for a playlist: its entries in the playlist's order, from `/Playlists/{id}/Items`. All
@@ -131,6 +160,22 @@ public extension JellyfinSession {
 
     /// The player shows the overview in its info panel.
     private static let queueFields: [ItemFields] = [.overview]
+
+    /// `items` in the order of `shown`, a collection's items as its page lists them: each where
+    /// it, or the series, season or folder it's in, is listed; anything else after them. Ties
+    /// keep the server's order.
+    private static func ordered(_ items: [BaseItemDto], like shown: [MediaItem.ID]) -> [BaseItemDto] {
+        let places = Dictionary(shown.enumerated().map { ($1, $0) }) { first, _ in first }
+        func place(of item: BaseItemDto) -> Int {
+            [item.id, item.seriesID, item.seasonID, item.parentID]
+                .lazy
+                .compactMap { $0.flatMap { places[$0] } }
+                .first ?? places.count
+        }
+        return items.enumerated()
+            .sorted { (place(of: $0.element), $0.offset) < (place(of: $1.element), $1.offset) }
+            .map(\.element)
+    }
 
     /// The series' episodes from `episodeID` on, specials included where the server puts them.
     private func orderedEpisodes(ofSeries seriesID: MediaItem.ID, from episodeID: MediaItem.ID?) async throws

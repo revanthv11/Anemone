@@ -85,25 +85,21 @@ struct QueuesTests {
         #expect(queue.map(\.id) == ["e4", "e5"])
     }
 
-    @Test func `a special next up at the very end starts the series again`() async throws {
-        let special = Self.items([Self.episode("sp1", season: 0, number: 1)])
-        let all = Self.items([
-            Self.episode("e1", season: 1, number: 1),
-            Self.episode("e2", season: 1, number: 2),
-            Self.episode("sp1", season: 0, number: 1),
+    @Test func `a special next up after the last season plays from there, as in Wholphin`() async throws {
+        let sent = register(host: "queue-last.test", replies: [
+            "/Shows/NextUp": Self.items([Self.episode("sp1", season: 0, number: 1)]),
+            // The server lists the series from the special on: it and the one after it.
+            "/Shows/s1/Episodes": Self.items([
+                Self.episode("sp1", season: 0, number: 1),
+                Self.episode("sp2", season: 0, number: 2),
+            ]),
         ])
-        MockServer.register(host: "queue-last.test") { request in
-            let fromSpecial = request.url?.queryValues["startItemId"] == "sp1"
-            return switch request.url?.path() {
-            case "/Shows/NextUp": .json(special)
-            case "/Shows/s1/Episodes": .json(fromSpecial ? special : all)
-            default: nil
-            }
-        }
 
         let queue = try await session(host: "queue-last.test").seriesQueue(seriesID: "s1")
 
-        #expect(queue.map(\.id) == ["e1", "e2"])
+        // Not the series again from its first episode.
+        #expect(queue.map(\.id) == ["sp1", "sp2"])
+        #expect(sent["/Shows/s1/Episodes"]?.query["startItemId"] == "sp1")
     }
 
     @Test func `a series of specials alone still plays`() async throws {
@@ -168,30 +164,80 @@ struct QueuesTests {
     }
 
     @Test func `a collection plays its videos in its own order and counts the rest`() async throws {
-        let sent = register(host: "queue-collection.test", replies: [
-            "/Items": Self.items([
-                #"{"Id":"m1","Name":"Film","Type":"Movie"}"#,
-                Self.episode("e1", season: 1, number: 1),
-                #"{"Id":"a1","Name":"Song","Type":"Audio"}"#,
-            ]),
+        let contents = Self.items([
+            #"{"Id":"m1","Name":"Film","Type":"Movie"}"#,
+            Self.episode("e1", season: 1, number: 1),
+            #"{"Id":"a1","Name":"Song","Type":"Audio"}"#,
         ])
+        let sent = registerCollection(host: "queue-collection.test", everything: contents, page: contents)
         let session = try session(host: "queue-collection.test")
 
         let found = try await session.collectionQueue(id: "c1", shuffled: false)
 
         #expect(found.items.map(\.id) == ["m1", "e1"])
         #expect(found.skippedCount == 1)
-        let request = try #require(sent["/Items"])
+        #expect(found.overLimitCount == 0)
+        let request = try #require(sent["everything"])
         #expect(request.query["parentId"] == "c1")
-        #expect(request.query["recursive"] == "true")
         #expect(request.query["filters"] == "IsNotFolder")
         #expect(request.query["excludeItemIds"] == "c1")
         #expect(request.query["excludeLocationTypes"] == "Virtual")
         #expect(request.query["sortBy"] == "Default")
-        #expect(request.query["limit"] == "100")
+        #expect(request.query["limit"] == nil)
+        #expect(request.query["enableTotalRecordCount"] == "true")
+        // The page's own request, for its order.
+        #expect(sent["page"]?.query["parentId"] == "c1")
+        #expect(sent["page"]?.query["sortBy"] == "Default")
 
         _ = try await session.collectionQueue(id: "c1", shuffled: true)
-        #expect(sent["/Items"]?.query["sortBy"] == "Random")
+        #expect(sent["everything"]?.query["sortBy"] == "Random")
+        #expect(sent["everything"]?.query["limit"] == "100")
+    }
+
+    @Test func `a collection in its own order plays in the order its page shows`() async throws {
+        // Asked for everything at once, the server sorts by name; the page lists the
+        // collection's own order, with the series where its episodes go.
+        let everything = Self.items([
+            #"{"Id":"m2","Name":"A Film","Type":"Movie"}"#,
+            Self.episode("e1", season: 1, number: 1),
+            Self.episode("e2", season: 1, number: 2),
+            #"{"Id":"m1","Name":"B Film","Type":"Movie"}"#,
+            #"{"Id":"m3","Name":"C Film","Type":"Movie"}"#,
+        ])
+        let page = Self.items([
+            #"{"Id":"m1","Name":"B Film","Type":"Movie"}"#,
+            #"{"Id":"s1","Name":"Show","Type":"Series"}"#,
+            #"{"Id":"m2","Name":"A Film","Type":"Movie"}"#,
+        ])
+        _ = registerCollection(host: "queue-collection-order.test", everything: everything, page: page)
+
+        let found = try await session(host: "queue-collection-order.test").collectionQueue(id: "c1", shuffled: false)
+
+        // m3 isn't on the page (as with a filter that treats it differently), so it goes last.
+        #expect(found.items.map(\.id) == ["m1", "e1", "e2", "m2", "m3"])
+    }
+
+    @Test func `a collection larger than a queue counts what's left out`() async throws {
+        let movies = (1 ... 130).map { #"{"Id":"m\#($0)","Name":"Film \#($0)","Type":"Movie"}"# }
+        // In its own order, everything comes, and the first 100 in the page's order play.
+        let everything = Self.items(movies)
+        let page = Self.items(Array(movies.reversed()))
+        _ = registerCollection(host: "queue-collection-big.test", everything: everything, page: page)
+        let session = try session(host: "queue-collection-big.test")
+
+        let found = try await session.collectionQueue(id: "c1", shuffled: false)
+
+        #expect(found.items.count == 100)
+        #expect(found.items.first?.id == "m130")
+        #expect(found.overLimitCount == 30)
+
+        // Shuffled, the server picks 100 and counts the rest in TotalRecordCount.
+        let random = #"{"Items":[\#(movies.prefix(100).joined(separator: ","))],"TotalRecordCount":130}"#
+        _ = registerCollection(host: "queue-collection-random.test", everything: random, page: page)
+        let shuffled = try await self.session(host: "queue-collection-random.test")
+            .collectionQueue(id: "c1", shuffled: true)
+        #expect(shuffled.items.count == 100)
+        #expect(shuffled.overLimitCount == 30)
     }
 
     @Test func `a collection plays in the sort and with the filters its page shows`() async throws {
@@ -251,6 +297,22 @@ struct QueuesTests {
          "ParentIndexNumber":\#(season),"IndexNumber":\#(number),"LocationType":"\#(location)",
          "UserData":{"Key":"\#(id)","PlaybackPositionTicks":\#(resumeTicks),"Played":false}}
         """#
+    }
+}
+
+private extension QueuesTests {
+    /// Answers a collection's `/Items` requests: everything in it (`recursive=true`), or what its
+    /// page lists. Records the last of each.
+    func registerCollection(host: String, everything: String, page: String) -> Requests {
+        let requests = Requests()
+        MockServer.register(host: host) { request in
+            guard request.url?.path() == "/Items" else { return nil }
+            let sent = SentRequest(request)
+            let isEverything = sent.query["recursive"] == "true"
+            requests.sent.withLock { $0[isEverything ? "everything" : "page"] = sent }
+            return .json(isEverything ? everything : page)
+        }
+        return requests
     }
 }
 

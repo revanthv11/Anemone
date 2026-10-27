@@ -31,4 +31,4 @@ Anemone's AVPlayer device profile, the checks it makes on the server's media seg
 | [swift-nio-transport-services](https://github.com/apple/swift-nio-transport-services) (via jellyfin-sdk-swift) | Apache-2.0 |
 | [swift-nio](https://github.com/apple/swift-nio), [swift-atomics](https://github.com/apple/swift-atomics), [swift-collections](https://github.com/apple/swift-collections), [swift-system](https://github.com/apple/swift-system) (via swift-nio-transport-services) | Apache-2.0 |
 
-Update this table whenever a dependency is added.
+<!-- Update this table whenever a dependency is added, and run scripts/update-licenses.sh. Settings › About lists it. -->
