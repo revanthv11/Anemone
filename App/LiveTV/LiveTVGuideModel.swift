@@ -29,10 +29,10 @@ final class LiveTVGuideModel {
     var window = DateInterval()
 
     @ObservationIgnored private let browse: BrowseModel
-    @ObservationIgnored private var requestedPages: Set<Int> = []
-    /// Counts the channel lists and guides `load()` has put up. Listings asked for under an
-    /// earlier one, whose pages held other channels, are dropped when they arrive.
-    @ObservationIgnored private var generation = 0
+    /// The pages asked for, and which answer for each is the newest. Listings asked for under an
+    /// earlier channel list or guide, whose pages held other channels, are dropped when they
+    /// arrive, and so is an answer older than the one its page shows.
+    @ObservationIgnored private var pages = LiveTVListingPages(pageSize: LiveTVGuideModel.pageSize)
     /// Counts calls to `load()`, so only the latest one puts up what it loaded.
     @ObservationIgnored private var loads = 0
 
@@ -47,20 +47,20 @@ final class LiveTVGuideModel {
         let guide = LiveTVGuide()
         loads += 1
         let load = loads
+        let firstPage = pages.start(0)
         do {
             let channels = try await session.liveTVChannels(order: Preferences.liveTVChannelOrder)
             let first = Array(channels.prefix(Self.pageSize))
             let programs = try await listings(for: first, in: guide)
             guard !Task.isCancelled, load == loads else { return }
-            generation += 1
             self.guide = guide
             self.channels = channels
             rows.merge(Self.rows(for: first, programs: programs, in: guide)) { $1 }
             // Rows already on screen won't ask again, so the pages they asked for reload now.
-            let shown = requestedPages.subtracting([0])
-            requestedPages = [0]
-            for page in shown {
-                loadListings(forRow: page * Self.pageSize)
+            for again in pages.startOver(showing: firstPage) {
+                Task {
+                    await loadListings(again)
+                }
             }
             if window.duration == 0 || window.start < guide.start {
                 window = guide.window(from: guide.start, length: LiveTVLayout.windowLength)
@@ -82,22 +82,23 @@ final class LiveTVGuideModel {
     /// Loads the listings for the page of channels holding `index`, if they haven't been asked
     /// for; rows call it as they come on screen.
     func loadListings(forRow index: Int) {
-        let page = index / Self.pageSize
-        guard state == .loaded, !requestedPages.contains(page) else { return }
-        requestedPages.insert(page)
+        guard state == .loaded, let load = pages.firstLoad(forRow: index) else { return }
         Task {
-            await loadListings(page: page)
+            await loadListings(load)
         }
     }
 
-    /// Loads the listings of every page asked for so far again, after a recording was set or
-    /// cancelled, so their markers change. A series recording marks its programmes on every
-    /// channel it airs on, not just the one chosen.
-    func reloadListings() async {
+    /// Loads listings again after a recording was set or cancelled, so their markers change. A
+    /// single programme's recording marks only that programme, so only the page holding its
+    /// `channel` loads again; a series recording (`channel` `nil`) marks its programmes on every
+    /// channel it airs on, so every page asked for so far does.
+    func reloadListings(channel: LiveTVChannel.ID? = nil) async {
+        let index = channel.flatMap { id in channels.firstIndex { $0.id == id } }
+        let loads = pages.reloads(channelIndex: index)
         await withTaskGroup(of: Void.self) { group in
-            for page in requestedPages {
+            for load in loads {
                 group.addTask {
-                    await self.loadListings(page: page, isReload: true)
+                    await self.loadListings(load)
                 }
             }
         }
@@ -154,21 +155,19 @@ final class LiveTVGuideModel {
         window = guide.window(from: guide.start, length: LiveTVLayout.windowLength)
     }
 
-    /// - Parameter isReload: the page's rows already show listings, which a failure leaves up.
-    private func loadListings(page: Int, isReload: Bool = false) async {
-        let channels = Array(channels.dropFirst(page * Self.pageSize).prefix(Self.pageSize))
+    /// Puts up the page's listings, unless a reload put up other channels or another guide
+    /// meanwhile (it asks for its own pages), or a later load of the page has already landed.
+    private func loadListings(_ load: LiveTVListingPages.Load) async {
+        let channels = Array(channels.dropFirst(load.page * Self.pageSize).prefix(Self.pageSize))
         guard !channels.isEmpty else { return }
-        let generation = generation
         let guide = guide
         do {
             let programs = try await listings(for: channels, in: guide)
-            // A reload put up other channels or another guide meanwhile, and asks for its own pages.
-            guard generation == self.generation else { return }
+            guard pages.accept(load) else { return }
             rows.merge(Self.rows(for: channels, programs: programs, in: guide)) { $1 }
         } catch {
-            guard generation == self.generation, !isReload else { return }
-            // Rows show no data; the page is asked for again when the guide next loads.
-            requestedPages.remove(page)
+            // Rows that show no data ask again when they next come on screen.
+            pages.failed(load)
         }
     }
 
