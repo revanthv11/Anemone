@@ -42,8 +42,8 @@ extension CollectionDisplay {
 }
 
 extension View {
-    /// Reads a collection's display options when its page opens, and saves them when they change.
-    /// Kept in UserDefaults per profile, as library options are.
+    /// Reads a collection's display options when its page opens, and saves them when the user
+    /// changes them. Kept in UserDefaults per profile, as library options are.
     func collectionDisplay(_ display: Binding<CollectionDisplay?>, for collectionID: MediaItem.ID) -> some View {
         modifier(CollectionDisplayStorage(display: display, collectionID: collectionID))
     }
@@ -54,18 +54,23 @@ private struct CollectionDisplayStorage: ViewModifier {
     let collectionID: MediaItem.ID
 
     @Environment(BrowseModel.self) private var browse
+    /// What storage holds for the collection, or the defaults shown when it holds nothing. Only a
+    /// change from this is the user's, so reading the options doesn't write them back.
+    @State private var stored: CollectionDisplay?
 
     func body(content: Content) -> some View {
         content
             .task(id: collectionID) {
                 let data = UserDefaults.standard.data(forKey: key)
-                display = data.flatMap { try? JSONDecoder().decode(CollectionDisplay.self, from: $0) }
+                let read = data.flatMap { try? JSONDecoder().decode(CollectionDisplay.self, from: $0) }
                     ?? CollectionDisplay()
+                stored = read
+                display = read
             }
             .onChange(of: display) { _, display in
-                if let display {
-                    UserDefaults.standard.set(try? JSONEncoder().encode(display), forKey: key)
-                }
+                guard let display, let stored, display != stored else { return }
+                UserDefaults.standard.set(try? JSONEncoder().encode(display), forKey: key)
+                self.stored = display
             }
     }
 

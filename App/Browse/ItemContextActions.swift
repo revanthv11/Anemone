@@ -21,8 +21,6 @@ extension View {
 /// on every card of that item.
 @Observable
 final class ItemContextActions {
-    /// Marks changed from menus, which cards show until their pages reload.
-    let marks = CardMarksStore()
     let menu: CardMenu
     /// The last favourite a menu added or removed, so the Favorites page can load that row again.
     /// Other changes show on the cards through `marks`, and need no reload.
@@ -31,31 +29,50 @@ final class ItemContextActions {
     var alert: ItemAlert?
     /// The item whose playlist choice is showing.
     var playlistItem: MediaItem?
-    /// The card whose item is playing, to update once the player closes.
-    @ObservationIgnored private var playing: (id: MediaItem.ID, given: CardMarks)?
+    /// The card whose item is playing, to update and focus again once the player closes.
+    @ObservationIgnored private var playing: Playing?
 
-    init() {
+    private struct Playing {
+        let id: MediaItem.ID
+        /// The marks the card's caller passed.
+        let given: CardMarks
+        let card: CardFocusToken?
+    }
+
+    /// - Parameter marks: the session's, `BrowseModel.cardMarks`, which item pages' own changes
+    ///   go to as well.
+    init(marks: CardMarksStore) {
         menu = CardMenu(marks: marks) { item, given in
             ItemContextMenu(item: item, given: given)
         }
+    }
+
+    /// Changes saved from menus and item pages, which cards show until their pages reload.
+    var marks: CardMarksStore {
+        menu.marks
     }
 
     /// Saves a change to the item's watched or favourite state, and shows it on its cards.
     /// Returns whether it was saved.
     @discardableResult
     func save(_ change: UserStateChange, for target: MenuTarget, given: CardMarks, browse: BrowseModel) async -> Bool {
-        guard let state = await browse.save(change, for: target.details, failed: { alert = $0 }) else {
+        guard await browse.save(change, for: target.details, given: given, failed: { alert = $0 }) != nil else {
             return false
         }
-        note(state, for: target.id, given: given)
         if case .favorite = change {
             favoriteChange = FavoriteChange(serial: (favoriteChange?.serial ?? 0) + 1, kind: target.item.kind)
+            // Home's favourites row of that type gains or loses the item, which only a reload shows.
+            if browse.homeRows?.contains(where: { $0.showsFavorites(of: target.item.kind) }) == true {
+                await browse.refresh()
+            }
         }
         return true
     }
 
     /// Plays the item from the beginning, or from where the user left off.
     func play(_ target: MenuTarget, resuming: Bool, given: CardMarks, browse: BrowseModel) async {
+        // Read before the request below, while focus can't have moved on from the menu's card.
+        let card = menu.focusReturn.menuCard
         var details = target.details
         // A card without the user's state, or one a menu or the player has changed since, may not
         // have the current resume position.
@@ -69,29 +86,25 @@ final class ItemContextActions {
                 return
             }
         }
-        playing = (target.id, given)
+        playing = Playing(id: target.id, given: given, card: card)
         playback = browse.playback(of: details, from: resuming ? details.userState.resumePosition : nil)
     }
 
-    /// Once the player closes, the card shows the new progress, and Home its new Continue
-    /// Watching and Next Up, as the item's own page does after playback.
+    /// Once the player closes, focus goes back to the card, which shows the new progress, and
+    /// Home its new Continue Watching and Next Up, as the item's own page does after playback.
     func playerClosed(browse: BrowseModel) async {
         guard let playing else { return }
         self.playing = nil
+        if let card = playing.card {
+            menu.focusReturn.returnFocus(to: card)
+        }
         let session = browse.session
         let id = playing.id
         if let details = await browse.optional(attempt { try await session.itemDetails(id: id) }) {
-            note(details.userState, for: id, given: playing.given)
+            let given = playing.given
+            marks.record(CardMarks(details.userState, replacing: given), for: id, replacing: given)
         }
         await browse.refresh()
-    }
-
-    private func note(_ state: ItemDetails.UserState, for id: MediaItem.ID, given: CardMarks) {
-        var badges = CardBadges(isFavorite: state.isFavorite, isPlayed: state.isPlayed)
-        // The server's answer to a change doesn't always have a count. Cards of the item that show
-        // one take it from here, and only those do.
-        badges.unplayedCount = state.unplayedCount ?? given.badges.unplayedCount.map { state.isPlayed ? 0 : $0 }
-        marks.record(CardMarks(badges: badges, progress: state.progress), for: id, replacing: given)
     }
 }
 
@@ -138,7 +151,7 @@ private struct ItemContextActionsHost: ViewModifier {
     @StateObject private var owner = ItemContextActionsOwner()
 
     func body(content: Content) -> some View {
-        @Bindable var actions = owner.actions
+        @Bindable var actions = owner.actions(marks: browse.cardMarks)
         content
             .environment(\.cardMenu, actions.menu)
             .environment(actions)
@@ -152,12 +165,21 @@ private struct ItemContextActionsHost: ViewModifier {
     }
 }
 
-/// Builds the actions once for the host. `@State` would build a new model, with its marks store,
-/// each time the modifier is created, and throw all but the first away; `@StateObject` builds
-/// its object only for the first. Nothing is published here: views observe the actions
-/// themselves.
+/// Builds the actions once for the host. `@State` would build a new model each time the modifier
+/// is created, and throw all but the first away; `@StateObject` builds its object only for the
+/// first. Nothing is published here: views observe the actions themselves.
 private final class ItemContextActionsOwner: ObservableObject {
-    let actions = ItemContextActions()
+    private var built: ItemContextActions?
+
+    /// The host's actions, built the first time with the session's marks store.
+    func actions(marks: CardMarksStore) -> ItemContextActions {
+        if let built {
+            return built
+        }
+        let actions = ItemContextActions(marks: marks)
+        built = actions
+        return actions
+    }
 }
 
 /// A card's menu: Wholphin's entries for what the card knows about its item.
@@ -350,6 +372,11 @@ private struct PlaylistPicker: View {
                 try await browse.session.addToPlaylist(playlist.id, itemID: item.id)
             }
             dismiss()
+        } catch PlaylistEditingError.notInPlaylist {
+            // Taken out elsewhere since the list loaded: says so, and shows the playlists as
+            // they are now.
+            problem = "\(item.name) isn't in \(playlist.name.isEmpty ? "that playlist" : playlist.name) any more."
+            await load()
         } catch {
             problem = browse.problem(with: error, doing: "change \(playlist.name)")
         }

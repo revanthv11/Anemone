@@ -1,5 +1,6 @@
 import AnemoneCore
 import AnemoneJellyfin
+import AnemoneUI
 import Foundation
 import Observation
 
@@ -26,6 +27,9 @@ final class BrowseModel {
     private(set) var homeRowsSource = HomeSettingsSource.default
     /// Why the last change to Home's rows couldn't be saved on the server, until one is.
     private(set) var homeSaveProblem: String?
+    /// Watched and favourite changes the app saved, from card menus and item pages alike, which
+    /// every card of the item shows until its page reloads.
+    @ObservationIgnored let cardMarks = CardMarksStore()
     @ObservationIgnored let homeWriter: HomePreferencesWriter
     @ObservationIgnored private let homeCache = HomeCache()
     @ObservationIgnored private var didPlaceInitialFocus = false
