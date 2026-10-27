@@ -8,8 +8,8 @@ import SwiftUI
 /// and Shuffle for everything in the list; a song card plays with the remote's Play/Pause.
 struct MusicGrid: View {
     let list: MusicList
-    /// What Play and Shuffle queue; no buttons when `nil`.
-    var playSource: MusicSource?
+    /// What Play and Shuffle queue, given the grid's sort; no buttons when `nil`.
+    var playSource: ((MusicSort) -> MusicSource)?
     @Binding var path: NavigationPath
     @Binding var showsNowPlaying: Bool
 
@@ -61,11 +61,11 @@ struct MusicGrid: View {
         HStack(spacing: 24) {
             if let playSource {
                 Button("Play", systemImage: "play.fill") {
-                    play(playSource, shuffled: false)
+                    play(playSource(sort ?? .default), shuffled: false)
                 }
                 .accessibilityIdentifier("music.play")
                 Button("Shuffle", systemImage: "shuffle") {
-                    play(playSource, shuffled: true)
+                    play(playSource(sort ?? .default), shuffled: true)
                 }
                 .accessibilityIdentifier("music.shuffle")
             }
@@ -272,7 +272,7 @@ private enum MusicSortStore {
 struct MusicGridPage: View {
     let title: String
     let list: MusicList
-    var playSource: MusicSource?
+    var playSource: ((MusicSort) -> MusicSource)?
     @Binding var path: NavigationPath
 
     @State private var showsNowPlaying = false

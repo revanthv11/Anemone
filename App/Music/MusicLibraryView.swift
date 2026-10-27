@@ -46,7 +46,7 @@ struct MusicLibraryView: View {
             MusicGridPage(
                 title: link.name,
                 list: .genre(link.id, library: link.libraryID),
-                playSource: .genre(link.id, library: link.libraryID),
+                playSource: { _ in .genre(link.id, library: link.libraryID) },
                 path: $path,
             )
         }
@@ -96,9 +96,11 @@ struct MusicLibraryView: View {
         case .recommended:
             MusicRecommendedView(library: library)
         case .albums:
+            // Albums play in the library's own order, album artist then album: the tab's sort
+            // orders albums, not their songs.
             MusicGrid(
                 list: .albums(library: library.id),
-                playSource: .library(library.id),
+                playSource: { _ in .library(library.id) },
                 path: $path,
                 showsNowPlaying: $showsNowPlaying,
             )
@@ -107,9 +109,10 @@ struct MusicLibraryView: View {
         case .genres:
             MusicGenresView(library: library)
         case .songs:
+            // Songs play in the order the tab shows them.
             MusicGrid(
                 list: .songs(library: library.id),
-                playSource: .library(library.id),
+                playSource: { .songs(library: library.id, sort: $0) },
                 path: $path,
                 showsNowPlaying: $showsNowPlaying,
             )
