@@ -123,13 +123,19 @@
         /// Asks for a series' seasons, in 4K or not. When the user already has a pending request
         /// at that quality, it's changed to these seasons, as Wholphin does, rather than adding a
         /// second one.
+        ///
+        /// - Parameter seasons: the seasons ticked among those `details` offers at that quality
+        ///   (`isRequestable`). A season of the user's pending request that isn't offered, and so
+        ///   couldn't be unticked, stays in the request: only unticking takes one out.
         func requestSeries(_ details: DiscoverDetails, seasons: [Int], is4K: Bool) async throws {
             if let pending = details.requests.first(where: {
                 $0.status == .pending && $0.requestedBy == user.id && $0.is4K == is4K
             }) {
+                let offered = (is4K ? details.seasons4K : details.seasons).filter(\.isRequestable).map(\.number)
+                let kept = Set(pending.seasons.keys).subtracting(offered)
                 let body = Operations.PutRequestRequestId.Input.Body.JsonPayload(
                     mediaType: .tv,
-                    seasons: seasons,
+                    seasons: kept.union(seasons).sorted(),
                     is4k: is4K,
                 )
                 let output = try await client.putRequestRequestId(
@@ -247,6 +253,13 @@
         /// Each season's availability, request status and whether it can be requested, at one
         /// quality. Ported from Wholphin's `updateSeasonStatus`.
         ///
+        /// Fixed while porting: in Wholphin, whichever request for a season comes last decides
+        /// whether the user may change it, so another user's request, or a declined one, listed
+        /// after the user's own pending request locks that season, and changing the request then
+        /// drops it. The user's own pending request wins for its seasons, wherever it's listed;
+        /// for other seasons, anyone else's request holds the season unless the user's own was
+        /// declined, whatever the order.
+        ///
         /// - Parameters:
         ///   - seasons: the series' seasons from TMDB, which set the list and its order.
         ///   - known: the seasons Seerr has records of, whose availability wins when higher.
@@ -267,19 +280,9 @@
                     availability[season.number] = status
                 }
             }
-            var requestStatus: [Int: SeerrRequestStatus] = [:]
-            var ownEditable: [Int: Bool] = [:]
-            for request in requests where request.is4K == is4K {
-                for (number, status) in request.seasons {
-                    if status > requestStatus[number, default: .unknown] {
-                        requestStatus[number] = status
-                    }
-                    ownEditable[number] = request.requestedBy == user
-                        && (request.status == .pending || request.status == .declined)
-                }
-            }
+            let requested = Requested(requests.filter { $0.is4K == is4K }, user: user)
             return seasons.map { season in
-                let status = requestStatus[season.number, default: .unknown]
+                let status = requested.status[season.number, default: .unknown]
                 let shown: SeerrAvailability = switch status {
                 case .pending: .pending
                 case .approved: .processing
@@ -293,8 +296,37 @@
                     episodeCount: season.episodeCount,
                     availability: shown,
                     requestStatus: status,
-                    isRequestable: ownEditable[season.number] ?? requestable,
+                    isRequestable: requested.own.contains(season.number)
+                        || (requested.mayAskAgain[season.number] ?? requestable),
+                    isInOwnRequest: requested.own.contains(season.number),
                 )
+            }
+        }
+
+        /// What a series' requests at one quality say of each season.
+        private struct Requested {
+            /// The furthest any request for it has got.
+            var status: [Int: SeerrRequestStatus] = [:]
+            /// The seasons of the user's own pending request.
+            var own: Set<Int> = []
+            /// For seasons in other requests, whether the user may ask for them again.
+            var mayAskAgain: [Int: Bool] = [:]
+
+            init(_ requests: [SeerrRequest], user: Int) {
+                for request in requests {
+                    let isOwn = request.requestedBy == user
+                    for (number, status) in request.seasons {
+                        if status > self.status[number, default: .unknown] {
+                            self.status[number] = status
+                        }
+                        if isOwn, request.status == .pending {
+                            own.insert(number)
+                        } else {
+                            mayAskAgain[number] = mayAskAgain[number, default: true]
+                                && isOwn && request.status == .declined
+                        }
+                    }
+                }
             }
         }
     }
