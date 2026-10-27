@@ -38,7 +38,19 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Select Xcode
-        run: sudo xcode-select -s "$XCODE_PATH"
+        id: xcode
+        run: |
+          sudo xcode-select -s "$XCODE_PATH"
+          echo "build=$(xcodebuild -version | awk '/Build version/ { print $3 }')" >> "$GITHUB_OUTPUT"
+      - name: Cache Swift packages
+        uses: actions/cache@v6
+        with:
+          path: |
+            Packages/AnemoneKit/.build/repositories
+            Packages/AnemoneKit/.build/checkouts
+            Packages/AnemoneKit/.build/artifacts
+            Packages/AnemoneKit/.build/workspace-state.json
+          key: spm-${{ runner.os }}-${{ runner.arch }}-xcode-${{ steps.xcode.outputs.build }}-${{ hashFiles('Packages/AnemoneKit/Package.resolved') }}
       - name: Package tests
         run: swift test --package-path Packages/AnemoneKit
 
@@ -47,24 +59,61 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Select Xcode
-        run: sudo xcode-select -s "$XCODE_PATH"
+        id: xcode
+        run: |
+          sudo xcode-select -s "$XCODE_PATH"
+          echo "build=$(xcodebuild -version | awk '/Build version/ { print $3 }')" >> "$GITHUB_OUTPUT"
+      - name: Cache Swift packages
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/SourcePackages
+          key: xcode-packages-${{ runner.os }}-${{ runner.arch }}-xcode-${{ steps.xcode.outputs.build }}-${{ hashFiles('Anemone.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/AnemoneKit/Package.resolved') }}
       - name: Build tvOS app
         run: >
           xcodebuild build
           -project Anemone.xcodeproj
           -scheme Anemone
           -destination 'generic/platform=tvOS Simulator'
+          -clonedSourcePackagesDirPath "$RUNNER_TEMP/SourcePackages"
           CODE_SIGNING_ALLOWED=NO
 
-  # The build and tests with Seerr on, which the jobs above leave out (docs/seerr.md).
-  seerr:
+  # The build and tests with Seerr on, which the jobs above leave out (docs/seerr.md). They're two
+  # jobs so the tests and the build run side by side.
+  seerr-test:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v7
       - name: Select Xcode
-        run: sudo xcode-select -s "$XCODE_PATH"
+        id: xcode
+        run: |
+          sudo xcode-select -s "$XCODE_PATH"
+          echo "build=$(xcodebuild -version | awk '/Build version/ { print $3 }')" >> "$GITHUB_OUTPUT"
+      - name: Cache Swift packages
+        uses: actions/cache@v6
+        with:
+          path: |
+            Packages/AnemoneKit/.build/repositories
+            Packages/AnemoneKit/.build/checkouts
+            Packages/AnemoneKit/.build/artifacts
+            Packages/AnemoneKit/.build/workspace-state.json
+          key: spm-${{ runner.os }}-${{ runner.arch }}-xcode-${{ steps.xcode.outputs.build }}-${{ hashFiles('Packages/AnemoneKit/Package.resolved') }}
       - name: Package tests with Seerr
         run: swift test --package-path Packages/AnemoneKit --traits ANEMONE_SEERR
+
+  seerr-build:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+      - name: Select Xcode
+        id: xcode
+        run: |
+          sudo xcode-select -s "$XCODE_PATH"
+          echo "build=$(xcodebuild -version | awk '/Build version/ { print $3 }')" >> "$GITHUB_OUTPUT"
+      - name: Cache Swift packages
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/SourcePackages
+          key: xcode-packages-${{ runner.os }}-${{ runner.arch }}-xcode-${{ steps.xcode.outputs.build }}-${{ hashFiles('Anemone.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/AnemoneKit/Package.resolved') }}
       - name: Build tvOS app with Seerr
         env:
           ANEMONE_SEERR: "1"
@@ -73,5 +122,6 @@ jobs:
           -project Anemone.xcodeproj
           -scheme Anemone
           -destination 'generic/platform=tvOS Simulator'
+          -clonedSourcePackagesDirPath "$RUNNER_TEMP/SourcePackages"
           CODE_SIGNING_ALLOWED=NO
           'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) ANEMONE_SEERR'
