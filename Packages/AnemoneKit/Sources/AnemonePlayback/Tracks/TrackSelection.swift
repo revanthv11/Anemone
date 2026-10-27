@@ -16,6 +16,8 @@ public final class TrackSelection: PlaybackFeature {
     struct Server: Sendable {
         var itemTracks: @Sendable (MediaItem.ID) async throws -> ItemTracks
         var profileSettings: @Sendable () async throws -> ProfileTrackSettings
+        /// The version picked on the item's page, if any.
+        var pickedVersion: @Sendable (MediaItem.ID) -> String? = { _ in nil }
     }
 
     /// The entry playing: its tracks and what plays.
@@ -43,8 +45,7 @@ public final class TrackSelection: PlaybackFeature {
     /// The Jellyfin profile's settings, fetched once per player.
     private var profile: ProfileTrackSettings?
     private(set) var entry: Entry?
-    /// Counts fetches of an item's tracks, so one that a newer fetch replaced, as when the
-    /// player moves on twice in quick succession, doesn't leave its item as the entry.
+    /// Counts fetches of tracks, so one a newer fetch replaced doesn't leave its item as the entry.
     private var fetches = 0
     /// Selecting the chosen tracks in a stream that just loaded.
     private var applying: Task<Void, Never>?
@@ -54,6 +55,7 @@ public final class TrackSelection: PlaybackFeature {
             server: Server(
                 itemTracks: { try await session.itemTracks(for: $0) },
                 profileSettings: { try await session.profileTrackSettings() },
+                pickedVersion: { MediaVersionChoices.standard.choice(for: $0, userID: session.userID) },
             ),
             store: TrackChoiceStore(userID: session.userID, defaults: defaults),
             defaults: defaults,
@@ -74,9 +76,9 @@ public final class TrackSelection: PlaybackFeature {
         tracks.apply(to: &request)
     }
 
-    /// The tracks to ask the server for; `nil` leaves them to the server, such as when the
-    /// item's tracks can't be fetched. A retry or a switch for the same item asks for what's
-    /// chosen now.
+    /// The tracks to ask for, with their version: `mediaSourceID`, else the one picked on the item's
+    /// page while the item has it, else the first. `nil` leaves them to the server, as when the
+    /// tracks can't be fetched. A retry or a switch for the same item asks for what's chosen now.
     func request(for itemID: MediaItem.ID, mediaSourceID: String?) async -> TrackRequest? {
         if let entry, entry.itemID == itemID {
             return request(for: entry)
@@ -85,12 +87,12 @@ public final class TrackSelection: PlaybackFeature {
         fetches += 1
         let fetch = fetches
         async let fetchedProfile = Self.profile(profile, from: server)
-        guard let item = try? await server.itemTracks(itemID), let source = item.source(mediaSourceID) else {
-            return nil
-        }
+        let picked = mediaSourceID == nil ? server.pickedVersion(itemID) : nil
+        guard let item = try? await server.itemTracks(itemID),
+              let source = picked.flatMap({ item.source($0) }) ?? item.source(mediaSourceID)
+        else { return nil }
         profile = await fetchedProfile
         let entry = choose(in: item, source: source)
-        // The stream asked for with a stale request isn't played, so its entry isn't kept.
         if fetch == fetches {
             self.entry = entry
         }

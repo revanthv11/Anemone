@@ -295,7 +295,7 @@ struct TrackSelectionTests {
     }
 }
 
-/// Fetching the tracks of one item while another's are on their way.
+/// Which version's tracks are fetched, and fetching one item's while another's are on their way.
 @MainActor
 struct TrackSelectionFetchTests {
     private let defaults: UserDefaults
@@ -306,6 +306,28 @@ struct TrackSelectionFetchTests {
         defaults = try #require(UserDefaults(suiteName: suite))
         defaults.removePersistentDomain(forName: suite)
         store = TrackChoiceStore(userID: "u1", defaults: defaults)
+    }
+
+    @Test func `the version picked on the item's page is asked for while the item has it`() async {
+        let sources: [ItemTracks.Source] = [.init(id: "v1", tracks: .multiTrack), .init(id: "v2", tracks: .multiTrack)]
+        func selection(picking picked: String?) -> TrackSelection {
+            TrackSelection(
+                server: TrackSelection.Server(
+                    itemTracks: { ItemTracks(itemID: $0, sources: sources) },
+                    profileSettings: { .english },
+                    pickedVersion: { _ in picked },
+                ),
+                store: store,
+                defaults: defaults,
+            )
+        }
+
+        #expect(await selection(picking: "v2").request(for: "m1", mediaSourceID: nil)?.mediaSourceID == "v2")
+        // One the item no longer has gives way to the first, as on the item's page.
+        #expect(await selection(picking: "gone").request(for: "m1", mediaSourceID: nil)?.mediaSourceID == "v1")
+        #expect(await selection(picking: nil).request(for: "m1", mediaSourceID: nil)?.mediaSourceID == "v1")
+        // A retry keeps the version playing.
+        #expect(await selection(picking: "v2").request(for: "m1", mediaSourceID: "v1")?.mediaSourceID == "v1")
     }
 
     @Test func `a fetch that a newer one replaced doesn't leave its item as the entry`() async throws {
