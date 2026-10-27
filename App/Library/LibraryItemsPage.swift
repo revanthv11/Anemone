@@ -41,6 +41,7 @@ struct LibraryItemsPage: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             case let .loaded(pager):
                 page(pager)
+                    .onItemsDeleted { pager.remove($0) }
             case .failed:
                 message(String(localized: "Couldn't load \(heading) from \(browse.server.name).")) {
                     Button("Try again") {

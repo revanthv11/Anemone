@@ -88,6 +88,8 @@ private struct FavoritesContentView: View {
             guard isSelected, let change = actions.favoriteChange, change.serial > seenFavoriteChange else { return }
             await reloadRow(change)
         }
+        // Gone at once after Back from a deleted favourite, before the reload above lands.
+        .onItemsDeleted { content = content?.removing($0) }
     }
 
     /// Wholphin's `HeaderUtils.height`, as on the collection page.

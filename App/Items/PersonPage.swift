@@ -50,6 +50,10 @@ struct PersonPage: View {
         }
         .initialFocus($focus, person.item.overview == nil ? .action(.favorite) : .overview)
         .itemAlert($alert)
+        // Their credits don't reload after Back, so a title deleted from its page is dropped here.
+        .onItemsDeleted { deleted in
+            filmography = filmography.mapValues { $0.filter { !$0.item.wasDeleted(in: deleted) } }
+        }
         .task(id: person.id) {
             // A person's credits don't change between visits, so coming back doesn't reload them.
             guard filmography.isEmpty else { return }

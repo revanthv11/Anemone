@@ -54,6 +54,12 @@ struct LibraryRecommendedTab: View {
         .task {
             await load()
         }
+        // The rows don't load again after Back, so a title deleted from its page is dropped here.
+        .onItemsDeleted { deleted in
+            if case let .loaded(recommended) = content {
+                content = .loaded(recommended.removing(deleted))
+            }
+        }
     }
 
     private func rows(_ recommended: RecommendedContent) -> some View {

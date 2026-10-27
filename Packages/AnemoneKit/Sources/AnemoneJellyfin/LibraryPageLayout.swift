@@ -8,6 +8,10 @@ import Foundation
 /// ID, which leaves out those the server no longer has). Such a page closes up: the items after
 /// it move up and `count` goes down, so no place waits for an item that will never come. Pages
 /// not loaded yet are taken to be full.
+///
+/// Items deleted from the app close up the same way (`remove(where:)`), and since the loader's
+/// list has lost them too, the pages after them are asked for that much earlier
+/// (`startIndex(ofPage:)`), so none of the items that moved up is skipped.
 struct PagedItems<Item> {
     let pageSize: Int
     /// How many items the first page counted, which the loader's pages are counted in.
@@ -17,6 +21,8 @@ struct PagedItems<Item> {
     private var pages: [Int: [Item]] = [:]
     /// Where each page starts.
     private var starts: [Int] = []
+    /// How many items `remove(where:)` took out of each loaded page.
+    private var removed: [Int: Int] = [:]
 
     init(pageSize: Int) {
         self.pageSize = pageSize
@@ -31,6 +37,7 @@ struct PagedItems<Item> {
     mutating func start(_ first: [Item], counted: Int) {
         self.counted = counted
         pages = [0: first]
+        removed = [:]
         layOut()
     }
 
@@ -77,6 +84,31 @@ struct PagedItems<Item> {
     /// Where the `offset`th item of `page` is.
     func index(of offset: Int, onPage page: Int) -> Int {
         starts[page] + offset
+    }
+
+    /// Where the loader's list has `page` now: its place in the list the first page counted, less
+    /// the items removed from the pages before it, which the list no longer has either.
+    func startIndex(ofPage page: Int) -> Int {
+        page * pageSize - removed.reduce(0) { $1.key < page ? $0 + $1.value : $0 }
+    }
+
+    /// Takes the matching items out of the pages loaded so far, as when they were deleted, and
+    /// returns how many went. The items after them move up, as after a page that came back short.
+    /// Pages not loaded yet are left alone: the loader leaves deleted items out of them.
+    @discardableResult
+    mutating func remove(where isRemoved: (Item) -> Bool) -> Int {
+        var total = 0
+        for (page, items) in pages {
+            let kept = items.filter { !isRemoved($0) }
+            guard kept.count < items.count else { continue }
+            pages[page] = kept
+            removed[page, default: 0] += items.count - kept.count
+            total += items.count - kept.count
+        }
+        if total > 0 {
+            layOut()
+        }
+        return total
     }
 
     private mutating func layOut() {

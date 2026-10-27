@@ -2,7 +2,8 @@ import Observation
 
 /// Marks changed from card menus, so every card of that item shows the change at once, the way
 /// Wholphin refreshes the row after a menu action. The pages holding the cards keep their own
-/// copies of the item, which catch up when they reload.
+/// copies of the item, which catch up when they reload. Deletions are kept here too, for the
+/// pages to take the item's cards out.
 ///
 /// Changes are kept by item and show on every card of it, whatever marks the card was given: a
 /// home row's card knows only the progress, an item page's knows the rest too. A card shows the
@@ -12,8 +13,22 @@ import Observation
 @Observable
 public final class CardMarksStore {
     private var changes: [String: ItemMarkChanges] = [:]
+    /// Items deleted from their pages, in the order they went, so the pages behind can drop
+    /// their cards without loading again (`deletions(since:)`). What a page loads afterwards comes
+    /// from the server, which no longer has them.
+    public private(set) var deletedIDs: [String] = []
 
     public init() {}
+
+    /// Notes that an item was deleted.
+    public func recordDeletion(of id: String) {
+        deletedIDs.append(id)
+    }
+
+    /// The items deleted after the first `seen`, for a page that has dropped those already.
+    public func deletions(since seen: Int) -> Set<String> {
+        Set(deletedIDs.dropFirst(seen))
+    }
 
     /// What a card of the item shows, given the marks its caller passed.
     public func marks(for id: String, given marks: CardMarks) -> CardMarks {

@@ -36,6 +36,8 @@ struct HomeItemsPage: View {
                     onSelect: { stack?.path.append($0) },
                     header: { header(count: pager.count) },
                 )
+                // The grid doesn't load again after Back, so a title deleted from its page goes here.
+                .onItemsDeleted { pager.remove($0) }
             case .failed:
                 VStack(spacing: 24) {
                     Text("Couldn't load \(link.title) from \(browse.server.name).")

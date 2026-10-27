@@ -77,6 +77,10 @@ struct SeriesPage: View {
                 self.similar = similar
             }
         }
+        // Nor is a series deleted from its page, so it's dropped from More Like This here.
+        .onItemsDeleted { deleted in
+            similar.removeAll { $0.item.wasDeleted(in: deleted) }
+        }
     }
 
     private var header: some View {

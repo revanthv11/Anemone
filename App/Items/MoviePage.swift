@@ -65,6 +65,10 @@ struct MoviePage: View {
             let id = item.id
             similar = await browse.optional(attempt { try await session.similarItems(to: id) }) ?? []
         }
+        // More Like This isn't asked for again, so a title deleted from its page is dropped here.
+        .onItemsDeleted { deleted in
+            similar.removeAll { $0.item.wasDeleted(in: deleted) }
+        }
     }
 
     private var isEpisode: Bool {

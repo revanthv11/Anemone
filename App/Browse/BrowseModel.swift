@@ -106,6 +106,15 @@ final class BrowseModel {
         home = .signedOut
     }
 
+    /// Called once an item's page has deleted it: Home drops its cards at once, and the pages
+    /// behind the item's page as they hear of it (`onItemsDeleted`).
+    func noteDeleted(_ id: MediaItem.ID) {
+        cardMarks.recordDeletion(of: id)
+        if case let .loaded(content) = home {
+            home = .loaded(content.removing([id]))
+        }
+    }
+
     private func homeOptions(isRefresh: Bool) -> HomeOptions {
         HomeOptions(
             itemsPerRow: Preferences.maxItemsPerRow.value(),
