@@ -35,7 +35,7 @@ public struct JumpBarSizing: Equatable, Sendable {
     }
 
     /// The size, in whole points, at which `count` letters fit in `height`: no more than full
-    /// size, and no less than the minimum. Full size until the height is known.
+    /// size, and no less than the minimum. Full size for an unknown (infinite) height.
     public func letterSize(count: Int, fitting height: CGFloat) -> CGFloat {
         guard count > 0, height.isFinite else { return fullLetterSize }
         let room = (height - fixedHeight) / CGFloat(count) - spacing
@@ -45,6 +45,33 @@ public struct JumpBarSizing: Equatable, Sendable {
     /// How tall the bar stands with `count` letters of `letterSize`.
     public func height(count: Int, letterSize: CGFloat) -> CGFloat {
         fixedHeight + CGFloat(count) * (letterSize + spacing)
+    }
+
+    /// The least room the bar has had since it appeared, now that `height` has been measured;
+    /// `nil` until a height is known.
+    ///
+    /// The letters are fitted to this rather than to the room of the moment, so they keep one
+    /// size while the grid scrolls: a library page tucks its tabs away while focus is past the
+    /// grid's first row, giving the bar the tab row's height for a while, and letters fitted to
+    /// that grew a few points, then shrank again as the tabs came back. A bar appears with the
+    /// tabs showing, so this is the room under them. The room never grows for good on a TV's
+    /// screen; turning the details header on or off builds a new bar.
+    public func leastRoom(_ least: CGFloat?, measuring height: CGFloat) -> CGFloat? {
+        guard height > 0, height.isFinite else { return least }
+        return min(least ?? height, height)
+    }
+
+    /// The height to fit the letters in: the room the bar has now, or the least it has had
+    /// (`leastRoom`) when that's less. The room it has now until that's been measured, so the
+    /// bar fits from the first frame it draws.
+    public func roomToFit(now height: CGFloat, least: CGFloat?) -> CGFloat {
+        min(height, least ?? height)
+    }
+
+    /// Whether `count` letters of `letterSize` stand taller than `height`, as they do in a room
+    /// too small for even the smallest letters.
+    public func overflows(count: Int, letterSize: CGFloat, height: CGFloat) -> Bool {
+        self.height(count: count, letterSize: letterSize) > height
     }
 
     /// The letters' type size: full size while it fills no more than three quarters of the

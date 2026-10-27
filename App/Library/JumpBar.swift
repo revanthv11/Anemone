@@ -7,6 +7,8 @@ import SwiftUI
 ///
 /// It takes the height beside the grid and no more, its letters shrinking to fit when they must
 /// (`JumpBarSizing`): a bar as tall as its full-size letters made the page taller than the screen.
+/// They're fitted to the least room the bar has had, so they keep their size while the page
+/// tucks its tabs away and brings them back.
 struct JumpBar: View {
     let current: Character
     let onFocus: () -> Void
@@ -15,8 +17,8 @@ struct JumpBar: View {
     let onSelect: (Character) -> Void
 
     @FocusState private var focusedLetter: Character?
-    /// The height beside the grid, once it's known.
-    @State private var height = CGFloat.infinity
+    /// The least height the bar has had beside the grid, once it's known.
+    @State private var leastRoom: CGFloat?
     @Environment(\.theme) private var theme
 
     /// Stands for the stop above the top letter.
@@ -31,7 +33,39 @@ struct JumpBar: View {
     )
 
     var body: some View {
-        let letterSize = Self.sizing.letterSize(count: LibraryJump.letters.count, fitting: height)
+        // As tall as the room beside the grid whatever the letters ask for, so they never push
+        // the page, and sized to fit it in the same layout pass, so the first frame fits too.
+        GeometryReader { proxy in
+            let room = proxy.size.height
+            let count = LibraryJump.letters.count
+            let letterSize = Self.sizing.letterSize(
+                count: count,
+                fitting: Self.sizing.roomToFit(now: room, least: leastRoom),
+            )
+            let overflows = Self.sizing.overflows(count: count, letterSize: letterSize, height: room)
+            letters(size: letterSize)
+                // Centred, as Wholphin centres its bar; but from the top when even the smallest
+                // letters don't fit, so they run off the bottom rather than up over the tabs or
+                // the details header.
+                .frame(width: proxy.size.width, height: room, alignment: overflows ? .top : .center)
+        }
+        .frame(width: GridLayout.letterSize)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+            leastRoom = Self.sizing.leastRoom(leastRoom, measuring: height)
+        }
+        .focusSection()
+        .defaultFocus($focusedLetter, current, priority: .userInitiated)
+        .onChange(of: focusedLetter) { _, letter in
+            if letter != nil {
+                onFocus()
+            }
+            if letter == Self.exit {
+                onLeaveTop?()
+            }
+        }
+    }
+
+    private func letters(size letterSize: CGFloat) -> some View {
         VStack(spacing: Self.sizing.spacing) {
             // An invisible stop above #, so Up from there comes here, and on to the page's tabs,
             // rather than to the sidebar's title, or nowhere while the tabs are tucked away.
@@ -59,20 +93,6 @@ struct JumpBar: View {
                 .accessibilityLabel(Text(verbatim: String(letter)).speechSpellsOutCharacters())
                 .accessibilityAddTraits(letter == current ? .isSelected : [])
                 .accessibilityIdentifier("grid.letter.\(letter)")
-            }
-        }
-        // As tall as the room beside the grid whatever the letters ask for, so they never push
-        // the page; they're sized to fit it once it's measured.
-        .frame(minHeight: 0, maxHeight: .infinity)
-        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
-        .focusSection()
-        .defaultFocus($focusedLetter, current, priority: .userInitiated)
-        .onChange(of: focusedLetter) { _, letter in
-            if letter != nil {
-                onFocus()
-            }
-            if letter == Self.exit {
-                onLeaveTop?()
             }
         }
     }
