@@ -24,6 +24,8 @@
         @State private var isChoosingQuality = false
         @State private var isChoosingSeasons = false
         @State private var isWorking = false
+        /// The button that asked for a request, for focus to go back to once it's made.
+        @State private var requestedFrom = ItemAction.play
 
         var body: some View {
             Group {
@@ -75,9 +77,9 @@
                     Task { await requestMovie(is4K: true) }
                 }
             }
-            // Back to the first button once the sheet has gone, since focus can't move while it's
-            // up, and the button it came from may have changed from Request to Requested.
-            .sheet(isPresented: $isChoosingSeasons, onDismiss: { focus = .action(.play) }, content: {
+            // Back to the button it came from once the sheet has gone, since focus can't move
+            // while it's up, and that button may have changed from Request to Requested.
+            .sheet(isPresented: $isChoosingSeasons, onDismiss: { focus = focusAfterRequest }, content: {
                 RequestSeasonsSheet(
                     details: details,
                     canRequest: connection.canRequestSeries,
@@ -136,16 +138,15 @@
             HStack(spacing: 24) {
                 switch details.item.availability {
                 case .unknown:
-                    requestButton(details, connection: connection)
-                        .focused($focus, equals: .action(.play))
+                    requestButton(details, connection: connection, as: .play)
                 case .pending, .processing:
                     requestedButton(details, connection: connection)
                         .focused($focus, equals: .action(.play))
                 case .partiallyAvailable, .available:
                     goToButton(details)
                         .focused($focus, equals: .action(.play))
-                    if details.item.availability == .partiallyAvailable, details.item.kind == .series {
-                        requestButton(details, connection: connection)
+                    if details.offersMoreSeasons {
+                        requestButton(details, connection: connection, as: .request)
                     }
                 case .blocklisted, .deleted:
                     ActionButton(title: "Unavailable", systemImage: "xmark.circle") {}
@@ -164,15 +165,22 @@
             .focusSection()
         }
 
+        /// - Parameter action: which button it is, for focus.
         @ViewBuilder
-        private func requestButton(_ details: DiscoverDetails, connection: SeerrConnection) -> some View {
+        private func requestButton(
+            _ details: DiscoverDetails,
+            connection: SeerrConnection,
+            as action: ItemAction,
+        ) -> some View {
             let canRequest = details.item.kind == .movie
                 ? connection.canRequestMovies || connection.canRequest4KMovies
                 : connection.canRequestSeries || connection.canRequest4KSeries
             ActionButton(title: "Request", systemImage: "arrow.down.circle") {
+                requestedFrom = action
                 request(details, connection: connection)
             }
             .disabled(!canRequest)
+            .focused($focus, equals: .action(action))
             .accessibilityIdentifier("action.request")
         }
 
@@ -185,6 +193,7 @@
                 && (connection.canRequestSeries || connection.canRequest4KSeries)
             return ActionButton(title: details.item.availability.label ?? "Requested", systemImage: "clock") {
                 if canRequestMore {
+                    requestedFrom = .play
                     request(details, connection: connection)
                 }
             }
@@ -259,6 +268,7 @@
         }
 
         private func cancel(_ request: SeerrRequest) async {
+            requestedFrom = .play
             await perform("cancel the request") { connection in
                 try await connection.cancelRequest(request)
             }
@@ -276,11 +286,23 @@
             await reload(connection)
             // The buttons take focus again only once they're enabled.
             isWorking = false
-            focus = .action(.play)
+            focus = focusAfterRequest
+        }
+
+        /// The button that asked for the request, while the page still has it; otherwise the
+        /// first.
+        private var focusAfterRequest: ItemFocus {
+            requestedFrom == .request && details?.offersMoreSeasons == true ? .action(.request) : .action(.play)
         }
     }
 
     private extension DiscoverDetails {
+        /// A series the server has some of, which can be asked for more of with a second Request
+        /// button after Go To.
+        var offersMoreSeasons: Bool {
+            item.availability == .partiallyAvailable && item.kind == .series
+        }
+
         /// The year, runtime, rating and availability, in one line under the title.
         var quickDetails: String {
             var parts: [String] = []

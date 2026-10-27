@@ -76,6 +76,9 @@ public struct ItemDetails: Hashable, Identifiable, Sendable {
     public var creditCounts: CreditCounts
     /// Width over height of the item's primary image.
     public var primaryImageAspectRatio: Double?
+    /// The item's IDs elsewhere, such as `"Tmdb": "603"`, which Seerr looks titles up by.
+    /// `itemDetails(id:)` comes with them; rows may not.
+    public var providerIDs: [String: String]
 
     public init(
         item: MediaItem,
@@ -95,6 +98,7 @@ public struct ItemDetails: Hashable, Identifiable, Sendable {
         birthPlace: String? = nil,
         creditCounts: CreditCounts = CreditCounts(),
         primaryImageAspectRatio: Double? = nil,
+        providerIDs: [String: String] = [:],
     ) {
         self.item = item
         self.tagline = tagline
@@ -113,6 +117,7 @@ public struct ItemDetails: Hashable, Identifiable, Sendable {
         self.birthPlace = birthPlace
         self.creditCounts = creditCounts
         self.primaryImageAspectRatio = primaryImageAspectRatio
+        self.providerIDs = providerIDs
     }
 
     public var id: MediaItem.ID {
@@ -259,6 +264,7 @@ extension ItemDetails {
             birthPlace: dto.productionLocations?.first { !$0.isEmpty },
             creditCounts: CreditCounts(movies: dto.movieCount, series: dto.seriesCount, episodes: dto.episodeCount),
             primaryImageAspectRatio: dto.primaryImageAspectRatio,
+            providerIDs: dto.providerIDs ?? [:],
         )
     }
 }

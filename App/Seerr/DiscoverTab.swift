@@ -17,8 +17,8 @@
                 content
                     // The tab's root, which `itemPages(in:)` doesn't reach.
                     .environment(\.pageStack, stack)
+                    // Opens Seerr's title pages too.
                     .itemPages(in: stack)
-                    .discoverPages(in: stack)
                     .navigationDestination(for: DiscoverSearchRoute.self) { _ in
                         DiscoverSearchPage()
                             .environment(\.pageStack, stack)

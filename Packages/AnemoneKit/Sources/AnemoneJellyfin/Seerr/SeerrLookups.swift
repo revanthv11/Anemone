@@ -12,18 +12,15 @@
         func serverPluginSeerrSettings() async throws -> SeerrPluginSettings? {
             try await serverPluginValue(SeerrPluginSettings.self, path: "seerrsettings")
         }
+    }
 
+    public extension ItemDetails {
         /// The item's TMDB ID, which Seerr's similar titles and credits are looked up by, as
         /// Wholphin's `SeerrService.similar` reads it from `providerIds`. `nil` when the server has
         /// none for it.
-        ///
-        /// A request of its own, since `ItemDetails` doesn't keep the provider IDs; it's only made
-        /// when a Seerr server is connected.
-        func tmdbID(ofItem id: MediaItem.ID) async throws -> Int? {
-            let item = try await send(Paths.getItem(itemID: id, userID: userID))
-            let ids = item.providerIDs ?? [:]
+        var tmdbID: Int? {
             // Jellyfin writes "Tmdb"; matched without case, as other clients have written it.
-            let value = ids.first { $0.key.caseInsensitiveCompare("Tmdb") == .orderedSame }?.value
+            let value = providerIDs.first { $0.key.caseInsensitiveCompare("Tmdb") == .orderedSame }?.value
             return value.flatMap { Int($0) }
         }
     }

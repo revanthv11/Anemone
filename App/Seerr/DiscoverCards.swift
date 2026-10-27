@@ -92,7 +92,8 @@
     }
 
     extension View {
-        /// Opens Seerr's title pages pushed on `stack`, as `itemPages(in:)` opens Jellyfin's.
+        /// Opens Seerr's title pages pushed on `stack`, as `itemPages(in:)` opens Jellyfin's and,
+        /// through `seerrPages(in:)`, adds this.
         func discoverPages(in stack: PageStack?) -> some View {
             navigationDestination(for: DiscoverItem.self) { item in
                 DiscoverItemPage(item: item)

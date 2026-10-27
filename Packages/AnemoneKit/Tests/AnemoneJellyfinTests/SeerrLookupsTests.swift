@@ -41,7 +41,7 @@
             }
         }
 
-        @Test func `an item's TMDB ID comes from its provider IDs`() async throws {
+        @Test func `an item page's TMDB ID comes from the item it loaded`() async throws {
             let server = HomeServer("seerr-tmdb.test") { path, _ in
                 switch path {
                 case "/Users/u1/Items/m1", "/Items/m1":
@@ -52,9 +52,14 @@
                     nil
                 }
             }
+            let session = try server.session()
 
-            #expect(try await server.session().tmdbID(ofItem: "m1") == 603)
-            #expect(try await server.session().tmdbID(ofItem: "m2") == nil)
+            let film = try await session.itemDetails(id: "m1")
+            let video = try await session.itemDetails(id: "m2")
+
+            #expect(film.providerIDs == ["Imdb": "tt0133093", "Tmdb": "603"])
+            #expect(film.tmdbID == 603)
+            #expect(video.tmdbID == nil)
         }
     }
 #endif

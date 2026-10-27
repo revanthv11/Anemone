@@ -58,6 +58,7 @@ extension View {
                 // the pages pushed on it.
                 .environment(\.pageStack, stack)
         }
+        .seerrPages(in: stack)
     }
 }
 
