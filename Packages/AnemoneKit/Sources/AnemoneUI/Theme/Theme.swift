@@ -1,4 +1,5 @@
 import AnemoneCore
+import Foundation
 
 /// The colours views use, by what they're for, in the theme chosen in Settings › Appearance.
 /// Views read it from the environment, `@Environment(\.theme) private var theme`, and use a
@@ -35,8 +36,9 @@ public struct Theme: Hashable, Sendable {
 
     // MARK: Accent
 
-    /// The theme's own colour, for what's selected or current: an underline under the chosen
-    /// tab, a selected toggle, the app's tint. Wholphin's `border`, opaque.
+    /// The theme's own colour, for what's selected or current in Anemone's own components: an
+    /// underline under the chosen tab, a chosen option's mark. Wholphin's `border`, opaque.
+    /// Not the app's tint: system controls keep tvOS's own focus look.
     public let accent: ThemeColor
     /// Text or marks that pick one thing out where `accent` is too dark to read, like the
     /// current letter of a jump bar (Wholphin's `tertiary`).
@@ -101,27 +103,27 @@ public struct Theme: Hashable, Sendable {
         onSurface = palette.onSurface
         surfaceVariant = palette.surfaceVariant
         onSurfaceVariant = palette.onSurfaceVariant
-        accent = palette.border.opacity(1)
+        accent = palette.border.withAlpha(1)
         highlight = palette.tertiary
         primary = palette.primary
         onPrimary = palette.onPrimary
         focusRing = palette.border
-        focusGlow = palette.border.opacity(0.5)
-        platter = palette.surfaceVariant.opacity(0.8)
-        onPlatter = palette.onSurface.opacity(0.8)
+        focusGlow = palette.border.withAlpha(0.5)
+        platter = palette.surfaceVariant.withAlpha(0.8)
+        onPlatter = palette.onSurface.withAlpha(0.8)
         focusedPlatter = palette.onSurface
         onFocusedPlatter = palette.inverseOnSurface
         cardBadge = Self.transparentBlack50
         onCardBadge = palette.onSurface
         // Wholphin's black theme has a near-white `border`, which a white check wouldn't show on.
-        watchedBadge = colors == .oledBlack ? palette.secondaryContainer : palette.border.opacity(1)
+        watchedBadge = colors == .oledBlack ? palette.secondaryContainer : palette.border.withAlpha(1)
         onWatchedBadge = ThemeColor(0xFFFF_FFFF)
         favorite = Self.holoRedLight
         progress = palette.tertiary
         progressTrack = Self.transparentBlack50
         seekPlayed = palette.border
-        seekBuffered = palette.onSurface.opacity(0.65)
-        seekTrack = palette.onSurface.opacity(0.25)
+        seekBuffered = palette.onSurface.withAlpha(0.65)
+        seekTrack = palette.onSurface.withAlpha(0.25)
         error = palette.error
         onError = palette.onError
         errorContainer = palette.errorContainer
@@ -130,6 +132,10 @@ public struct Theme: Hashable, Sendable {
 
     /// Wholphin's default, purple.
     public static let standard = Theme(Preferences.appThemeColors.defaultValue)
+
+    /// How wide `focusRing` is drawn around a focused card or tile, the same in every theme:
+    /// TV Material's 3 dp focus border, at Anemone's 2 points per dp of a 960 dp wide screen.
+    public static let focusRingWidth: CGFloat = 6
 
     /// Wholphin's `AppColors.TransparentBlack50`.
     private static let transparentBlack50 = ThemeColor(0x8000_0000)

@@ -118,7 +118,7 @@ public struct MediaCard: View {
             .overlay {
                 if isFocused {
                     RoundedRectangle(cornerRadius: Self.cornerRadius)
-                        .strokeBorder(theme.focusRing, lineWidth: Self.focusRingWidth)
+                        .strokeBorder(theme.focusRing, lineWidth: Theme.focusRingWidth)
                 }
             }
             .liftOnFocus()
@@ -126,8 +126,6 @@ public struct MediaCard: View {
 
     private static let progressInset: CGFloat = 12
     private static let cornerRadius: CGFloat = 12
-    /// TV Material's 3 dp focus border, at Anemone's 2 points per dp of a 960 dp wide screen.
-    private static let focusRingWidth: CGFloat = 6
 }
 
 private extension View {

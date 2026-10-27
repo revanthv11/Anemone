@@ -34,19 +34,24 @@ public struct ThemeColor: Hashable, Sendable {
         Color(.sRGB, red: red, green: green, blue: blue, opacity: alpha)
     }
 
-    /// The same colour at another opacity, from 0 to 1, as Compose's `copy(alpha =)` sets it.
-    public func opacity(_ alpha: Double) -> ThemeColor {
-        let byte = UInt32((min(max(alpha, 0), 1) * 255).rounded())
-        return ThemeColor(byte << 24 | argb & 0x00FF_FFFF)
+    /// The same colour with its alpha replaced, from 0 to 1, as Compose's `copy(alpha =)` sets it.
+    /// Not SwiftUI's `opacity(_:)`, which a `ShapeStyle` also has and which multiplies the alpha
+    /// it already has: a 75% `border` at `opacity(0.5)` shows at 37.5%, at `withAlpha(0.5)` at 50%.
+    public func withAlpha(_ alpha: Double) -> ThemeColor {
+        ThemeColor(Self.byte(alpha) << 24 | argb & 0x00FF_FFFF)
     }
 
-    /// What shows when this colour is drawn over `background`; opaque when the background is.
+    /// What shows when this colour is drawn over `background`, by Porter and Duff's source-over,
+    /// the normal blend. Opaque when either is; over a translucent background the result is
+    /// translucent, its colour weighted by how much of it each one covers.
     public func over(_ background: ThemeColor) -> ThemeColor {
+        let below = background.alpha * (1 - alpha)
+        let outAlpha = alpha + below
+        guard outAlpha > 0 else { return ThemeColor(0) }
         let mixed = [(red, background.red), (green, background.green), (blue, background.blue)].map { top, bottom in
-            UInt32(((top * alpha + bottom * (1 - alpha)) * 255).rounded())
+            Self.byte((top * alpha + bottom * below) / outAlpha)
         }
-        let outAlpha = UInt32(((alpha + background.alpha * (1 - alpha)) * 255).rounded())
-        return ThemeColor(outAlpha << 24 | mixed[0] << 16 | mixed[1] << 8 | mixed[2])
+        return ThemeColor(Self.byte(outAlpha) << 24 | mixed[0] << 16 | mixed[1] << 8 | mixed[2])
     }
 
     /// WCAG 2's relative luminance, from 0 (black) to 1 (white), ignoring opacity.
@@ -67,6 +72,10 @@ public struct ThemeColor: Hashable, Sendable {
 
     private static func component(_ value: UInt32) -> Double {
         Double(value & 0xFF) / 255
+    }
+
+    private static func byte(_ component: Double) -> UInt32 {
+        UInt32((min(max(component, 0), 1) * 255).rounded())
     }
 }
 

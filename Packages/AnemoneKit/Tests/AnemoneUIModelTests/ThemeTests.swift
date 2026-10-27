@@ -12,9 +12,8 @@ struct ThemeTests {
         ])
     }
 
-    @Test func `the setting has Wholphin's name and default, and reads a theme it doesn't know as purple`() throws {
-        let defaults = try #require(UserDefaults(suiteName: "ThemeTests.setting"))
-        defaults.removePersistentDomain(forName: "ThemeTests.setting")
+    @Test func `the setting has Wholphin's name and default, and reads a theme it doesn't know as purple`() {
+        let defaults = MemoryDefaults()
         let setting = Preferences.appThemeColors
         #expect(setting.key == "appThemeColors")
         #expect(setting.value(in: defaults) == .purple)
@@ -74,9 +73,9 @@ struct ThemeTests {
         let theme = Theme(colors, scheme: scheme)
         let palette = theme.palette
         // TV Material's focus border is `inversePrimary`, sometimes translucent.
-        #expect(palette.border.opacity(1) == palette.inversePrimary.opacity(1))
+        #expect(palette.border.withAlpha(1) == palette.inversePrimary.withAlpha(1))
         #expect(theme.focusRing == palette.border)
-        #expect(theme.accent == palette.border.opacity(1))
+        #expect(theme.accent == palette.border.withAlpha(1))
         #expect(theme.progress == palette.tertiary)
         #expect(theme.secondaryText == palette.onSurfaceVariant)
         #expect(theme.focusedPlatter == palette.onSurface)
@@ -91,7 +90,48 @@ struct ThemeTests {
         #expect(abs(white.contrast(with: black) - 21) < 0.001)
         #expect(white.contrast(with: white) == 1)
         #expect(ThemeColor(0x80FF_FFFF).over(black) == ThemeColor(0xFF80_8080))
-        #expect(ThemeColor(0xFF12_3456).opacity(0.75) == ThemeColor(0xBF12_3456))
+        // Replaces the alpha, where SwiftUI's `opacity(_:)` would multiply it.
+        #expect(ThemeColor(0xFF12_3456).withAlpha(0.75) == ThemeColor(0xBF12_3456))
+        #expect(ThemeColor(0x4012_3456).withAlpha(0.75) == ThemeColor(0xBF12_3456))
+        #expect(ThemeColor(0x8012_3456).withAlpha(2) == ThemeColor(0xFF12_3456))
+    }
+
+    @Test func `a colour drawn over a translucent one composites source-over`() {
+        // Opaque on top hides what's under it; opaque underneath stays opaque.
+        #expect(ThemeColor(0xFF12_3456).over(ThemeColor(0x80FF_FFFF)) == ThemeColor(0xFF12_3456))
+        #expect(ThemeColor(0xBF74_1BF8).over(ThemeColor(0xFF15_121C)) == ThemeColor(0xFF5C_19C1))
+        // Over nothing, a colour is itself, not darkened towards black.
+        #expect(ThemeColor(0x80FF_8000).over(ThemeColor(0)) == ThemeColor(0x80FF_8000))
+        #expect(ThemeColor(0x00FF_0000).over(ThemeColor(0)) == ThemeColor(0))
+        // Half red over half blue: three quarters covered, two thirds of it by the red.
+        #expect(ThemeColor(0x80FF_0000).over(ThemeColor(0x8000_00FF)) == ThemeColor(0xC0AA_0055))
+        // A quarter white over half black: the black covers more, so it's a dark grey.
+        #expect(ThemeColor(0x40FF_FFFF).over(ThemeColor(0x8000_0000)) == ThemeColor(0xA066_6666))
+    }
+
+    @Test(arguments: [
+        (ThemeColor(0x80FF_0000), ThemeColor(0x8000_00FF)),
+        (ThemeColor(0x40FF_FFFF), ThemeColor(0x8000_0000)),
+        (ThemeColor(0xBF74_1BF8), ThemeColor(0x26FF_FFFF)),
+        (ThemeColor(0xC04D_4B4B), ThemeColor(0x0000_0000)),
+    ])
+    func `translucent layers flattened first show the same on the page`(top: ThemeColor, middle: ThemeColor) {
+        // Source-over is associative: a over (b over the page) is (a over b) over the page.
+        for page in [ThemeColor(0xFF15_121C), ThemeColor(0xFFFF_FFFF), ThemeColor(0xFF00_0000)] {
+            let layered = top.over(middle.over(page))
+            let flattened = top.over(middle).over(page)
+            #expect(layered.alpha == 1)
+            #expect(flattened.alpha == 1)
+            let components = [
+                (layered.red, flattened.red),
+                (layered.green, flattened.green),
+                (layered.blue, flattened.blue),
+            ]
+            // Each step rounds to a byte, so they may be one apart.
+            for (one, other) in components {
+                #expect(abs(one - other) <= 1.0 / 255 + 1e-9, "\(top) over \(middle) over \(page)")
+            }
+        }
     }
 
     /// Text against what it's drawn on: 4.5 to 1 for AA. Each palette's own pairs are checked in
@@ -223,5 +263,27 @@ struct ThemeTests {
             }
         }
         return roles
+    }
+}
+
+/// Defaults kept in memory, so the setting's test leaves nothing on disk: macOS writes a suite's
+/// plist, even an emptied one, after the test process has ended.
+private final class MemoryDefaults: UserDefaults, @unchecked Sendable {
+    private var values: [String: Any] = [:]
+
+    override func object(forKey key: String) -> Any? {
+        values[key]
+    }
+
+    override func string(forKey key: String) -> String? {
+        values[key] as? String
+    }
+
+    override func set(_ value: Any?, forKey key: String) {
+        values[key] = value
+    }
+
+    override func removeObject(forKey key: String) {
+        values[key] = nil
     }
 }

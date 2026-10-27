@@ -37,7 +37,7 @@ public struct PersonCard: View {
             .overlay {
                 // Wholphin's focused person card: a 3 dp ring in the focus colour.
                 Circle()
-                    .strokeBorder(theme.focusRing, lineWidth: 6)
+                    .strokeBorder(theme.focusRing, lineWidth: Theme.focusRingWidth)
                     .opacity(isFocused ? 1 : 0)
             }
             .scaleEffect(isFocused ? 1.12 : 1)
