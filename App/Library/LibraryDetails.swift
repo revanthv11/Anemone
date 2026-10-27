@@ -130,6 +130,8 @@ extension FocusedTitle {
 
 enum LibraryDetailsLayout {
     static let headerHeight: CGFloat = 250
+    /// Between the header and a grid scrolled up under it.
+    static let spacingBelowHeader: CGFloat = 16
     static let logoWidth: CGFloat = 520
     static let logoHeight: CGFloat = 80
     static let overviewWidth: CGFloat = 1100

@@ -75,7 +75,7 @@ struct LibraryItemsPage: View {
         let options = viewOptions
         switch (options.showsDetails, options.layout) {
         case (true, .grid):
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: LibraryDetailsLayout.spacingBelowHeader) {
                 LibraryDetailsHeader(focus: focus)
                     .padding(.horizontal, GridLayout.horizontalInset)
                 grid(pager)
@@ -119,7 +119,9 @@ struct LibraryItemsPage: View {
                     focus.note(pager.item(at: index))
                 }
             },
-            onPastFirstRow: onPastFirstRow,
+            // The details stay put over the grid or beside the list, so the tabs above them do too,
+            // rather than leaving the details under the sidebar's title.
+            onPastFirstRow: options.showsDetails ? { _ in } : onPastFirstRow,
             emptyMessage: emptyMessage,
             header: {
                 if withHeader {

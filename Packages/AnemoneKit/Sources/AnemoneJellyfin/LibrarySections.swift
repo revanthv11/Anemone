@@ -28,8 +28,7 @@ public extension Library {
     /// The tab the page opens on: the remembered one, as Wholphin's `RememberedTabService` keeps
     /// it, when the library still has that tab; otherwise the first.
     func startingSection(remembered: String?) -> LibrarySection {
-        let sections = sections
-        return remembered.flatMap(LibrarySection.init(rawValue:)).flatMap { sections.contains($0) ? $0 : nil }
-            ?? sections[0]
+        let tabs = sections
+        return remembered.flatMap(LibrarySection.init(rawValue:)).flatMap { tabs.contains($0) ? $0 : nil } ?? tabs[0]
     }
 }
