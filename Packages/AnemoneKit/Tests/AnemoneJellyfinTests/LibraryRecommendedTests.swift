@@ -65,6 +65,30 @@ struct LibraryRecommendedTests {
         #expect(unwatched["includeItemTypes"] == ["Series"])
     }
 
+    @Test func `the tab follows Home's items per row and Next Up rewatching settings`() async throws {
+        let sent = recordRecommendedRequests(host: "rec-settings.test")
+
+        _ = try await librarySession(host: "rec-settings.test").recommended(
+            in: shows,
+            itemsPerRow: 5,
+            enableRewatchingNextUp: true,
+        )
+
+        let queries = sent.withLock { $0 }
+        let nextUp = try #require(queries.first { $0.path == "/Shows/NextUp" }?.query)
+        #expect(nextUp["enableRewatching"] == ["true"])
+        #expect(nextUp["limit"] == ["5"])
+        #expect(queries.first { $0.path == "/UserItems/Resume" }?.query["limit"] == ["5"])
+        let items = queries.filter { $0.path == "/Items" }.map(\.query)
+        let released = try #require(items.first { $0["sortBy"]?.first == "PremiereDate" })
+        let added = try #require(items.first { $0["sortBy"] == ["DateCreated"] && $0["isPlayed"] == nil })
+        let unwatched = try #require(items.first { $0["sortBy"] == ["CommunityRating"] })
+        #expect([released, added, unwatched].allSatisfy { $0["limit"] == ["5"] })
+        // The suggestions are cut from five too: 30% new and 30% random, at least one of each.
+        let newest = try #require(items.first { $0["sortBy"] == ["DateCreated"] && $0["isPlayed"] == ["false"] })
+        #expect(newest["limit"] == ["1"])
+    }
+
     @Test func `a failing row is left out and reported, but a revoked token stops the tab`() async throws {
         MockServer.register(host: "rec-fail.test") { request in
             request.url?.path() == "/UserItems/Resume" ? nil : .json(#"{"Items":[]}"#)

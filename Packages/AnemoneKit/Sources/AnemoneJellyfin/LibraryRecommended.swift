@@ -63,11 +63,16 @@ public extension Library {
 public extension JellyfinSession {
     /// A library's Recommended tab. Rows load in parallel; one failing doesn't stop the others.
     ///
-    /// - Parameter limit: Wholphin's "max items per row".
+    /// Like Wholphin's, the tab follows two of Settings › Home's settings, so it matches Home.
+    ///
+    /// - Parameters:
+    ///   - limit: "Max items on home page rows", for every row and the suggestions.
+    ///   - enableRewatchingNextUp: "Enable rewatching in Next Up", for a TV library's Next Up.
     /// - Throws: `SessionError.signedOut` from any row.
     func recommended(
         in library: Library,
         itemsPerRow limit: Int = HomeRow.defaultLimit,
+        enableRewatchingNextUp: Bool = false,
         now: Date = .now,
     ) async throws -> RecommendedContent {
         let kinds = library.recommendedRows
@@ -75,7 +80,14 @@ public extension JellyfinSession {
             for (index, kind) in kinds.enumerated() {
                 group.addTask {
                     do {
-                        return try await (index, .success(recommendedItems(kind, in: library, limit: limit, now: now)))
+                        let items = try await recommendedItems(
+                            kind,
+                            in: library,
+                            limit: limit,
+                            enableRewatchingNextUp: enableRewatchingNextUp,
+                            now: now,
+                        )
+                        return (index, .success(items))
                     } catch {
                         return (index, .failure(error))
                     }
@@ -108,11 +120,14 @@ public extension JellyfinSession {
     /// One row of a library's Recommended tab, asked for as Wholphin asks. Empty for a row the
     /// library doesn't have, such as Next Up for movies.
     ///
-    /// - Parameter now: the latest release date Recently Released shows.
+    /// - Parameters:
+    ///   - enableRewatchingNextUp: whether Next Up offers series watched before, as on Home.
+    ///   - now: the latest release date Recently Released shows.
     func recommendedItems(
         _ row: RecommendedRow.Kind,
         in library: Library,
         limit: Int = HomeRow.defaultLimit,
+        enableRewatchingNextUp: Bool = false,
         now: Date = .now,
     ) async throws -> [MediaItem] {
         guard let kind = library.suggestionKind else { return [] }
@@ -121,7 +136,7 @@ public extension JellyfinSession {
         case .continueWatching:
             return try await resumeItems(in: library, type: isTV ? .episode : .movie, limit: limit)
         case .nextUp:
-            return isTV ? try await nextUpItems(in: library, limit: limit) : []
+            return isTV ? try await nextUpItems(in: library, limit: limit, rewatching: enableRewatchingNextUp) : []
         case .recentlyReleased:
             var parameters = recommendedParameters(in: library, types: [isTV ? .episode : .movie], limit: limit)
             parameters.maxPremiereDate = now
@@ -162,7 +177,7 @@ public extension JellyfinSession {
         return try await send(Paths.getResumeItems(parameters: parameters)).items.recommendedItems
     }
 
-    private func nextUpItems(in library: Library, limit: Int) async throws -> [MediaItem] {
+    private func nextUpItems(in library: Library, limit: Int, rewatching: Bool) async throws -> [MediaItem] {
         var parameters = Paths.GetNextUpParameters(userID: userID)
         parameters.parentID = library.id
         parameters.limit = limit
@@ -171,8 +186,7 @@ public extension JellyfinSession {
         parameters.enableUserData = true
         parameters.enableTotalRecordCount = false
         parameters.enableResumable = false
-        // Wholphin's "rewatch in Next Up" setting, which is off unless changed.
-        parameters.enableRewatching = false
+        parameters.enableRewatching = rewatching
         return try await send(Paths.getNextUp(parameters: parameters)).items.recommendedItems
     }
 

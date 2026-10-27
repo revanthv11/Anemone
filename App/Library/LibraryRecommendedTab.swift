@@ -1,3 +1,4 @@
+import AnemoneCore
 import AnemoneJellyfin
 import AnemoneUI
 import SwiftUI
@@ -102,7 +103,12 @@ struct LibraryRecommendedTab: View {
 
     private func load() async {
         do {
-            let recommended = try await browse.session.recommended(in: library)
+            // Settings › Home's row length and Next Up rewatching apply here too, as in Wholphin.
+            let recommended = try await browse.session.recommended(
+                in: library,
+                itemsPerRow: Preferences.maxItemsPerRow.value(),
+                enableRewatchingNextUp: Preferences.enableRewatchingNextUp.value(),
+            )
             guard !Task.isCancelled else { return }
             if let first = recommended.rows.first?.items.first {
                 focus.details = ItemDetails(item: first)
