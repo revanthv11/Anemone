@@ -32,6 +32,12 @@ struct PlayerScreen: View {
                             PlayerCardView(card: card)
                                 // A new card is a new view, so it takes focus too.
                                 .id(card.id)
+                                // Menu takes the card's last button, its way out, rather than
+                                // closing the player: Up Next's Cancel keeps the credits playing,
+                                // as Wholphin's Back does, and closes the player only at the end.
+                                .onExitCommand {
+                                    playback.accessories.card?.actions.last?.perform()
+                                }
                                 .padding(80)
                         }
                     }

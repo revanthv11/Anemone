@@ -78,7 +78,8 @@ public final class Seeker {
         target != nil
     }
 
-    /// Reads the engine's time and length again; the overlay calls it a few times a second.
+    /// Reads the engine's time and length again; the overlay calls it a few times a second while
+    /// something on screen shows them (`PlayerOverlay.showsPosition`).
     public func refresh() {
         position = engine.currentTime
         duration = engine.duration

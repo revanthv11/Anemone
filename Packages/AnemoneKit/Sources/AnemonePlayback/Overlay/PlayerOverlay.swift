@@ -72,6 +72,9 @@ public final class PlayerOverlay {
     public var hideDelay: Duration
 
     @ObservationIgnored private let details: PlaybackDetails?
+    @ObservationIgnored private let segments: SegmentSkipping?
+    /// The user's setting for a kind of segment, read each time, as `SegmentSkipping` reads it.
+    @ObservationIgnored private let skipBehavior: @MainActor (MediaSegment.Kind) -> SkipSegmentBehavior
     @ObservationIgnored private let lingerDelay: Duration
     /// Presses whose start the overlay took, so it takes their end too.
     @ObservationIgnored private var claimed: Set<Button> = []
@@ -84,12 +87,17 @@ public final class PlayerOverlay {
         seeker: Seeker? = nil,
         hideDelay: Duration = .milliseconds(Preferences.controllerTimeoutMs.value()),
         seekBarLinger: Duration = PlayerOverlay.seekBarLinger,
+        skipBehavior: @escaping @MainActor (MediaSegment.Kind) -> SkipSegmentBehavior = {
+            Preferences.skipBehavior(for: $0).value()
+        },
     ) {
         self.controller = controller
         self.seeker = seeker ?? Seeker(engine: controller.engine)
         self.hideDelay = hideDelay
+        self.skipBehavior = skipBehavior
         lingerDelay = seekBarLinger
         details = controller.feature(PlaybackDetails.self)
+        segments = controller.feature(SegmentSkipping.self)
     }
 
     /// Paused, or not yet under way.
@@ -108,7 +116,7 @@ public final class PlayerOverlay {
         case .leftArrow, .rightArrow:
             let direction: SeekDirection = button == .leftArrow ? .back : .forward
             if !controlsVisible {
-                showsSeekBar = true
+                showSeekBar()
             }
             let ignored = controlsVisible ? 0 : SeekAcceleration.hiddenControlsIgnoredRepeats
             seeker.pressBegan(direction, ignoredRepeats: ignored)
@@ -217,7 +225,7 @@ public final class PlayerOverlay {
         isSwiping = true
         pulse()
         if !controlsVisible {
-            showsSeekBar = true
+            showSeekBar()
         }
         seeker.swipeBegan()
     }
@@ -239,6 +247,10 @@ public final class PlayerOverlay {
     // MARK: - Controls
 
     public func showControls() {
+        if !showsPosition {
+            // Nothing has read the position while nothing showed it.
+            seeker.refresh()
+        }
         controlsVisible = true
         page = .controls
         showsSeekBar = false
@@ -307,49 +319,32 @@ public final class PlayerOverlay {
     }
 }
 
-/// Playback, through the controller and its engine.
+/// What the overlay shows besides the controls.
 public extension PlayerOverlay {
-    func togglePlayPause() {
-        guard !controller.hasEnded else { return }
-        if isPaused {
-            controller.engine.play()
-        } else {
-            controller.engine.pause()
+    /// Whether anything on screen shows where playback is: the controls, or the compact seek bar.
+    /// The overlay reads the engine's position only while it does, rather than all through
+    /// playback.
+    var showsPosition: Bool {
+        controlsVisible || showsSeekBar
+    }
+
+    /// The segment playing, for the skip button in Wholphin's controls, which skips the rest of
+    /// it: a kind the user doesn't ignore, once `SegmentSkipping`'s own button has gone. While
+    /// that one shows, it's among the controls' actions.
+    var skippableSegment: MediaSegment? {
+        guard let segments, let segment = segments.current, segments.offered != segment,
+              skipBehavior(segment.kind) != .ignore
+        else { return nil }
+        return segment
+    }
+
+    /// The compact seek bar, while seeking with the controls hidden.
+    private func showSeekBar() {
+        if !showsPosition {
+            // Nothing has read the position, or the length a swipe scrubs by, while nothing showed
+            // them.
+            seeker.refresh()
         }
-        pulse()
-    }
-
-    /// Wholphin's Previous: the previous entry near the start of this one, otherwise back to the
-    /// start. Intros are passed over.
-    func previous() {
-        if let index = controller.queue.previousIndex, controller.engine.currentTime < Self.restartThreshold {
-            play(entryAt: index)
-        } else {
-            seeker.jump(to: .zero)
-            pulse()
-        }
-    }
-
-    var hasNext: Bool {
-        controller.queue.next != nil
-    }
-
-    /// The next entry, passing over intros.
-    func next() {
-        guard let index = controller.queue.nextIndex else { return }
-        play(entryAt: index)
-    }
-
-    /// Plays another queue entry, as the queue row does.
-    func play(entryAt index: Int) {
-        seeker.cancel()
-        hideControls()
-        controller.play(entryAt: index)
-    }
-
-    /// Jumps to a chapter and hides the controls, as Wholphin's chapter row does.
-    func jump(to chapter: Chapter) {
-        seeker.jump(to: chapter.start)
-        hideControls()
+        showsSeekBar = true
     }
 }
