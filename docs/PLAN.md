@@ -107,7 +107,8 @@ Apart from Settings, now a list with a page for each part of the app, nothing vi
 ### Phase 1: foundation
 
 - [x] Add a server by URL: HTTPS first, then Jellyfin's default port; reverse-proxy paths kept; Jellyfin 12+ and finished-setup checks
-- [ ] Server discovery (waits on the multicast spike)
+- [x] Server discovery in AnemoneJellyfin: `ServerDiscovery` sends Jellyfin's "who is JellyfinServer?" to UDP port 7359 at each network's broadcast address and 255.255.255.255, then for 5 s lists each server that answers, once, from its JSON reply (id, name and address). BSD sockets, since a Network.framework connection only hears from the address it sends to; the port and addresses can be set, so tests answer on 127.0.0.1
+- [ ] Discovered servers on the add-server screen: waits on Apple's multicast entitlement and the multicast spike
 - [x] Sign in with a password or Quick Connect
 - [x] Multiple servers and profiles; switching protected by a hashed PIN or by requiring sign-in
 - [x] Everything stored in one Keychain item; last profile restored on launch unless it's locked
@@ -116,6 +117,10 @@ Apart from Settings, now a list with a page for each part of the app, nothing vi
 Tested live against the Jellyfin 12.3 demo server (adding the server, the profile list, getting a Quick Connect code) and against the maintainer's own Jellyfin 12.2 server: password sign-in, session restore, PIN lock and unlock, a locked profile not being restored on launch, and sign-out.
 
 tvOS ignores `.keyboardType(.numberPad)`, so PIN entry uses the full on-screen keyboard. A custom PIN pad is an idea for later.
+
+Server discovery is tested only by unit tests on macOS, against a stand-in server on 127.0.0.1 at a port the system picks: the probe's text, a reply becoming a server, a server answering twice listed once, stray datagrams ignored, a nameless server going by its host, the search ending on time, stopping early closing its socket, and which interfaces' broadcast addresses are used. Not verified: a real Jellyfin server answering a broadcast, and anything on Apple TV. Nothing in the app calls it yet.
+
+Not yet: the multicast entitlement (`com.apple.developer.networking.multicast`), which iOS needs to send a broadcast and tvOS may too (the multicast spike checks on hardware). It's a user and Apple step: the maintainer asks Apple for it (developer.apple.com/contact/request/networking-multicast), then it goes in the app's entitlements and provisioning profile. After that, a "found nearby" list on the add-server screen, each server added through `ServerConnector` like a typed address, as Wholphin's server list does.
 
 ### Phase 2: browsing
 
@@ -208,7 +213,15 @@ Not yet: chapters for episodes outside a season, Wholphin's "Show media manageme
 
 #### 2h: Favorites page and card context menu
 
-Not started. The Favorites destination is in the sidebar, before the libraries as in Wholphin's drawer, and hidden until this lands.
+- [x] Favorites page in the sidebar, before the libraries as in Wholphin's drawer: a row per type where Wholphin has a tab per type, in its order, for the types the user's libraries can hold (up to 100 per row, by name), with a header and backdrop for the focused card. It reloads when it shows again and after a card's menu changes something; a row that fails is left out with a notice
+- [x] Card context menu on a long press of Select, in Wholphin's order: Go to, Play or Resume and Restart, Add to playlist, Remove from Continue Watching, Remove from Next Up (Home's, from 2e), Mark as watched or unwatched, Add to or remove from favorites, and Go to series; people get Go to and favourites. `MediaCard` says what it shows, `CardRow` opens the menu on the card's button, and one handler set in `SignedInView` does the work, so every card on item pages and in Search has it
+- [x] A change from the menu shows at once on every card of that item, until the card's page reloads with newer state
+- [x] Add to playlist lists the 25 newest playlists the user may edit, as Wholphin does. One that already holds the item has a check, and choosing it takes the item out again; Wholphin doesn't look inside, so it can add an item twice
+- Cards that hold only a `MediaItem` don't know whether it's watched or a favourite, so their menu offers both ways. Home and library grids don't pass their items to the menu yet, and Home sets which of its rows are Continue Watching and Next Up (`cardMenuSource`)
+
+Tested live in the simulator against the Jellyfin 12.3 demo server, with throwaway UI tests: on The Great Train Robbery's card on a person page, the menu added it to favorites and marked it unwatched and watched again, with the card's heart and check following each time; the Favorites page then listed it under Movies, and removing it there from the card's menu took it off the page. "Go to series" on a Pioneer One episode card on the season page opened the series page, and Back returned to the season page. Add to playlist added the movie to playlist "123", showed the check the next time, and took it out again. Play from the menu played the movie and closed back to the page. Long-pressing a person card shows no menu. Not verified live: Resume and Restart, Remove from Continue Watching and Next Up (Home doesn't pass its items to the menu yet), the menu in Search results, and an item whose state the card doesn't know.
+
+Not yet: Home rows and library grids passing their items (and Home its row types) to the menu; creating a playlist from Add to playlist; Wholphin's person card menu; delete (with 2g's option); after playing from a menu, focus returns to the page's first control rather than the card.
 
 ### Phase 3: playback v1 (AVPlayer)
 
@@ -289,7 +302,22 @@ Not verified live: switching audio in place in a file that plays directly (the f
 
 #### 3e: Anemone player overlay, seeking, chapters, trickplay
 
-Not started. Plex-style overlay: D-pad seek with acceleration, clickpad scrubbing, chapters, queue, trickplay, and the controls features add.
+- [x] Settings › Playback › Player Controls: the system player, still the default, or Anemone's overlay, with Wholphin's skip amounts (10 s back, 30 s forward), how long the controls stay up (5 s) and a debug panel. Engines that draw their own video, as MPV will, always get the overlay
+- [x] Wholphin's overlay over an `AVPlayerLayer`, driven only through the controller and its `PlayerEngine`: the title, episode, tracks playing and "Ends at"; the seek bar and its times; Previous, skip back, Play/Pause, skip forward and Next; a pause indicator. Previous restarts the entry unless it's within 3 s of the start, as in Wholphin
+- [x] D-pad seeking that speeds up while held. SwiftUI's move commands don't say how long a press lasts, so a view controller takes `pressesBegan` and `pressesEnded` before the focus engine, as Swiftfin's player does, and repeats a held press at Android's pace (every 50 ms after 500 ms) through Wholphin's `SeekAcceleration` tiers; with the controls hidden the first 8 repeats pass, as in Wholphin. The seek lands 750 ms after the last press, as Wholphin's seek bar waits; Select seeks at once and Menu drops it. Menu then hides the controls, then closes the player
+- [x] Swipe scrubbing on the clickpad, with the controls hidden or on the seek bar: a swipe across the surface covers a fifth of the video, between 2 and 10 minutes
+- [x] Trickplay thumbnails over the seek bar, from the item's trickplay for the version playing, at the widest width up to 480 px. Sheets come through the session, since they need the token, and only the three asked for last stay decoded: a sheet that finishes loading after seeking has moved on keeps just its JPEG
+- [x] The chapter row with the chapters' images, starting on the chapter playing, and the queue row with what plays after this entry, below the transport as in Wholphin
+- [x] What features add through `PlayerAccessories`: their actions over the video take focus when they appear, their menus open as lists over the controls, and the card shows above everything, as with the system player
+- [x] A debug panel behind a setting: the engine, play method and session, version, position, speed, trickplay, chapters and tracks
+
+Wholphin's `TODO()` crashes for the playlist and video-filter dialogs (`PlaybackPage.kt:292-296`) aren't ported: the overlay has neither action.
+
+Tested live in the simulator against the fixture server, with Anemone H264 Chapters (3 minutes, 6 chapters, trickplay): right twice with the controls hidden showed the compact seek bar with a thumbnail and landed a minute on; Select brought up the controls on Play/Pause; on the seek bar two presses moved 60 s with a thumbnail over the bar; down from the transport opened the chapter row on the chapter playing, and choosing an earlier one jumped there; Play/Pause paused and resumed, as the debug panel showed the controller heard; Menu hid the controls, then closed the player; and with 3c's `-fakeSegments`, Skip Intro showed over the video with focus and skipped the intro. And against the demo server, with Night of the Living Dead (96 minutes, trickplay): holding right for 2 s moved 11 minutes and then holding for 5 s moved 47, where the 2 s hold's pace would have reached 41 (a hold starts seeking after 0.9 s), and after closing the page offered Resume from where the seek had landed. With the setting left at System, the system player is unchanged. Jellyfin keeps no resume position for videos under 5 minutes, so the fixture movie's page offered Play again. After review: on the fixture movie, paused at 2:35 in the last chapter, whose card starts off screen, down from the transport opened the row on that card, and after choosing the second chapter the row opened on it; the times read 2:35 and -0:25 beside "Ends at"; and on the demo movie, a 5 s hold and then a 2 s one crossed three trickplay sheets and the compact bar still showed the thumbnail for where each landed.
+
+Not verified live: swiping on the clickpad, which the simulator's UI tests can't do (the scrubbing itself is unit-tested), the queue row, which needs more than one entry (3b), and features' menus and cards in the overlay, since no feature adds any yet.
+
+Not yet: Now Playing and remote commands while the overlay plays, which 3f adds for both players; skip-back on resume; a playback speed menu.
 
 #### 3f: Now Playing, display matching and playback settings
 
@@ -333,13 +361,19 @@ Not started.
 
 #### 6a: release config: privacy, ATS, export compliance, licenses screen, EULA draft
 
-Not started.
+The release work and its reasons are in `docs/release/`, starting with `checklist.md`.
 
-- Privacy manifest and privacy labels (no data collected; logs go only to the user's own server)
-- Export compliance (standard encryption only)
-- ATS justification for user-entered plain-HTTP servers; local network usage string
-- Demo Jellyfin server and reviewer login, with legally free media
-- Custom GPL EULA, source tag per build
+- [x] Privacy manifests for the app and the Top Shelf extension: no tracking and no data collected, since everything goes only to the user's own server. The app declares UserDefaults (`CA92.1`) and file timestamps (`C617.1`, Nuke's artwork disk cache). The App Privacy answers and a privacy policy draft are in `docs/release/privacy.md` and `privacy-policy.md`
+- [x] Export compliance: `ITSAppUsesNonExemptEncryption` is `NO`, since the app only uses the system's HTTPS, the Keychain and SHA-256 for PINs. To look at again if MPVKit brings its own TLS library
+- [x] ATS: `NSAllowsArbitraryLoads` in the app, and now in the extension, for the plain-HTTP servers people type in, with the case for App Review in `docs/release/ats.md`. The local network usage string names the servers the user adds
+- [x] Settings › About: the version, the GPL, and where the source of each build is tagged; then a page per project Anemone is based on (Wholphin, Swiftfin) and per package, each with its full license text, as Wholphin's `LicenseInfo` lists its libraries. The list is read from `NOTICE.md`, which the app bundles at build time (a link in `App/Settings/About`), so a credit added there shows up without touching the screen; a test checks that the file keeps parsing. `scripts/update-licenses.sh` copies the packages' license texts from Xcode's checkouts and warns about a package NOTICE.md doesn't credit
+- [x] A custom GPL EULA draft, following Apple's minimum terms, and an App Review notes template (`docs/release/eula.md`, `app-review-notes.md`)
+- [x] `scripts/tag-build.sh` tags the commit each TestFlight build is archived from as `build/<version>-<build>`, the tag Settings › About names, after checking the commit is on GitHub and the build number isn't tagged yet
+- [ ] Demo Jellyfin server and reviewer login, with legally free media (the developer's to set up)
+
+Tested live in the simulator: Settings › About showed the version, the GPL, Wholphin, Swiftfin and all eight packages, and focus scrolled it to the last package and back; the GPL's page scrolled a paragraph at a time; Wholphin's page reached its license, and Nuke's showed its MIT text. In the add-server flow, `http://localhost:8196` (the local fixture server, plain HTTP) connected and showed that server's profiles, and the demo server's saved profile then went back to Home. The built app's `Info.plist` has the export compliance and ATS keys, and both bundles carry their privacy manifest. Not verified: a plain-HTTP server on another host (the simulator only reached localhost), an archive's privacy report, and anything in App Store Connect.
+
+Not yet: the app icon, Top Shelf image and screenshots; the EULA's final wording; the App Store Connect record. The release checklist lists them.
 
 #### 6b: colour themes, VoiceOver pass, localization import
 

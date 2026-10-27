@@ -9,6 +9,7 @@ public extension PlaybackController {
             SegmentSkipping(session: session),
             UpNext(),
             TrackSelection(session: session),
+            PlaybackDetails(session: session),
         ]
     }
 }

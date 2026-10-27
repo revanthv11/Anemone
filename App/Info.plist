@@ -4,11 +4,15 @@
 <dict>
 	<key>NSAppTransportSecurity</key>
 	<dict>
-		<!-- Home Jellyfin servers are usually reached over plain HTTP at an address the user types. -->
+		<!-- Home Jellyfin servers are usually reached over plain HTTP at an address the user types,
+		     so no list of domains can name them. The case for App Review is in docs/release/ats.md. -->
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<!-- HTTPS through the system only, which is exempt; see docs/release/export-compliance.md. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Anemone connects to Jellyfin servers on your local network.</string>
+	<string>Anemone connects to the Jellyfin servers you add, including ones on your home network.</string>
 </dict>
 </plist>
