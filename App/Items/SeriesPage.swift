@@ -1,4 +1,5 @@
 import AnemoneJellyfin
+import AnemonePlayback
 import AnemoneUI
 import SwiftUI
 
@@ -13,6 +14,7 @@ struct SeriesPage: View {
     @State private var seasons: [ItemDetails] = []
     @State private var similar: [ItemDetails] = []
     @State private var alert: ItemAlert?
+    @State private var playback: PlaybackRequest?
     @State private var confirmsPlayed = false
     @State private var extras = ItemExtras()
 
@@ -43,6 +45,9 @@ struct SeriesPage: View {
         }
         .initialFocus($focus, .action(.play))
         .itemAlert($alert)
+        .player($playback) {
+            await reload()
+        }
         // Marking a whole series is confirmed first, as in Wholphin.
         .alert(series.item.name, isPresented: $confirmsPlayed) {
             Button(series.userState.isPlayed ? "Mark as unwatched" : "Mark as watched") {
@@ -95,14 +100,15 @@ struct SeriesPage: View {
         HStack(spacing: 24) {
             // Wholphin plays the next episode up, or the first one.
             ActionButton(title: "Play", systemImage: "play.fill") {
-                alert = .queueUnavailable
+                play(shuffled: false)
             }
             .focused($focus, equals: .action(.play))
             .accessibilityIdentifier("action.play")
             ActionButton(title: "Shuffle", systemImage: "shuffle") {
-                alert = .queueUnavailable
+                play(shuffled: true)
             }
             .focused($focus, equals: .action(.shuffle))
+            .accessibilityIdentifier("action.shuffle")
             PlayedButton(isPlayed: series.userState.isPlayed) {
                 confirmsPlayed = true
             }
@@ -113,8 +119,6 @@ struct SeriesPage: View {
             .focused($focus, equals: .action(.favorite))
             TrailerButton(trailers: extras.trailers).focused($focus, equals: .action(.trailer))
             DeleteButton(item: series, canDelete: extras.canDelete).focused($focus, equals: .action(.delete))
-            PlaybackNotWiredNote()
-                .padding(.leading, 16)
         }
         .padding(.vertical, 20)
         .focusSection()
@@ -148,6 +152,12 @@ struct SeriesPage: View {
         }
     }
 
+    private func play(shuffled: Bool) {
+        Task {
+            await browse.playQueue(of: series, shuffled: shuffled) { playback = $0 } failed: { alert = $0 }
+        }
+    }
+
     private func setFavorite(_ isFavorite: Bool) async {
         if let state = await browse.save(.favorite(isFavorite), for: series, failed: { alert = $0 }) {
             series.apply(state)
@@ -158,6 +168,11 @@ struct SeriesPage: View {
     /// Wholphin's `setWatchedSeries`.
     private func setSeriesPlayed(_ isPlayed: Bool) async {
         guard await browse.save(.played(isPlayed), for: series, failed: { alert = $0 }) != nil else { return }
+        await reload()
+    }
+
+    /// The series and its seasons, for their new counts.
+    private func reload() async {
         let session = browse.session
         let id = series.id
         async let series = attempt { try await session.itemDetails(id: id) }

@@ -9,6 +9,10 @@ struct PlaybackSettingsPage: View {
                 SegmentSettingsPage()
             }
             .accessibilityIdentifier("settings.skipSegments")
+            NavigationLink("Autoplay") {
+                AutoplaySettingsPage()
+            }
+            .accessibilityIdentifier("settings.playback.autoplay")
         }
         .navigationTitle("Playback")
     }
