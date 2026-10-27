@@ -99,6 +99,9 @@ struct DrawnSubtitlesTests {
         #expect(await cues(at: .seconds(1), in: drawn) == ["Track 6 one"])
         try pick("subtitles.forced", in: "subtitles", of: playback)
         #expect(await eventually { drawn.track?.index == 5 })
+        // The track is set before its file is asked for, so switching off at once could cancel
+        // the request; waits for it first.
+        #expect(await eventually { fetches.all.count == 3 })
         try pick("subtitles.off", in: "subtitles", of: playback)
         #expect(await eventually { drawn.track == nil })
         #expect(drawn.update(at: .seconds(1)) == nil)
