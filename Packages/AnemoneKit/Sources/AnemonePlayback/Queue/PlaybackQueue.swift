@@ -23,6 +23,10 @@ public struct PlaybackQueue: Sendable {
     /// How many items the queue was built without because they can't play here, such as music
     /// in a playlist of videos, so the player can say so.
     public var skippedCount = 0
+    /// How many items the queue was built without because there were more than a queue holds
+    /// (`JellyfinSession.queueLimit`, as in Wholphin), such as in a large collection, so the
+    /// player can say so.
+    public var overLimitCount = 0
 
     /// A queue of `entry` alone.
     public init(_ entry: Entry) {
