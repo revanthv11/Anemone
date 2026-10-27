@@ -16,7 +16,7 @@ struct PlaybackSettingsPage: View {
             NavigationLink("Audio and Subtitles") {
                 AudioSubtitleSettingsPage()
             }
-            .accessibilityIdentifier("settings.audioSubtitles")
+            .accessibilityIdentifier("settings.playback.audioSubtitles")
             NavigationLink("Player Controls", destination: PlayerControlsSettingsPage.init)
                 .accessibilityIdentifier("settings.playback.playerControls")
         }
