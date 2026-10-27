@@ -19,6 +19,15 @@ struct TrackRequest: Hashable, Sendable {
         subtitleIndex ?? -1
     }
 
+    /// Puts these tracks in a request for a stream: the version, unless the request already has
+    /// the one playing, the indices, and the profile.
+    func apply(to request: inout StreamRequest) {
+        request.mediaSourceID = request.mediaSourceID ?? mediaSourceID
+        request.audioStreamIndex = audioIndex
+        request.subtitleStreamIndex = subtitleStreamIndex
+        request.profile = profile(from: request.profile)
+    }
+
     /// `profile`, or for burned-in subtitles a copy that has the server burn in every subtitle,
     /// as Swiftfin's "force subtitle burn-in" does. Otherwise the server would convert ASS to
     /// WebVTT for the HLS playlist, losing its styling and positions.

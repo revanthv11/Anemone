@@ -77,7 +77,8 @@ public final class SegmentSkipping: PlaybackFeature {
         case .stopped:
             enter(nil)
             withdrawOffer()
-        case .ended:
+        case .ended, .reloaded:
+            // A reload plays the same entry, so what was skipped stays skipped.
             break
         }
     }

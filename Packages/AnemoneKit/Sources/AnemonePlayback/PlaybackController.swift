@@ -16,9 +16,8 @@ public final class PlaybackController: Identifiable {
         case failed(any Error)
     }
 
-    /// Asks the server how to play an item: the item, whether direct play and direct stream are
-    /// allowed (not for Wholphin's retry as a transcode), and the version, which a retry keeps.
-    typealias StreamLoader = @Sendable (MediaItem.ID, Bool, String?) async throws -> PlaybackStream
+    /// Asks the server how to play an item, once features have prepared the request.
+    typealias StreamLoader = @Sendable (StreamRequest) async throws -> PlaybackStream
 
     public private(set) var queue: PlaybackQueue
     public private(set) var state = State.loading
@@ -52,6 +51,9 @@ public final class PlaybackController: Identifiable {
     @ObservationIgnored private var stream: PlaybackStream?
     /// Whether the last load allowed direct play, which `reload()` keeps.
     @ObservationIgnored private var allowsDirect = true
+    /// Where the loaded stream starts, until the engine is ready there: the engine's time says
+    /// 0 until then.
+    @ObservationIgnored private var pendingStart: Duration?
     /// Whether the loaded stream's play session is open, so features hear `stopped` once.
     @ObservationIgnored private var isSessionOpen = false
     /// The last session's `stopped`, which a later stop waits for.
@@ -68,20 +70,19 @@ public final class PlaybackController: Identifiable {
     /// A player for `request` on `session`'s server, with the features every player gets.
     public convenience init(session: JellyfinSession, request: PlaybackRequest) {
         // AVPlayer for everything until the MPV engine (Phase 4) chooses per item.
-        let engine = AVPlayerEngine()
-        let profile = engine.deviceProfile
-        let features = Self.features(for: session)
-        let tracks = features.lazy.compactMap { $0 as? TrackSelection }.first
-        self.init(request: request, engine: engine, features: features) { itemID, allowsDirect, mediaSourceID in
-            let choice = await tracks?.request(for: itemID, mediaSourceID: mediaSourceID)
-            return try await session.playbackStream(
-                for: itemID,
-                profile: choice?.profile(from: profile) ?? profile,
+        self.init(
+            request: request,
+            engine: AVPlayerEngine(),
+            features: Self.features(for: session),
+        ) { request in
+            try await session.playbackStream(
+                for: request.itemID,
+                profile: request.profile,
                 maxBitrate: AVPlayerProfile.defaultMaxBitrate,
-                allowsDirect: allowsDirect,
-                mediaSourceID: mediaSourceID ?? choice?.mediaSourceID,
-                audioStreamIndex: choice?.audioIndex,
-                subtitleStreamIndex: choice?.subtitleStreamIndex,
+                allowsDirect: request.allowsDirect,
+                mediaSourceID: request.mediaSourceID,
+                audioStreamIndex: request.audioStreamIndex,
+                subtitleStreamIndex: request.subtitleStreamIndex,
             )
         }
     }
@@ -147,11 +148,12 @@ public final class PlaybackController: Identifiable {
         play(entryAt: queue.currentIndex + 1)
     }
 
-    /// Asks the server for the current entry again and plays it on from where it is, after
-    /// ending its play session: for audio or subtitles the stream doesn't carry, as Wholphin's
-    /// `changeStreams` does.
+    /// Asks the server for the current entry again, after ending its play session, and plays
+    /// the new stream on from where the old one was: for audio or subtitles the stream doesn't
+    /// carry, as Wholphin's `changeStreams` does. Features hear `reloaded` rather than `loaded`,
+    /// since the entry is the same.
     public func reload() {
-        guard !isStopped, stream != nil else { return }
+        guard !isStopped, !hasEnded, stream != nil else { return }
         let position = currentPosition
         stopWatching()
         engine.pause()
@@ -159,7 +161,7 @@ public final class PlaybackController: Identifiable {
         let attempt = beginLoad()
         Task {
             await endSession(at: position)
-            await load(allowsDirect: allowsDirect, from: position, as: attempt)
+            await load(allowsDirect: allowsDirect, from: position, as: attempt, isReload: true)
         }
     }
 
@@ -195,14 +197,29 @@ public final class PlaybackController: Identifiable {
         return loads
     }
 
-    private func load(allowsDirect: Bool, from position: Duration?, as attempt: Int) async {
+    private func load(
+        allowsDirect: Bool,
+        from position: Duration?,
+        as attempt: Int,
+        isReload: Bool = false,
+    ) async {
         guard !isStopped else { return }
         let entry = queue.current
         self.allowsDirect = allowsDirect
+        var request = StreamRequest(
+            itemID: entry.itemID,
+            allowsDirect: allowsDirect,
+            mediaSourceID: stream?.mediaSourceID,
+            profile: engine.deviceProfile,
+        )
+        for feature in features {
+            await feature.prepare(&request)
+        }
+        guard !isStopped, attempt == loads else { return }
         do {
-            let stream = try await loadStream(entry.itemID, allowsDirect, stream?.mediaSourceID)
+            let stream = try await loadStream(request)
             guard !isStopped, attempt == loads else { return }
-            await play(stream, entry, from: position)
+            await play(stream, entry, from: position, isReload: isReload)
         } catch {
             guard !isStopped, attempt == loads else { return }
             state = .failed(error)
@@ -210,14 +227,20 @@ public final class PlaybackController: Identifiable {
         }
     }
 
-    private func play(_ stream: PlaybackStream, _ entry: PlaybackQueue.Entry, from position: Duration?) async {
+    private func play(
+        _ stream: PlaybackStream,
+        _ entry: PlaybackQueue.Entry,
+        from position: Duration?,
+        isReload: Bool,
+    ) async {
         self.stream = stream
         status = .paused
         isUnderWay = false
         wasPaused = false
+        pendingStart = position ?? .zero
         let events = engine.load(stream.url, from: position, metadata: entry.metadata)
         isSessionOpen = true
-        await publish(.loaded(stream, entry))
+        await publish(isReload ? .reloaded(stream) : .loaded(stream, entry))
         follow(events)
     }
 
@@ -279,8 +302,9 @@ public final class PlaybackController: Identifiable {
         }
     }
 
+    /// Where playback is: until the loaded stream is ready, where it's to start.
     private var currentPosition: Duration {
-        engine.currentTime
+        pendingStart ?? engine.currentTime
     }
 
     private var progress: PlaybackProgress {
@@ -324,6 +348,7 @@ private extension PlaybackController {
     }
 
     func ready() {
+        pendingStart = nil
         guard !isStopped else { return }
         state = .playing
         engine.play()

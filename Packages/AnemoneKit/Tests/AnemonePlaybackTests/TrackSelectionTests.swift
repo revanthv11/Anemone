@@ -13,7 +13,7 @@ struct TrackSelectionTests {
     private let log = EventLog()
     private let defaults: UserDefaults
     private let store: TrackChoiceStore
-    private let requests = TrackRequestLog()
+    private let requests = StreamRequestLog()
 
     init() throws {
         let suite = "TrackSelectionTests.\(UUID().uuidString)"
@@ -28,14 +28,14 @@ struct TrackSelectionTests {
         TrackSelection(
             server: TrackSelection.Server(
                 itemTracks: { id in
-                    id.hasPrefix("e")
-                        ? ItemTracks(
+                    id.hasPrefix("m")
+                        ? ItemTracks(itemID: id, sources: [.init(id: id, tracks: .multiTrack)])
+                        : ItemTracks(
                             itemID: id,
                             seriesID: "show",
                             seasonID: "s2",
-                            sources: [.init(id: id, tracks: .episode)],
+                            sources: [.init(id: id, tracks: .fixture(for: id))],
                         )
-                        : ItemTracks(itemID: id, sources: [.init(id: id, tracks: .multiTrack)])
                 },
                 profileSettings: { profile },
             ),
@@ -44,7 +44,7 @@ struct TrackSelectionTests {
         )
     }
 
-    /// A player that asks `selection` for tracks, as the real one does, and gets HLS back.
+    /// A player with `selection`, which puts its tracks in each request, and that gets HLS back.
     private func player(
         _ selection: TrackSelection,
         playing itemID: String = "m1",
@@ -55,10 +55,9 @@ struct TrackSelectionTests {
             engine: engine,
             features: [selection, log],
             positionInterval: .milliseconds(10),
-        ) { [requests] itemID, _, sourceID in
-            let choice = await selection.request(for: itemID, mediaSourceID: sourceID)
-            requests.append(choice)
-            return PlaybackStream.hls(itemID, choice, method: method)
+        ) { [requests] request in
+            requests.append(request)
+            return PlaybackStream.hls(request.itemID, request.tracks, method: method)
         }
     }
 
@@ -127,10 +126,10 @@ struct TrackSelectionTests {
 
         try pick("audio.2", in: "audio", of: playback)
 
-        #expect(await eventually { log.events.count { $0.hasPrefix("loaded") } == 2 })
+        #expect(await eventually { log.events.contains { $0.hasPrefix("reloaded") } })
         #expect(requests.all.last == TrackRequest(mediaSourceID: "m1", audioIndex: 2, subtitleIndex: 4))
         #expect(engine.loads.last?.position == .seconds(42))
-        #expect(log.events.after("stopped 42.0 seconds") == ["loaded m1 directStream"])
+        #expect(log.events.after("stopped 42.0 seconds") == ["reloaded m1 directStream"])
         #expect(menu("audio", in: playback)?.options.filter(\.isSelected).map(\.id) == ["audio.2"])
     }
 
@@ -181,6 +180,21 @@ struct TrackSelectionTests {
         #expect(await eventually { engine.selected[.subtitle] == 1 })
         #expect(menu("subtitles", in: playback)?.options.filter(\.isSelected).map(\.id) == ["subtitles.forced"])
         #expect(store.itemChoice(for: "m1")?.subtitle == .onlyForced)
+    }
+
+    @Test func `only forced kept for the season stays only forced, so it follows the audio`() async throws {
+        store.save(SeriesTrackChoice(parentID: "s2", parent: .season, kind: .subtitle, activation: .onlyForced))
+        let playback = player(selection(profile: ProfileTrackSettings(subtitleMode: SubtitleMode.none)), playing: "f1")
+        await start(playback)
+        #expect(requests.all == [TrackRequest(mediaSourceID: "f1", audioIndex: 1, subtitleIndex: 3)])
+        #expect(menu("subtitles", in: playback)?.options.filter(\.isSelected).map(\.id) == ["subtitles.forced"])
+
+        try pick("audio.2", in: "audio", of: playback)
+
+        // The Japanese forced subtitles, with Japanese audio.
+        #expect(await eventually { requests.all.count == 2 })
+        #expect(requests.all.last == TrackRequest(mediaSourceID: "f1", audioIndex: 2, subtitleIndex: 4))
+        #expect(menu("subtitles", in: playback)?.options.filter(\.isSelected).map(\.id) == ["subtitles.forced"])
     }
 
     @Test func `a pick is remembered for the item`() async throws {
@@ -234,10 +248,13 @@ struct TrackSelectionTests {
             request: PlaybackRequest(.item("m1")),
             engine: engine,
             features: [selection, log],
-        ) { [requests] itemID, _, _ in
-            let choice = await selection.request(for: itemID, mediaSourceID: nil)
-            requests.append(choice)
-            return PlaybackStream.hls(itemID, TrackRequest(audioIndex: 2, subtitleIndex: 5), method: .directStream)
+        ) { [requests] request in
+            requests.append(request)
+            return PlaybackStream.hls(
+                request.itemID,
+                TrackRequest(audioIndex: 2, subtitleIndex: 5),
+                method: .directStream,
+            )
         }
 
         await start(playback)
@@ -261,13 +278,12 @@ struct TrackSelectionTests {
             request: PlaybackRequest(.item("m1")),
             engine: engine,
             features: [selection, log],
-        ) { itemID, _, _ in
-            let choice = await selection.request(for: itemID, mediaSourceID: nil)
-            return PlaybackStream(
-                itemID: itemID,
+        ) { request in
+            PlaybackStream(
+                itemID: request.itemID,
                 url: URL(filePath: "/m1"),
                 method: .directPlay,
-                audioStreamIndex: choice?.audioIndex,
+                audioStreamIndex: request.audioStreamIndex,
                 tracks: tracks,
             )
         }

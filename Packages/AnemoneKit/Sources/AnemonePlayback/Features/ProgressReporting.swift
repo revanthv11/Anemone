@@ -32,7 +32,7 @@ public final class ProgressReporting: PlaybackFeature {
 
     public func handle(_ event: PlaybackEvent, in _: PlaybackController) async {
         switch event {
-        case let .loaded(stream, _):
+        case let .loaded(stream, _), let .reloaded(stream):
             self.stream = stream
         case let .started(progress):
             positions = 0

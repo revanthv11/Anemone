@@ -72,7 +72,8 @@ public final class UpNext: PlaybackFeature {
                 withdraw()
                 noteTimer?.cancel()
             }
-        case .paused:
+        case .paused, .reloaded:
+            // A reload plays the same entry: an offer, or one cancelled, carries on.
             break
         }
     }

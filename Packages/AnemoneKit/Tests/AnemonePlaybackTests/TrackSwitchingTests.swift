@@ -146,9 +146,121 @@ struct PlaybackReloadTests {
 
         playback.reload()
 
-        #expect(await eventually { log.events.count { $0.hasPrefix("loaded") } == 2 })
+        #expect(await eventually { log.events.contains { $0.hasPrefix("reloaded") } })
         #expect(engine.loads.last?.position == .seconds(30))
         #expect(streams.received.last == .init(itemID: "m1", allowsDirect: true, mediaSourceID: "src-m1"))
-        #expect(log.events.after("stopped 30.0 seconds") == ["loaded m1 directPlay"])
+        #expect(log.events.after("stopped 30.0 seconds") == ["reloaded m1 directPlay"])
+    }
+
+    @Test func `a reload before the stream is ready plays on from where it was to start`() async {
+        let engine = FakeEngine()
+        let playback = PlaybackController(
+            request: PlaybackRequest(.item("m1", from: .seconds(300))),
+            engine: engine,
+            features: [],
+            loadStream: FakeStreams().load,
+        )
+        await playback.start()
+
+        // The engine says 0 until it's ready at the resume position, as AVPlayer does.
+        playback.reload()
+        #expect(await eventually { engine.loads.count == 2 })
+        // And again, before the new stream is ready.
+        playback.reload()
+        #expect(await eventually { engine.loads.count == 3 })
+
+        #expect(engine.loads.map(\.position) == [.seconds(300), .seconds(300), .seconds(300)])
+    }
+
+    @Test func `features have a say in each request for a stream`() async {
+        let engine = FakeEngine()
+        let picker = AudioPicker()
+        let requests = StreamRequestLog()
+        let playback = PlaybackController(
+            request: PlaybackRequest(.item("m1")),
+            engine: engine,
+            features: [picker],
+        ) { request in
+            requests.append(request)
+            return FakeStreams.stream(request.itemID, method: .directPlay)
+        }
+        await playback.start()
+        picker.audioIndex = 2
+
+        playback.reload()
+
+        #expect(await eventually { requests.sent.count == 2 })
+        #expect(requests.sent.map(\.audioStreamIndex) == [1, 2])
+        #expect(requests.sent.map(\.mediaSourceID) == [nil, "src-m1"])
+        #expect(requests.sent.first?.profile == engine.deviceProfile)
+    }
+
+    @Test func `a reload keeps what Up Next and segment skipping did for the entry`() async throws {
+        let engine = FakeEngine()
+        let log = EventLog()
+        let intro = MediaSegment(id: "intro", kind: .intro, start: .seconds(10), end: .seconds(40))
+        let outro = MediaSegment(id: "outro", kind: .outro, start: .seconds(80), end: .seconds(100))
+        let segments = SegmentSkipping(
+            load: { _ in [intro, outro] },
+            offerDuration: .milliseconds(300),
+            behavior: { $0 == .intro ? .ask : .ignore },
+        )
+        let upNext = UpNext(
+            settings: UpNext.Settings(
+                autoplays: true,
+                countdown: .seconds(100),
+                timing: .duringCredits,
+                passOutCount: 0,
+                stillWatchingTimeout: .seconds(5),
+                testCreditsStart: nil,
+            ),
+            second: .milliseconds(10),
+        )
+        let playback = try PlaybackController(
+            request: PlaybackRequest(queue: #require(PlaybackQueue(entries: [.item("e1"), .item("e2")]))),
+            engine: engine,
+            features: [segments, log, upNext],
+            positionInterval: .milliseconds(10),
+            loadStream: FakeStreams().load,
+        )
+        func reload(_ count: Int) async {
+            playback.reload()
+            _ = await eventually { engine.loads.count == count }
+            engine.send(.ready)
+            _ = await eventually { log.events.count { $0.hasPrefix("started") } == count }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        await playback.start()
+        engine.send(.ready)
+        #expect(await eventually { !segments.segments.isEmpty })
+
+        // The intro's skip button comes and goes, and doesn't come back after a reload.
+        engine.currentTime = .seconds(12)
+        #expect(await eventually { !playback.accessories.actions.isEmpty })
+        #expect(await eventually { playback.accessories.actions.isEmpty })
+        await reload(2)
+        #expect(log.events.after("stopped 12.0 seconds").first == "reloaded e1 directPlay")
+        #expect(playback.accessories.actions.isEmpty)
+
+        // Up Next comes with the credits and is cancelled, and stays cancelled after a reload.
+        engine.currentTime = .seconds(85)
+        #expect(await eventually { playback.accessories.card?.id == UpNext.upNextCard })
+        try #require(playback.accessories.card?.actions.first { $0.id == "upNext.cancel" }).perform()
+        await reload(3)
+        #expect(engine.loads.last?.position == .seconds(85))
+        #expect(playback.accessories.card == nil)
+        await playback.stop()
+    }
+}
+
+/// A feature that asks for an audio track.
+@MainActor
+private final class AudioPicker: PlaybackFeature {
+    var audioIndex = 1
+
+    func handle(_: PlaybackEvent, in _: PlaybackController) async {}
+
+    func prepare(_ request: inout StreamRequest) async {
+        request.audioStreamIndex = audioIndex
     }
 }

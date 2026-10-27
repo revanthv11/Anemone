@@ -87,16 +87,35 @@ final class TrackEngine: PlayerEngine {
     }
 }
 
-/// The track requests a test's player made.
-final class TrackRequestLog: Sendable {
-    private let requests = Mutex<[TrackRequest?]>([])
+/// The requests for a stream a test's player made, once its features prepared them.
+final class StreamRequestLog: Sendable {
+    private let requests = Mutex<[StreamRequest]>([])
 
-    var all: [TrackRequest?] {
+    var sent: [StreamRequest] {
         requests.withLock(\.self)
     }
 
-    func append(_ request: TrackRequest?) {
+    /// The tracks each request asked for.
+    var all: [TrackRequest?] {
+        sent.map(\.tracks)
+    }
+
+    func append(_ request: StreamRequest) {
         requests.withLock { $0.append(request) }
+    }
+}
+
+extension StreamRequest {
+    /// The tracks asked for, as `TrackSelection` puts them in; `nil` when nothing chose any.
+    var tracks: TrackRequest? {
+        guard audioStreamIndex != nil || subtitleStreamIndex != nil else { return nil }
+        return TrackRequest(
+            mediaSourceID: mediaSourceID,
+            audioIndex: audioStreamIndex,
+            subtitleIndex: subtitleStreamIndex.flatMap { $0 < 0 ? nil : $0 },
+            // The test engines' profiles burn nothing in themselves.
+            burnsInSubtitles: profile.subtitleProfiles?.contains { $0.method == .encode } == true,
+        )
     }
 }
 
@@ -146,13 +165,34 @@ extension [MediaTrack] {
         MediaTrack(index: 3, kind: .subtitle, language: "eng", codec: "subrip"),
         MediaTrack(index: 4, kind: .subtitle, language: "spa", codec: "subrip"),
     ]
+
+    /// An episode with forced subtitles for each audio language.
+    static let forcedEpisode = [
+        MediaTrack(index: 1, kind: .audio, language: "eng", codec: "aac", isDefault: true),
+        MediaTrack(index: 2, kind: .audio, language: "jpn", codec: "aac"),
+        MediaTrack(index: 3, kind: .subtitle, language: "eng", codec: "subrip", isForced: true),
+        MediaTrack(index: 4, kind: .subtitle, language: "jpn", codec: "subrip", isForced: true),
+        MediaTrack(index: 5, kind: .subtitle, language: "eng", codec: "subrip"),
+    ]
+
+    /// The tracks of a test item: episodes start with "e", episodes with forced subtitles with
+    /// "f", and anything else has the multi-track file.
+    static func fixture(for itemID: String) -> Self {
+        if itemID.hasPrefix("e") {
+            .episode
+        } else if itemID.hasPrefix("f") {
+            .forcedEpisode
+        } else {
+            .multiTrack
+        }
+    }
 }
 
 extension PlaybackStream {
     /// What Jellyfin sends for `request`: HLS in which text subtitles come in the playlist,
     /// unless subtitles are burned in.
     static func hls(_ itemID: String, _ request: TrackRequest?, method: PlaybackMethod) -> PlaybackStream {
-        let source: [MediaTrack] = itemID.hasPrefix("e") ? .episode : .multiTrack
+        let source: [MediaTrack] = .fixture(for: itemID)
         let burnsIn = request.map { request in
             request.burnsInSubtitles || source.contains { $0.index == request.subtitleIndex && !$0.isText }
         } ?? false

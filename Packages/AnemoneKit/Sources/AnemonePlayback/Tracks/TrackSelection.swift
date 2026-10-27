@@ -63,9 +63,17 @@ public final class TrackSelection: PlaybackFeature {
         self.defaults = defaults
     }
 
-    /// The tracks to ask the server for, before each PlaybackInfo request; `nil` leaves them to
-    /// the server, such as when the item's tracks can't be fetched. A retry or a switch for the
-    /// same item asks for what's chosen now.
+    /// Asks the server for the tracks chosen for the entry, with each request for a stream.
+    public func prepare(_ request: inout StreamRequest) async {
+        guard let tracks = await self.request(for: request.itemID, mediaSourceID: request.mediaSourceID) else {
+            return
+        }
+        tracks.apply(to: &request)
+    }
+
+    /// The tracks to ask the server for; `nil` leaves them to the server, such as when the
+    /// item's tracks can't be fetched. A retry or a switch for the same item asks for what's
+    /// chosen now.
     func request(for itemID: MediaItem.ID, mediaSourceID: String?) async -> TrackRequest? {
         if let entry, entry.itemID == itemID {
             return request(for: entry)
@@ -85,6 +93,8 @@ public final class TrackSelection: PlaybackFeature {
         switch event {
         case let .loaded(stream, queued):
             loaded(stream, itemID: queued.itemID, in: controller)
+        case let .reloaded(stream):
+            loaded(stream, itemID: controller.queue.current.itemID, in: controller)
         case .started:
             await reselectSubtitles(in: controller.engine)
         default:
@@ -134,7 +144,8 @@ public final class TrackSelection: PlaybackFeature {
             mediaSourceID: source.id,
             tracks: tracks,
             audio: audio.track,
-            subtitleChoice: picked?.subtitle == .onlyForced ? .onlyForced : subtitle.track.choice,
+            // "Only forced" stays a choice of its own, so it's found again when the audio changes.
+            subtitleChoice: subtitle.isOnlyForced ? .onlyForced : subtitle.track.choice,
             subtitle: subtitle.track,
         )
     }
@@ -370,13 +381,9 @@ extension TrackSelection {
                 }
             }
         }
-        store.save(picked)
-        guard let series else { return }
-        if let seasonID = entry.seasonID {
-            store.save(series(seasonID, .season))
-        }
-        if let seriesID = entry.seriesID {
-            store.save(series(seriesID, .series))
-        }
+        let parents = [(entry.seasonID, SeriesTrackChoice.Parent.season), (entry.seriesID, .series)]
+        store.save(picked, series: series.map { series in
+            parents.compactMap { id, parent in id.map { series($0, parent) } }
+        } ?? [])
     }
 }
