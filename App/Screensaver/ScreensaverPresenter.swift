@@ -82,15 +82,16 @@ private struct ScreensaverPresenter: ViewModifier {
         }
     }
 
-    /// Whether a video is on screen: the system player anywhere in what's presented, or anything
-    /// that turned off the system's idle timer, as a player does.
+    /// Whether a video is on screen, like Wholphin's `keepScreenOn` during playback: a player
+    /// presented over the app, either the system one or Anemone's overlay (whose video view is an
+    /// `AVPlayerLayer`, MPV's included), or anything that turned off the system's idle timer.
     private static func keepsScreenOn(in window: UIWindow?) -> Bool {
         if UIApplication.shared.isIdleTimerDisabled {
             return true
         }
-        var controller = window?.rootViewController
+        var controller = window?.rootViewController?.presentedViewController
         while let current = controller {
-            if current.containsPlayer {
+            if current.containsPlayer || current.viewIfLoaded?.containsVideo == true {
                 return true
             }
             controller = current.presentedViewController
@@ -109,6 +110,12 @@ private final class ScreensaverStage {
 private extension UIViewController {
     var containsPlayer: Bool {
         self is AVPlayerViewController || children.contains { $0.containsPlayer }
+    }
+}
+
+private extension UIView {
+    var containsVideo: Bool {
+        layer is AVPlayerLayer || subviews.contains { $0.containsVideo }
     }
 }
 
