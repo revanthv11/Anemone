@@ -9,6 +9,7 @@ public extension PlaybackController {
             SegmentSkipping(session: session),
             UpNext(),
             PlaybackDetails(session: session),
+            LiveStreamClosing(session: session),
         ]
     }
 }
