@@ -33,6 +33,8 @@ struct SeasonPage: View {
     @State private var episodeScroll: MediaItem.ID?
     /// Set when a season is picked, so focus moves to its first episode once it loads.
     @State private var focusesEpisodes = false
+    @State private var episodeExtras = ItemExtras()
+    @State private var seasonExtras = ItemExtras()
 
     private static let episodeRow = "episodes"
 
@@ -63,6 +65,8 @@ struct SeasonPage: View {
         .pageTask(id: currentSeasonID) {
             await loadEpisodes(of: currentSeasonID)
         }
+        .itemExtras($episodeExtras, of: selectedEpisodeID)
+        .itemExtras($seasonExtras, of: currentSeasonID)
         .onChange(of: focus) { _, focus in
             memory.note(focus)
             if case let .card(row, item) = focus, row == Self.episodeRow {
@@ -95,7 +99,9 @@ struct SeasonPage: View {
                         episodeRow
                         episodeButtons
                     }
+                    ChaptersRow(chapters: episodeExtras.chapters, focus: $focus, memory: memory, play: playEpisode)
                     peopleRows
+                    ExtrasRow(extras: seasonExtras.features, focus: $focus, memory: memory)
                 }
                 .padding(.horizontal, ItemLayout.horizontalInset)
                 .padding(.top, 40)
@@ -212,6 +218,8 @@ struct SeasonPage: View {
                     Task { await save(.favorite(!episode.userState.isFavorite), for: episode) }
                 }
                 .focused($focus, equals: .action(.favorite))
+                DeleteButton(item: episode, canDelete: episodeExtras.canDelete) { remove(episode) }
+                    .focused($focus, equals: .action(.delete))
             }
         }
         .frame(minHeight: 80)
@@ -247,6 +255,25 @@ struct SeasonPage: View {
             focusesEpisodes = true
             pickedSeasonID = season.id
         }
+    }
+
+    /// Plays the selected episode from a chapter.
+    private func playEpisode(from position: Duration) {
+        if let selectedEpisode {
+            playback = browse.playback(of: selectedEpisode, from: position)
+        }
+    }
+
+    /// After an episode is deleted, the page stays on its season and moves to the next episode,
+    /// as Wholphin's series overview refreshes in place.
+    private func remove(_ episode: ItemDetails) {
+        guard var episodes, let index = episodes.firstIndex(where: { $0.id == episode.id }) else { return }
+        episodes.remove(at: index)
+        let next = episodes.indices.contains(index) ? episodes[index] : episodes.last
+        self.episodes = episodes
+        selectedEpisodeID = next?.id
+        episodeScroll = next?.id
+        focus = next.map { episodeFocus($0.id) }
     }
 }
 

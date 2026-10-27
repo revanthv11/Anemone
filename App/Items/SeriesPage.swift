@@ -14,6 +14,7 @@ struct SeriesPage: View {
     @State private var similar: [ItemDetails] = []
     @State private var alert: ItemAlert?
     @State private var confirmsPlayed = false
+    @State private var extras = ItemExtras()
 
     var body: some View {
         ScrollViewReader { scroller in
@@ -53,6 +54,7 @@ struct SeriesPage: View {
                 ? "Mark the entire series as unwatched?"
                 : "Mark the entire series as watched?")
         }
+        .itemExtras($extras, of: series.id)
         // Seasons reload when the page comes back into view, as Wholphin refreshes them on resume.
         .pageTask(id: series.id) {
             let session = browse.session
@@ -109,6 +111,8 @@ struct SeriesPage: View {
                 Task { await setFavorite(!series.userState.isFavorite) }
             }
             .focused($focus, equals: .action(.favorite))
+            TrailerButton(trailers: extras.trailers).focused($focus, equals: .action(.trailer))
+            DeleteButton(item: series, canDelete: extras.canDelete).focused($focus, equals: .action(.delete))
             PlaybackNotWiredNote()
                 .padding(.leading, 16)
         }
@@ -131,6 +135,7 @@ struct SeriesPage: View {
         if !series.people.isEmpty {
             PeopleRow(id: "people", title: "People", people: series.people, focus: $focus, memory: memory)
         }
+        ExtrasRow(extras: extras.features, focus: $focus, memory: memory)
         if !similar.isEmpty {
             ItemRow(
                 id: "similar",
