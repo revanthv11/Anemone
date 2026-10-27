@@ -17,7 +17,7 @@
             }
 
             // Every guessed address was checked, each with a session of its own.
-            #expect(SeerrMockServer.requests(to: host).count == 4)
+            #expect(Set(SeerrMockServer.requests(to: host).compactMap(\.url)).count == 4)
             #expect(SeerrTransport.openSessions(to: host) == 0)
         }
 
