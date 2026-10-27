@@ -195,7 +195,16 @@ Not started. Wholphin's other library tabs (Recommended, Collections, Genres, St
 
 #### 2g: item page extras: trailers, extras, chapters, delete, collection options
 
-Not started.
+- [x] Trailers on movie and series pages, ported from Wholphin's `TrailerService`: one plays at once, several are listed first, local trailers before remote ones and official trailers before teasers. Local trailers play in the player. Remote trailers hand off to the YouTube app (Wholphin opens them in the browser, which Apple TV doesn't have); when YouTube isn't installed, or the trailer is on another site, the page says so
+- [x] Extras row, ported from Wholphin's `ExtrasService`: featurettes, deleted scenes, behind the scenes and the rest, a card per extra or per kind when there are several, on movie and series pages and for the season on the season page. Selecting one plays it; a kind's card lists its extras first. When the player closes, the row reloads, so the card shows the new progress or the extra watched
+- [x] Chapters row on movie pages and for the selected episode on the season page: each chapter's image, name and start, which plays from there
+- [x] Delete, after asking, for items the server lets the user delete (`CanDelete`): movies, videos, series, episodes and collections. The page goes back afterwards, as in Wholphin; on the season page it stays, on the next episode
+- [x] Collection page sort, filter and view options, kept per collection: the collection's own order or Wholphin's movie sorts, the library page's filters, and Wholphin's "Separate types" (a row per type, or one grid with the library grid's view options)
+- Extras, chapters, trailers and `CanDelete` come with one `/Items/{id}` request; local trailers and special features are asked for only when the item has some. A collection's page makes only that one request, for `CanDelete`
+
+Tested live in the simulator. Against the local fixture server: a movie's six chapters with their images, and selecting the third played from 1:00; its Extras row (a featurette and a behind-the-scenes extra) and its local trailer both played, and the extra's card showed it watched as soon as its player closed; a remote YouTube trailer said to install YouTube, which the simulator doesn't have; the season page showed each episode's own chapters as focus moved along the episodes, and asked for them only once focus had stayed on an episode for 300 ms (passing over one quickly sent nothing for it); deleting a movie in a throwaway library asked first, went back, and took its files off the server; Home dropped it, and the library page did once reopened, since it doesn't reload after Back. The collection options were checked over a library's movies standing in for a collection, since neither server has one: sorting, filtering to unplayed, one grid, the grid's view options, and putting it all back; and over a music album, whose tracks have no row, it said there was nothing in it yet. Against the Jellyfin 12.3 demo server: a movie with two YouTube trailers listed both, numbered, and said to install YouTube. Not verified live: the hand-off to the YouTube app itself, series trailers and extras, a season's extras, a kind of extra with several entries, deleting a series, episode or collection, and a real collection.
+
+Not yet: chapters for episodes outside a season, Wholphin's "Show media management options" setting (Delete shows whenever the server allows it), delete in the card context menu, and the details header option for collections.
 
 #### 2h: Favorites page and card context menu
 

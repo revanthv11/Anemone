@@ -101,22 +101,6 @@ public extension JellyfinSession {
         return try await send(Paths.getSimilarItems(itemID: itemID, parameters: parameters)).items.details
     }
 
-    /// A collection's items in rows by type, in Wholphin's default order.
-    func collectionSections(id: MediaItem.ID) async throws -> [CollectionSection] {
-        // One request, split by type here. Wholphin asks once per type, which needs a workaround
-        // for nested collections (jellyfin/jellyfin#16454).
-        let parameters = Paths.GetItemsParameters(
-            userID: userID,
-            isRecursive: false,
-            sortOrder: [.ascending],
-            parentID: id,
-            fields: Self.rowFields,
-            sortBy: [.default],
-            enableUserData: true,
-        )
-        return try await CollectionSection.sections(send(Paths.getItems(parameters: parameters)).items.details)
-    }
-
     /// A playlist's items in the playlist's order.
     func playlistItems(id: MediaItem.ID) async throws -> [ItemDetails] {
         let parameters = Paths.GetPlaylistItemsParameters(userID: userID, fields: Self.rowFields, enableUserData: true)

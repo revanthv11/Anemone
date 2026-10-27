@@ -16,6 +16,7 @@ struct MoviePage: View {
     @State private var similar: [ItemDetails] = []
     @State private var alert: ItemAlert?
     @State private var playback: PlaybackRequest?
+    @State private var extras = ItemExtras()
 
     var body: some View {
         ScrollViewReader { scroller in
@@ -50,6 +51,7 @@ struct MoviePage: View {
         .player($playback) {
             await reload()
         }
+        .itemExtras($extras, of: item.id)
         .task(id: item.id) {
             guard !isEpisode, similar.isEmpty else { return }
             let session = browse.session
@@ -110,6 +112,8 @@ struct MoviePage: View {
                 Task { await save(.favorite(!item.userState.isFavorite)) }
             }
             .focused($focus, equals: .action(.favorite))
+            TrailerButton(trailers: extras.trailers).focused($focus, equals: .action(.trailer))
+            DeleteButton(item: item, canDelete: extras.canDelete).focused($focus, equals: .action(.delete))
         }
         .padding(.vertical, 20)
         .focusSection()
@@ -120,6 +124,8 @@ struct MoviePage: View {
         if !item.people.isEmpty {
             PeopleRow(id: "people", title: "People", people: item.people, focus: $focus, memory: memory)
         }
+        ChaptersRow(chapters: extras.chapters, focus: $focus, memory: memory, play: play(from:))
+        ExtrasRow(extras: $extras, focus: $focus, memory: memory)
         if !similar.isEmpty {
             // Wholphin shows posters only when the page is a movie's.
             ItemRow(

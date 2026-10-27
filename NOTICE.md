@@ -16,7 +16,7 @@ Some of Wholphin's device profile code is adapted from the official [jellyfin-an
 
 ## Swiftfin
 
-Anemone's AVPlayer device profile, the checks it makes on the server's media segments, and the way its player overlay takes the Siri Remote's presses before the focus engine and passes on those it doesn't use are adapted from [Swiftfin](https://github.com/jellyfin/Swiftfin), the official Jellyfin client for Apple platforms.
+Anemone's AVPlayer device profile, the checks it makes on the server's media segments, the way its player overlay takes the Siri Remote's presses before the focus engine and passes on those it doesn't use, and the link that opens a YouTube trailer in the YouTube app are adapted from [Swiftfin](https://github.com/jellyfin/Swiftfin), the official Jellyfin client for Apple platforms.
 
 - Copyright (c) Jellyfin & Jellyfin Contributors
 - Licensed under the Mozilla Public License, version 2.0, which allows combining it into this GPL-3.0 work

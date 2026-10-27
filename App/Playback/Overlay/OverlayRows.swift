@@ -7,7 +7,6 @@ import SwiftUI
 /// jumps there. Ported from Wholphin's `ChapterRowOverlay` and `ChapterCard`.
 struct ChapterRow: View {
     let chapters: [Chapter]
-    let itemID: MediaItem.ID
     /// Where playback is, for which chapter starts in focus.
     let playing: Duration
     let session: JellyfinSession
@@ -28,7 +27,7 @@ struct ChapterRow: View {
                     choose(chapter)
                 } label: {
                     OverlayCard(
-                        imageURL: session.chapterImageURL(chapter, of: itemID, maxWidth: 480),
+                        imageURL: session.imageURL(for: chapter, maxWidth: 480),
                         placeholder: "film",
                         title: chapter.name ?? "Chapter \(chapter.index + 1)",
                         detail: chapter.start.clockText,

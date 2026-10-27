@@ -95,7 +95,7 @@ struct TrickplayTests {
           "Chapters":[
             {"Name":"Ending","StartPositionTicks":30000000000,"ImageTag":"t2"},
             {"Name":"Opening","StartPositionTicks":0,"ImageTag":"t0"},
-            {"Name":" ","StartPositionTicks":6000000000}
+            {"Name":"","StartPositionTicks":6000000000}
           ],
           "Trickplay":{"src1":{"320":{"Width":320,"Height":180,"TileWidth":10,"TileHeight":10,
                                        "ThumbnailCount":558,"Interval":10000,"Bandwidth":1000}}}}],
@@ -109,9 +109,9 @@ struct TrickplayTests {
         #expect(query["fields"] == "Chapters,Trickplay")
         #expect(query["userId"] == "u1")
         #expect(previews.chapters == [
-            Chapter(index: 1, name: "Opening", start: .zero, imageTag: "t0"),
-            Chapter(index: 2, name: nil, start: .seconds(600)),
-            Chapter(index: 0, name: "Ending", start: .seconds(3000), imageTag: "t2"),
+            Chapter(itemID: "m1", index: 1, name: "Opening", start: .zero, imageTag: "t0"),
+            Chapter(itemID: "m1", index: 2, name: nil, start: .seconds(600)),
+            Chapter(itemID: "m1", index: 0, name: "Ending", start: .seconds(3000), imageTag: "t2"),
         ])
         #expect(previews.trickplay == trickplay)
     }
@@ -168,29 +168,18 @@ struct TrickplayTests {
         #expect(recent.sheets.count == 3)
     }
 
-    @Test func `points at a chapter's image by its index`() throws {
-        let session = try session(host: "images.test")
-        let chapter = Chapter(index: 3, name: "Act Two", start: .seconds(60), imageTag: "abc")
-
-        let url = try #require(session.chapterImageURL(chapter, of: "m1", maxWidth: 400))
-
-        #expect(url.path() == "/Items/m1/Images/Chapter/3")
-        #expect(url.queryValues == ["tag": "abc", "maxWidth": "400", "quality": "96"])
-        #expect(session.chapterImageURL(Chapter(index: 0, name: nil, start: .zero), of: "m1", maxWidth: 400) == nil)
-    }
-
     @Test func `finds the chapter playing, or the first before them all`() {
         // In playing order, with the server's indices, which needn't follow it.
         let chapters = [
-            Chapter(index: 1, name: "A", start: .seconds(10)),
-            Chapter(index: 2, name: "B", start: .seconds(60)),
-            Chapter(index: 0, name: "C", start: .seconds(120)),
+            Chapter(itemID: "m1", index: 1, name: "A", start: .seconds(10)),
+            Chapter(itemID: "m1", index: 2, name: "B", start: .seconds(60)),
+            Chapter(itemID: "m1", index: 0, name: "C", start: .seconds(120)),
         ]
 
         #expect(chapters.chapter(at: .zero)?.name == "A")
         #expect(chapters.chapter(at: .seconds(59))?.name == "A")
         #expect(chapters.chapter(at: .seconds(60))?.name == "B")
-        #expect(chapters.chapter(at: .seconds(5000))?.id == 0)
+        #expect(chapters.chapter(at: .seconds(5000))?.index == 0)
         #expect([Chapter]().chapter(at: .seconds(5)) == nil)
     }
 

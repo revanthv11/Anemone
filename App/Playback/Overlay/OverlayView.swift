@@ -19,7 +19,7 @@ enum OverlayFocus: Hashable {
     /// reaches them, as Wholphin's `HiddenFocusBox` does.
     case backToControls
     case backToChapters
-    /// A chapter by its `Chapter.id`, the server's index, not its place in the row.
+    /// A chapter by its `Chapter.id`, from the server's index, not its place in the row.
     case chapter(Chapter.ID)
     case queueEntry(Int)
 }
@@ -168,7 +168,6 @@ struct OverlayView: View {
                 focusLine(.backToControls)
                 ChapterRow(
                     chapters: chapters,
-                    itemID: playback.queue.current.itemID,
                     playing: overlay.seeker.position,
                     session: session,
                     focus: $focus,

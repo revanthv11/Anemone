@@ -15,7 +15,7 @@ struct PlayerOverlayTests {
         let requests = previewRequests
         let details = PlaybackDetails { itemID, mediaSourceID in
             requests.list.withLock { $0.append("\(itemID) \(mediaSourceID ?? "-")") }
-            return SeekPreviews(chapters: [Chapter(index: 0, name: "Start", start: .zero)])
+            return SeekPreviews(chapters: [Chapter(itemID: "m1", index: 0, name: "Start", start: .zero)])
         }
         return try PlaybackController(
             request: PlaybackRequest(queue: #require(PlaybackQueue(entries: entries))),
@@ -238,7 +238,7 @@ struct PlayerOverlayTests {
         overlay.show(.chapters)
         #expect(overlay.page == .chapters)
 
-        overlay.jump(to: Chapter(index: 2, name: "Third", start: .seconds(75)))
+        overlay.jump(to: Chapter(itemID: "m1", index: 2, name: "Third", start: .seconds(75)))
 
         #expect(!overlay.controlsVisible)
         #expect(overlay.page == .controls)

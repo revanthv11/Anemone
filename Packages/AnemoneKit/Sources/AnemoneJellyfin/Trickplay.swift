@@ -154,7 +154,7 @@ public extension JellyfinSession {
             throw SessionError.unexpectedResponse
         }
         return SeekPreviews(
-            chapters: Chapter.chapters(dto.chapters),
+            chapters: Chapter.chapters(of: dto),
             trickplay: Trickplay(itemID: itemID, manifest: dto.trickplay, mediaSourceID: mediaSourceID),
         )
     }
