@@ -101,23 +101,11 @@ public extension JellyfinSession {
         async let active = send(Paths.getRecordings(parameters: recordings))
         async let scheduled = send(Paths.getTimers(parameters: .init(isActive: false, isScheduled: true)))
         async let series = send(Paths.getSeriesTimers())
-        let recordingsUnderWay = try await active.items ?? []
         return try await LiveTVSchedule(
-            active: recordingsWithTimes(recordingsUnderWay),
+            active: recordingsWithTimes(active.items ?? []),
             scheduled: (scheduled.items ?? []).compactMap(LiveTVTimer.init),
             series: (series.items ?? []).compactMap(LiveTVSeriesTimer.init),
         )
-    }
-
-    /// The server gives a recording under way its timer's times. Should one come without them,
-    /// its timer is asked for, so it's listed with the timer's times rather than left out.
-    private func recordingsWithTimes(_ dtos: [BaseItemDto]) async -> [LiveTVRecording] {
-        var timers: [String: LiveTVTimer] = [:]
-        let timerIDs = dtos.filter { $0.startDate == nil || $0.endDate == nil }.compactMap(\.timerID)
-        for timerID in Set(timerIDs) {
-            timers[timerID] = try? await LiveTVTimer(send(Paths.getTimer(timerID: timerID)))
-        }
-        return dtos.compactMap { LiveTVRecording($0, timer: $0.timerID.flatMap { timers[$0] }) }
     }
 
     /// The folders recordings are kept in, each a tab of the Live TV page as in Wholphin. Wholphin's
