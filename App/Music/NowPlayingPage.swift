@@ -41,6 +41,7 @@ struct NowPlayingPage: View {
     @Environment(MusicPlayer.self) private var player
     @Environment(BrowseModel.self) private var browse
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.theme) private var theme
     @AppStorage(Preferences.musicShowsAlbumArt) private var showsAlbumArt
     @AppStorage(Preferences.musicShowsLyrics) private var showsLyrics
     @AppStorage(Preferences.musicShowsBackdrop) private var showsBackdrop
@@ -67,7 +68,8 @@ struct NowPlayingPage: View {
         }
         .background {
             ZStack {
-                Color.black
+                // It covers the app's root, so it brings the theme's background with it.
+                theme.background.color
                 if showsBackdrop, let image = backdrop?.image {
                     BackdropImage(url: browse.imageURL(image, width: ItemLayout.backdropPixelWidth))
                 }
@@ -144,25 +146,33 @@ struct NowPlayingPage: View {
                     MusicArtwork(image: song.coverImage, width: 200)
                         .padding(.bottom, 12)
                 }
-                Text(song.item.name)
-                    .font(.title2.bold())
-                    .lineLimit(2)
-                    .accessibilityIdentifier("nowPlaying.title")
-                if let album = song.albumName {
-                    Text(album)
-                        .font(.title3)
-                        .lineLimit(1)
+                // One element, so VoiceOver reads the song, its album and its artists together,
+                // as the page's heading.
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(song.item.name)
+                        .font(.title2.bold())
+                        .foregroundStyle(theme.onBackground)
+                        .lineLimit(2)
+                    if let album = song.albumName {
+                        Text(album)
+                            .font(.title3)
+                            .foregroundStyle(theme.onBackground)
+                            .lineLimit(1)
+                    }
+                    if let artists = song.artistNames {
+                        Text(artists)
+                            .font(.title3)
+                            .foregroundStyle(theme.secondaryText)
+                            .lineLimit(1)
+                    }
                 }
-                if let artists = song.artistNames {
-                    Text(artists)
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("nowPlaying.title")
                 if player.status == .failed {
                     Text(player.failure.map(browse.playbackProblem(with:)) ?? "Couldn't play this song.")
                         .font(.callout)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.secondaryText)
                         .frame(maxWidth: 600, alignment: .leading)
                         .accessibilityIdentifier("nowPlaying.problem")
                 }
@@ -173,7 +183,7 @@ struct NowPlayingPage: View {
                 .frame(width: 560)
         } else {
             Text("Nothing is playing.")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.secondaryText)
         }
     }
 
@@ -189,7 +199,12 @@ struct NowPlayingPage: View {
             control(.rewind, "gobackward.10", "Back 10 seconds") {
                 player.skip(by: .seconds(-10))
             }
-            control(.playPause, player.isPlaying ? "pause.fill" : "play.fill", player.isPlaying ? "Pause" : "Play") {
+            control(
+                .playPause,
+                player.isPlaying ? "pause.fill" : "play.fill",
+                player.isPlaying ? "Pause" : "Play",
+                value: player.isPlaying ? "Playing" : "Paused",
+            ) {
                 player.togglePlayPause()
             }
             control(.forward, "goforward.30", "Forward 30 seconds") {
@@ -200,13 +215,24 @@ struct NowPlayingPage: View {
             }
             .disabled(player.queue.nextIndex(automatic: false) == nil)
             Spacer()
-            control(.shuffle, "shuffle", "Shuffle", isOn: player.queue.isShuffled) {
+            control(
+                .shuffle,
+                "shuffle",
+                "Shuffle",
+                value: player.queue.isShuffled ? "On" : "Off",
+                isOn: player.queue.isShuffled,
+            ) {
                 player.toggleShuffle()
             }
-            control(.repeatMode, repeatSymbol, "Repeat", isOn: player.queue.repeatMode != .off) {
+            control(
+                .repeatMode,
+                repeatSymbol,
+                "Repeat",
+                value: repeatDescription,
+                isOn: player.queue.repeatMode != .off,
+            ) {
                 player.cycleRepeatMode()
             }
-            .accessibilityValue(repeatDescription)
             control(.options, "ellipsis", "Options") {
                 showsOptions = true
             }
@@ -226,22 +252,23 @@ struct NowPlayingPage: View {
         }
     }
 
+    /// A round button. VoiceOver reads `title`, then `value`: whether the song is playing, or
+    /// how a toggle is set.
     private func control(
         _ control: Control,
         _ systemImage: String,
         _ title: String,
-        isOn: Bool? = nil,
+        value: String? = nil,
+        isOn: Bool = false,
         action: @escaping () -> Void,
     ) -> some View {
         Button(action: action) {
-            Image(systemName: systemImage)
-                .foregroundStyle(isOn == true ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
-                .frame(width: 40, height: 40)
+            ToggleSymbol(systemImage: systemImage, isOn: isOn)
         }
         .buttonBorderShape(.circle)
         .focused($focus, equals: .control(control))
         .accessibilityLabel(title)
-        .accessibilityValue(isOn.map { $0 ? "On" : "Off" } ?? "")
+        .accessibilityValue(value ?? "")
         .accessibilityIdentifier("nowPlaying.\(control)")
     }
 
@@ -264,5 +291,22 @@ struct NowPlayingPage: View {
             guard !Task.isCancelled else { return }
             backdrop = (song.id, image)
         }
+    }
+}
+
+/// A Now Playing button's symbol, in the theme's highlight while its toggle is on, as Wholphin
+/// brightens an active shuffle or repeat. The system's light focused button keeps its own dark
+/// label, which a light highlight would vanish on; VoiceOver reads the setting either way.
+private struct ToggleSymbol: View {
+    let systemImage: String
+    let isOn: Bool
+
+    @Environment(\.isFocused) private var isFocused
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        Image(systemName: systemImage)
+            .foregroundStyle(isOn && !isFocused ? AnyShapeStyle(theme.highlight) : AnyShapeStyle(.primary))
+            .frame(width: 40, height: 40)
     }
 }

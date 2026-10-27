@@ -20,6 +20,7 @@ struct AlbumPage: View {
     @State private var alert: ItemAlert?
     @State private var showsNowPlaying = false
     @State private var placedFocus = false
+    @Environment(\.theme) private var theme
 
     var body: some View {
         ScrollViewReader { scroller in
@@ -98,7 +99,9 @@ struct AlbumPage: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(songs.count == 1 ? "1 song" : "\(songs.count) songs")
                     .font(.headline)
+                    .foregroundStyle(theme.onBackground)
                     .padding(.bottom, 8)
+                    .accessibilityAddTraits(.isHeader)
                 let showsArtist = album?.isVariousArtists ?? false
                 ForEach(Array(songs.enumerated()), id: \.element.id) { index, song in
                     SongRow(song: song, number: song.trackNumber ?? index + 1, showsArtist: showsArtist) {
@@ -179,6 +182,8 @@ struct MusicHeader<Buttons: View>: View {
     let image: ItemImage?
     @ViewBuilder let buttons: Buttons
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         HStack(alignment: .top, spacing: 48) {
             MusicArtwork(image: image, width: 360)
@@ -186,11 +191,13 @@ struct MusicHeader<Buttons: View>: View {
                 if let artist {
                     Text(artist)
                         .font(.title3.weight(.semibold))
+                        .foregroundStyle(theme.onBackground)
                         .lineLimit(1)
                         .accessibilityIdentifier("detail.artist")
                 }
                 Text(details.item.name)
                     .font(.title.bold())
+                    .foregroundStyle(theme.onBackground)
                     .lineLimit(2)
                     .accessibilityAddTraits(.isHeader)
                     .accessibilityIdentifier("detail.title")

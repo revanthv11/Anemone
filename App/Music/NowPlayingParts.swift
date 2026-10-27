@@ -13,6 +13,8 @@ struct LyricsView: View {
     let focus: FocusState<NowPlayingPage.Focus?>.Binding
     let seek: (Duration) -> Void
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         let current = lyrics.lineIndex(at: position)
         ScrollViewReader { scroller in
@@ -26,13 +28,19 @@ struct LyricsView: View {
                         } label: {
                             Text(line.text.isEmpty ? " " : line.text)
                                 .font(.title3.weight(index == current ? .bold : .regular))
-                                .foregroundStyle(index == current || current == nil ? .primary : .secondary)
+                                .foregroundStyle(
+                                    index == current || current == nil ? theme.onBackground : theme.secondaryText,
+                                )
                                 .multilineTextAlignment(.leading)
                         }
                         .buttonStyle(HighlightButtonStyle())
                         .focused(focus, equals: .lyric(index))
                         .id(index)
+                        // A gap between verses reads as one, rather than as nothing.
+                        .accessibilityLabel(line.text.isEmpty ? "Instrumental" : line.text)
+                        .accessibilityHint(line.start == nil ? "" : "Plays from this line")
                         .accessibilityIdentifier("nowPlaying.lyric.\(index)")
+                        // The line being sung.
                         .accessibilityAddTraits(index == current ? .isSelected : [])
                     }
                 }
@@ -71,29 +79,40 @@ struct NowPlayingProgress: View {
     let position: Duration
     let duration: Duration?
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         VStack(spacing: 8) {
             GeometryReader { geometry in
                 Capsule()
-                    .fill(.white.opacity(0.25))
+                    .fill(theme.seekTrack)
                     .overlay(alignment: .leading) {
                         Capsule()
-                            .fill(.white)
+                            .fill(theme.seekPlayed)
                             .frame(width: geometry.size.width * fraction)
                     }
             }
             .frame(height: 8)
             HStack {
                 Text(position.clockText)
-                    .accessibilityIdentifier("nowPlaying.position")
                 Spacer()
                 Text(duration?.clockText ?? "")
             }
             .font(.caption)
             .monospacedDigit()
-            .foregroundStyle(.secondary)
+            .foregroundStyle(theme.secondaryText)
         }
-        .accessibilityElement(children: .contain)
+        // One element, read as how far the song has got of how long it is.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Position")
+        .accessibilityValue(spokenPosition)
+        .accessibilityIdentifier("nowPlaying.position")
+    }
+
+    /// "1 minute, 5 seconds of 3 minutes, 20 seconds".
+    private var spokenPosition: Text {
+        guard let duration, duration > .zero else { return Text(position.spokenTime) }
+        return Text("\(position.spokenTime) of \(duration.spokenTime)")
     }
 
     private var fraction: CGFloat {
@@ -108,11 +127,14 @@ struct UpNextRow: View {
     let focus: FocusState<NowPlayingPage.Focus?>.Binding
 
     @Environment(MusicPlayer.self) private var player
+    @Environment(\.theme) private var theme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Queue")
                 .font(.headline)
+                .foregroundStyle(theme.onBackground)
+                .accessibilityAddTraits(.isHeader)
             ScrollViewReader { scroller in
                 ScrollView(.horizontal) {
                     LazyHStack(alignment: .top, spacing: 32) {
@@ -145,10 +167,11 @@ struct UpNextRow: View {
                     if isCurrent {
                         Image(systemName: "speaker.wave.2.fill")
                             .font(.caption2.bold())
+                            .foregroundStyle(theme.onCardBadge)
                             .padding(10)
-                            .background(.black.opacity(0.6), in: .circle)
+                            .background(theme.cardBadge, in: .circle)
                             .padding(8)
-                            .accessibilityLabel("Playing")
+                            .accessibilityHidden(true)
                     }
                 }
         }
@@ -179,6 +202,8 @@ struct UpNextRow: View {
         }
         .id(entry.id)
         .focused(focus, equals: .entry(entry.id))
+        // The card reads the song, its album and artists; the one playing says so.
+        .accessibilityValue(isCurrent ? "Playing" : "")
         .accessibilityIdentifier("nowPlaying.queue.\(index)")
         .accessibilityAddTraits(isCurrent ? .isSelected : [])
     }

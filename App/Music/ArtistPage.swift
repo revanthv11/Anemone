@@ -18,6 +18,7 @@ struct ArtistPage: View {
     @State private var similar: [MusicItem] = []
     @State private var alert: ItemAlert?
     @State private var showsNowPlaying = false
+    @Environment(\.theme) private var theme
 
     var body: some View {
         ScrollViewReader { scroller in
@@ -80,7 +81,9 @@ struct ArtistPage: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("Popular Songs")
                 .font(.headline)
+                .foregroundStyle(theme.onBackground)
                 .padding(.bottom, 8)
+                .accessibilityAddTraits(.isHeader)
             ForEach(Array(popular.enumerated()), id: \.element.id) { index, song in
                 SongRow(song: song, number: index + 1) {
                     play(song)

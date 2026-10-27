@@ -19,6 +19,7 @@ struct MusicGrid: View {
     @State private var pager: MusicPager?
     @State private var problem: String?
     @State private var alert: ItemAlert?
+    @Environment(\.theme) private var theme
 
     private static let columns = 6
     private static let spacing: CGFloat = 40
@@ -33,7 +34,7 @@ struct MusicGrid: View {
                         grid(pager, width: geometry.size.width - 2 * GridLayout.horizontalInset)
                     } else if let problem {
                         Text(problem)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(theme.secondaryText)
                             .frame(maxWidth: .infinity)
                     } else {
                         ProgressView()
@@ -73,7 +74,7 @@ struct MusicGrid: View {
             Spacer()
             if let count = pager?.count {
                 Text(count == 1 ? "1 item" : "\(count.formatted()) items")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryText)
                     .accessibilityIdentifier("music.count")
             }
         }
@@ -169,7 +170,10 @@ private struct MusicGridCard: View {
         }
         .buttonStyle(.borderless)
         .modifier(SongCardActions(song: item?.item.kind == .audio ? item : nil, play: play))
+        // The name, then the card's line under it: an album's artist and year, a song's album
+        // and artists.
         .accessibilityLabel(item?.item.name ?? "Loading")
+        .accessibilityValue(item?.subtitle ?? "")
         .accessibilityIdentifier("music.card.\(index)")
         .task {
             await pager.prefetch(around: index)
@@ -276,13 +280,16 @@ struct MusicGridPage: View {
     @Binding var path: NavigationPath
 
     @State private var showsNowPlaying = false
+    @Environment(\.theme) private var theme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(title)
                 .font(.title2.bold())
+                .foregroundStyle(theme.onBackground)
                 .padding(.horizontal, GridLayout.horizontalInset)
                 .padding(.top, 40)
+                .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("detail.title")
             MusicGrid(list: list, playSource: playSource, path: $path, showsNowPlaying: $showsNowPlaying)
         }

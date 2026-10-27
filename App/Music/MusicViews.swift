@@ -57,10 +57,14 @@ struct MusicRow: View {
     let items: [MusicItem]
     let focus: FocusState<MusicFocus?>.Binding
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.headline)
+                .foregroundStyle(theme.onBackground)
+                .accessibilityAddTraits(.isHeader)
             ScrollView(.horizontal) {
                 LazyHStack(alignment: .top, spacing: ItemLayout.cardSpacing) {
                     ForEach(items) { item in
@@ -89,60 +93,66 @@ struct SongRow: View {
     let action: () -> Void
 
     @Environment(MusicPlayer.self) private var player
+    @Environment(\.theme) private var theme
 
     var body: some View {
+        // No label of its own: VoiceOver reads the row's parts in order, whether the song is
+        // playing or queued, its name, its artists where shown, the favourite mark and length.
         Button(action: action) {
             HStack(spacing: 24) {
                 marker
                     .frame(width: 32)
                 Text(number.map(String.init) ?? "")
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryText)
                     .frame(width: 60, alignment: .trailing)
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(song.item.name)
+                        .foregroundStyle(theme.onBackground)
                         .lineLimit(1)
                     if showsArtist, let artists = song.artistNames {
                         Text(artists)
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(theme.secondaryText)
                             .lineLimit(1)
                     }
                 }
                 Spacer(minLength: 24)
                 if song.details.userState.isFavorite {
                     Image(systemName: "heart.fill")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(theme.favorite)
                         .accessibilityLabel("Favorite")
                 }
                 Text(song.item.runtime?.clockText ?? "")
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryText)
+                    .accessibilityLabel(song.item.runtime?.spokenTime ?? "")
             }
             .font(.callout)
             .padding(.horizontal, 24)
             .padding(.vertical, 14)
         }
         .buttonStyle(RowButtonStyle())
-        .accessibilityLabel(song.item.name)
     }
 
     @ViewBuilder
     private var marker: some View {
         if player.current?.id == song.id {
             Image(systemName: player.isPlaying ? "speaker.wave.2.fill" : "speaker.fill")
-                .foregroundStyle(.tint)
+                .foregroundStyle(theme.highlight)
                 .accessibilityLabel("Playing")
         } else if player.queue.contains(song.id) {
             Circle()
                 .frame(width: 10, height: 10)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.secondaryText)
                 .accessibilityLabel("Queued")
         }
     }
 }
 
-/// Shows focus as a soft bar behind a list row, like Wholphin's list items.
+/// Shows focus as a soft bar behind a list row, like Wholphin's list items, in the theme's
+/// platter.
 struct RowButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         RowBody(configuration: configuration)
@@ -151,11 +161,12 @@ struct RowButtonStyle: ButtonStyle {
     private struct RowBody: View {
         let configuration: ButtonStyleConfiguration
         @Environment(\.isFocused) private var isFocused
+        @Environment(\.theme) private var theme
 
         var body: some View {
             configuration.label
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.white.opacity(isFocused ? 0.2 : 0), in: .rect(cornerRadius: 12))
+                .background(isFocused ? theme.platter.color : .clear, in: .rect(cornerRadius: 12))
                 .scaleEffect(configuration.isPressed ? 0.98 : isFocused ? 1.02 : 1)
                 .animation(.easeOut(duration: 0.15), value: isFocused)
         }
