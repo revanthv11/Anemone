@@ -51,6 +51,8 @@ struct ScreensaverView: View {
         .task {
             await showSlides()
         }
+        // ScreensaverPresenter hosts it on its own, outside the app's environment.
+        .appTheme()
     }
 
     /// Darker towards the edges, and at the top behind the clock, as in Wholphin.
