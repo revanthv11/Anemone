@@ -11,7 +11,7 @@ import Testing
 @MainActor
 struct DrawnSubtitlesTests {
     private let engine = TrackEngine()
-    private let log = EventLog()
+    let log = EventLog()
     private let requests = StreamRequestLog()
     private let fetches = SubtitleFetchLog()
     private let defaults: UserDefaults
@@ -26,7 +26,7 @@ struct DrawnSubtitlesTests {
 
     /// Subtitles whose files the fake server sends, after `delay` for the indices in `slow`;
     /// those in `failing` can't be fetched.
-    private func drawn(failing: Set<Int> = [], slow: Set<Int> = [], delay: Duration = .zero) -> DrawnSubtitles {
+    func drawn(failing: Set<Int> = [], slow: Set<Int> = [], delay: Duration = .zero) -> DrawnSubtitles {
         DrawnSubtitles(server: DrawnSubtitles.Server(timeline: { [fetches] request in
             fetches.append(request)
             if slow.contains(request.index) {
@@ -43,7 +43,7 @@ struct DrawnSubtitlesTests {
     /// English, and getting HLS back whose text subtitles come as files of their own. Track
     /// selection hears of each stream first when `selectionFirst`, with a feature between that
     /// takes its time, so it says what to draw before the drawn subtitles hear of the stream.
-    private func player(_ drawn: DrawnSubtitles, selectionFirst: Bool = false) -> PlaybackController {
+    func player(_ drawn: DrawnSubtitles, selectionFirst: Bool = false) -> PlaybackController {
         let selection = TrackSelection(
             server: TrackSelection.Server(
                 itemTracks: { ItemTracks(itemID: $0, sources: [.init(id: $0, tracks: .multiTrack)]) },
@@ -63,13 +63,13 @@ struct DrawnSubtitlesTests {
         }
     }
 
-    private func start(_ playback: PlaybackController) async {
+    func start(_ playback: PlaybackController) async {
         await playback.start()
         engine.send(.ready)
         _ = await eventually { log.events.contains { $0.hasPrefix("started") } }
     }
 
-    private func pick(_ optionID: String, in menuID: String, of playback: PlaybackController) throws {
+    func pick(_ optionID: String, in menuID: String, of playback: PlaybackController) throws {
         let menu = playback.accessories.menus.first { $0.id == menuID }
         try #require(menu?.options.first { $0.id == optionID }).select()
     }
