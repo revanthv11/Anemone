@@ -33,8 +33,11 @@ struct LiveTVHomeCard<Label: View>: View {
                 followUp.play(browse.playback(onChannelOf: program))
                 shownProgram = nil
             } changed: { _, _ in
-                // Active Recordings may have changed.
-                followUp.recordingChanged()
+                // Active Recordings may have changed. Menu can close the sheet before the change
+                // lands, and then nothing is left to wait for.
+                if followUp.recordingChanged() {
+                    Task { await browse.refresh() }
+                }
             }
         }
     }
@@ -46,7 +49,9 @@ struct LiveTVHomeCard<Label: View>: View {
         }
         Task {
             do {
-                shownProgram = try await browse.session.liveTVProgram(id: item.id)
+                let program = try await browse.session.liveTVProgram(id: item.id)
+                followUp.sheetOpened()
+                shownProgram = program
             } catch {
                 if let message = browse.problem(with: error, failure: "Couldn't load \(item.name).") {
                     actions.alert = .failed(message)
