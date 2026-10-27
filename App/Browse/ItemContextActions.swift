@@ -180,8 +180,6 @@ private struct ItemContextMenu: View {
             ItemMenuState(isResumable: (given.progress ?? 0) > 0)
         }
         return target.item.menuEntries(state: state, source: source, canGoTo: stack != nil)
-            // Waits for Home's Remove from Next Up (Phase 2e) to move here.
-            .filter { $0 != .removeFromNextUp }
     }
 
     private func perform(_ entry: ItemMenuEntry, on target: MenuTarget) {
@@ -203,7 +201,8 @@ private struct ItemContextMenu: View {
                 }
             }
         case .removeFromNextUp:
-            break
+            // Home's, which also refreshes Home.
+            Task { await browse.removeFromNextUp(target.item) }
         case let .setPlayed(isPlayed):
             Task { await actions.save(.played(isPlayed), for: target, given: given, browse: browse) }
         case let .setFavorite(isFavorite):
@@ -286,22 +285,31 @@ private struct PlaylistPicker: View {
                         .foregroundStyle(.secondary)
                         .focusable()
                 }
-                List(playlists) { playlist in
-                    Button {
-                        Task { await choose(playlist) }
-                    } label: {
-                        PlaylistLabel(playlist: playlist)
+                // A sheet takes its content's size, which a `List` doesn't have.
+                ScrollView(.vertical) {
+                    VStack(spacing: 16) {
+                        ForEach(playlists) { playlist in
+                            Button {
+                                Task { await choose(playlist) }
+                            } label: {
+                                PlaylistLabel(playlist: playlist)
+                            }
+                            .disabled(isSaving)
+                            .accessibilityValue(playlist.entryID == nil ? "" : "Has this item")
+                            .accessibilityIdentifier("playlist.\(playlist.id)")
+                        }
                     }
-                    .disabled(isSaving)
-                    .accessibilityIdentifier("playlist.\(playlist.id)")
+                    .padding(.vertical, ItemLayout.focusPadding)
                 }
+                .scrollClipDisabled()
+                .frame(maxHeight: 600)
             } else if problem == nil {
                 ProgressView()
                     .frame(maxWidth: .infinity)
             }
         }
-        .frame(maxWidth: 1100, maxHeight: .infinity, alignment: .topLeading)
-        .padding(80)
+        .frame(width: 1100, alignment: .topLeading)
+        .padding(60)
         .task {
             await load()
         }
@@ -343,7 +351,5 @@ private struct PlaylistLabel: View {
             Text(playlist.itemCount == 1 ? "1 item" : "\(playlist.itemCount) items")
                 .foregroundStyle(.secondary)
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityValue(playlist.entryID == nil ? "" : "Has this item")
     }
 }
