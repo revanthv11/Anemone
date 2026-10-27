@@ -46,6 +46,9 @@ struct OverlayControls: View {
                 transport
                 HStack(spacing: 20) {
                     Spacer()
+                    if let segment = overlay.skippableSegment {
+                        skipSegmentButton(segment)
+                    }
                     ForEach(playback.accessories.menus) { menu in
                         menuButton(menu)
                     }
@@ -61,9 +64,14 @@ struct OverlayControls: View {
             if let id = overlay.openMenuID, let menu = playback.accessories.menus.first(where: { $0.id == id }) {
                 MenuPanel(menu: menu, focus: focus) {
                     overlay.closeMenu()
-                    focus.wrappedValue = .menu(menu.id)
                 }
                 .alignmentGuide(.bottom) { $0[.bottom] + 110 }
+            }
+        }
+        .onChange(of: overlay.openMenuID) { closed, open in
+            // Back on the menu's button, whether a choice closed the list or Menu did.
+            if open == nil, let closed, overlay.controlsVisible {
+                focus.wrappedValue = .menu(closed)
             }
         }
     }
@@ -117,6 +125,20 @@ struct OverlayControls: View {
         .buttonStyle(OverlayButtonStyle())
         .focused(focus, equals: .transport(button))
         .accessibilityIdentifier("player.\(button)")
+    }
+
+    /// Wholphin's button beside the menus that skips the rest of the intro, credits or other
+    /// segment playing, after its own button over the video has gone.
+    private func skipSegmentButton(_ segment: MediaSegment) -> some View {
+        Button {
+            overlay.skipRest(of: segment)
+            // Before the button goes, once playback is past the segment.
+            focus.wrappedValue = .transport(.playPause)
+        } label: {
+            Label(segment.kind.skipTitle, systemImage: "forward.end.fill")
+        }
+        .focused(focus, equals: .skipSegment)
+        .accessibilityIdentifier("player.skipSegment")
     }
 
     private func menuButton(_ menu: PlayerMenu) -> some View {
@@ -275,7 +297,8 @@ struct SeekTrack: View {
     }
 }
 
-/// When playback will end at the current speed, as Wholphin's "Ends at".
+/// When playback will end at the current speed, as Wholphin's "Ends at". It works it out again
+/// every second, as Wholphin does, so it moves on while paused too, when the position doesn't.
 private struct EndTime: View {
     let seeker: Seeker
     let rate: Float
@@ -283,9 +306,12 @@ private struct EndTime: View {
     var body: some View {
         if let duration = seeker.duration, duration > .zero {
             let remaining = max(duration - seeker.position, .zero) / Double(max(rate, 0.1))
-            remaining.endsAtText(from: .now)
-                .font(.callout)
-                .foregroundStyle(.secondary)
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                remaining.endsAtText(from: context.date)
+            }
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .accessibilityIdentifier("player.endsAt")
         }
     }
 }

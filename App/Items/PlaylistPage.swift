@@ -277,8 +277,7 @@ private struct EntryRow: View {
             VStack(alignment: .trailing, spacing: 4) {
                 Text(runtime.lengthText)
                 TimelineView(.everyMinute) { context in
-                    let end = context.date.addingTimeInterval(TimeInterval(runtime.components.seconds))
-                    Text("Ends at \(end.formatted(date: .omitted, time: .shortened))")
+                    runtime.endsAtText(from: context.date)
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
