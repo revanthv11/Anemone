@@ -1,5 +1,6 @@
 import AnemoneJellyfin
 import AnemonePlayback
+import AnemoneUI
 import SwiftUI
 
 /// The transport, as Wholphin's `PlaybackController` and `PlaybackControls` lay it out: the title
@@ -72,6 +73,12 @@ struct OverlayControls: View {
             // Back on the menu's button, whether a choice closed the list or Menu did.
             if open == nil, let closed, overlay.controlsVisible {
                 focus.wrappedValue = .menu(closed)
+            }
+        }
+        .onChange(of: overlay.skipButtonLeftFocus) { _, left in
+            // Its segment ended while the skip button had focus: Play/Pause, as after pressing it.
+            if left {
+                focus.wrappedValue = .transport(.playPause)
             }
         }
     }
@@ -298,7 +305,8 @@ struct SeekTrack: View {
 }
 
 /// When playback will end at the current speed, as Wholphin's "Ends at". It works it out again
-/// every second, as Wholphin does, so it moves on while paused too, when the position doesn't.
+/// every second, as Wholphin does, so it moves on while paused too, when the position doesn't;
+/// on a schedule from a fixed moment, which a body run doesn't start again.
 private struct EndTime: View {
     let seeker: Seeker
     let rate: Float
@@ -306,7 +314,7 @@ private struct EndTime: View {
     var body: some View {
         if let duration = seeker.duration, duration > .zero {
             let remaining = max(duration - seeker.position, .zero) / Double(max(rate, 0.1))
-            TimelineView(.periodic(from: .now, by: 1)) { context in
+            TimelineView(.everySecond) { context in
                 remaining.endsAtText(from: context.date)
             }
             .font(.callout)

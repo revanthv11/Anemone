@@ -94,9 +94,12 @@ final class FakeStreams: Sendable {
 
     private let requests = Mutex<[Request]>([])
     private let failure: (any Error)?
+    /// Items the server won't offer a stream for, when `failure` is `nil`.
+    private let failingItems: Set<String>
 
-    init(failingWith failure: (any Error)? = nil) {
+    init(failingWith failure: (any Error)? = nil, failingItems: Set<String> = []) {
         self.failure = failure
+        self.failingItems = failingItems
     }
 
     var received: [Request] {
@@ -115,6 +118,9 @@ final class FakeStreams: Sendable {
             }
             if let failure {
                 throw failure
+            }
+            if failingItems.contains(request.itemID) {
+                throw PlaybackError.nothingToPlay
             }
             return Self.stream(request.itemID, method: request.allowsDirect ? .directPlay : .transcode)
         }

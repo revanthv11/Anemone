@@ -41,10 +41,9 @@ public final class SegmentSkipping: PlaybackFeature {
     @ObservationIgnored private var handled: Set<MediaSegment.ID> = []
     @ObservationIgnored private var loading: Task<Void, Never>?
     @ObservationIgnored private var offerTimeout: Task<Void, Never>?
-    /// The loaded entry's place in the queue and item, to tell a retry as a transcode, which
+    /// The loaded entry's `PlaybackController.entryNumber`, to tell a retry as a transcode, which
     /// keeps what was skipped, from another entry.
-    @ObservationIgnored private var entry: (index: Int, itemID: MediaItem.ID)?
-    @ObservationIgnored private var hasFailed = false
+    @ObservationIgnored private var entryNumber: Int?
     @ObservationIgnored private weak var controller: PlaybackController?
 
     public convenience init(session: JellyfinSession) {
@@ -69,18 +68,23 @@ public final class SegmentSkipping: PlaybackFeature {
         self.controller = controller
         switch event {
         case let .loaded(_, entry):
-            loaded(entry, at: controller.queue.currentIndex)
+            loaded(entry, number: controller.entryNumber)
         case let .started(progress), let .position(progress), let .paused(progress), let .resumed(progress):
             update(at: progress.position)
-        case .failed:
-            hasFailed = true
         case .stopped:
             enter(nil)
             withdrawOffer()
-        case .ended, .reloaded:
+        case .ended, .failed, .reloaded:
             // A reload plays the same entry, so what was skipped stays skipped.
             break
         }
+    }
+
+    /// Where the credits start, the first outro segment's start, whatever the setting for
+    /// outros: moving on from past there marks an entry played (`PlaybackController`'s
+    /// `hasReachedCredits`).
+    public var creditsStart: Duration? {
+        segments.first { $0.kind == .outro }?.start
     }
 
     /// Skips the segment whose button is showing, as the button does.
@@ -91,11 +95,12 @@ public final class SegmentSkipping: PlaybackFeature {
         skip(offered)
     }
 
-    /// Wholphin starts afresh with each item, but a retry as a transcode is the same item.
-    private func loaded(_ entry: PlaybackQueue.Entry, at index: Int) {
-        let isRetry = hasFailed && self.entry?.index == index && self.entry?.itemID == entry.itemID
-        hasFailed = false
-        self.entry = (index, entry.itemID)
+    /// Wholphin starts afresh with each item, but a retry as a transcode is the same entry. Told
+    /// by the entry's number, not its place and item: a later entry that failed before it loaded,
+    /// then a return to this one, isn't a retry.
+    private func loaded(_ entry: PlaybackQueue.Entry, number: Int) {
+        let isRetry = entryNumber == number
+        entryNumber = number
         guard !isRetry else { return }
         loading?.cancel()
         handled = []
@@ -112,7 +117,11 @@ public final class SegmentSkipping: PlaybackFeature {
     /// Like Wholphin's check every 500 ms, on each position the controller sends.
     private func update(at position: Duration) {
         let segment = segments.first { $0.contains(position) }
+        let number = controller?.entryNumber
         enter(segment)
+        // Up Next can move on to the next entry as the credits start (with no countdown): this
+        // entry's button, or its skip, would only land on the next one as it loads.
+        guard controller?.entryNumber == number else { return }
         guard let segment else {
             withdrawOffer()
             return

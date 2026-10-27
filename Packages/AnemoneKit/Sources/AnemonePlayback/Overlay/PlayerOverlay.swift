@@ -42,6 +42,8 @@ public final class PlayerOverlay {
         case seekBar
         /// On a feature's action over the video, such as Skip Intro.
         case action
+        /// On the controls' button that skips the rest of the segment playing.
+        case skipButton
         /// On any other button.
         case control
     }
@@ -336,6 +338,25 @@ public extension PlayerOverlay {
               skipBehavior(segment.kind) != .ignore
         else { return nil }
         return segment
+    }
+
+    /// Whether focus should move to Play/Pause: the controls' skip button had it, and has gone as
+    /// its segment ended, which would leave focus nowhere. Pressing the button moves focus there
+    /// before it goes.
+    var skipButtonLeftFocus: Bool {
+        controlsVisible && focus == .skipButton && skippableSegment == nil
+    }
+
+    /// Another entry is playing, such as the movie after its cinema pre-roll. A seek still being
+    /// chosen was along the entry before, so it's dropped, with the compact seek bar showing it,
+    /// and a press still held seeks no more: landing at that time in the new entry isn't what the
+    /// presses asked for. Wholphin's seek lands there all the same, once its 750 ms wait is up;
+    /// after a pre-roll, that's a few seconds into the movie, since the seek stops at the end of
+    /// the pre-roll.
+    func entryChanged() {
+        seeker.cancel()
+        seekBarHiding?.cancel()
+        showsSeekBar = false
     }
 
     /// The compact seek bar, while seeking with the controls hidden.

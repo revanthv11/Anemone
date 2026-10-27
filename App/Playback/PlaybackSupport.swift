@@ -23,11 +23,13 @@ extension BrowseModel {
     /// Play or Shuffle on a series, season, collection or playlist, like Wholphin's
     /// `PlaylistCreator`: asks the server what to play, then hands it to `play`, or says why
     /// there's nothing through `failed`. Series Play resumes the episode next up; the rest start
-    /// from the beginning.
+    /// from the beginning. A collection's page passes the items it lists as `shown`, in `order`,
+    /// so they aren't asked for again.
     func playQueue(
         of container: ItemDetails,
         shuffled: Bool,
         order: (sort: LibrarySort, filter: LibraryFilter)? = nil,
+        shown: [ItemDetails]? = nil,
         play: (PlaybackRequest) -> Void,
         failed: (ItemAlert) -> Void,
     ) async {
@@ -36,7 +38,7 @@ extension BrowseModel {
         Self.isFindingQueue = true
         defer { Self.isFindingQueue = false }
         do {
-            let found = try await queueItems(of: container, shuffled: shuffled, order: order)
+            let found = try await queueItems(of: container, shuffled: shuffled, order: order, shown: shown)
             let resumesFirst = container.item.kind == .series && !shuffled
             let entries = found.items.enumerated().map { index, item in
                 entry(for: item, from: index == 0 && resumesFirst ? item.userState.resumePosition : nil)
@@ -126,6 +128,7 @@ private extension BrowseModel {
         of container: ItemDetails,
         shuffled: Bool,
         order: (sort: LibrarySort, filter: LibraryFilter)?,
+        shown: [ItemDetails]?,
     ) async throws -> PlayableItems {
         let session = session
         let id = container.id
@@ -145,6 +148,7 @@ private extension BrowseModel {
                 shuffled: shuffled,
                 sort: order?.sort ?? LibrarySort(.default),
                 filter: order?.filter ?? LibraryFilter(),
+                shown: shown,
             )
         case .playlist:
             return try await session.playlistQueue(id: id)
