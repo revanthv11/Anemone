@@ -108,10 +108,14 @@ public extension JellyfinSession {
 extension JellyfinSession {
     /// How many IDs one request asks for.
     static let itemIDPageSize = 1000
+    /// How many of those requests go out at once.
+    static let itemIDRequestWidth = 4
 
     /// The IDs of every item `parameters` matches, in its order, a page at a time, with nothing
     /// else the server can leave out: no images, user data or extra fields (Jellyfin adds none
-    /// unless `fields` asks for them) and no total count, so a large library stays quick.
+    /// unless `fields` asks for them), so a large library stays quick. The first page also asks
+    /// for the count, so the pages after it go out `itemIDRequestWidth` at a time rather than one
+    /// after another: a 20,000-title library is still 20 requests, but about six round trips.
     ///
     /// - Parameter keep: whether to keep an item, for items the server sends that the caller
     ///   doesn't list.
@@ -124,22 +128,65 @@ extension JellyfinSession {
         parameters.fields = nil
         parameters.enableImages = false
         parameters.enableUserData = false
-        parameters.enableTotalRecordCount = false
         parameters.limit = pageSize
+        let pages = try await Self.allPages(size: pageSize, width: Self.itemIDRequestWidth) { startIndex, counts in
+            parameters.startIndex = startIndex
+            parameters.enableTotalRecordCount = counts
+            return Paths.getItems(parameters: parameters)
+        } fetch: { [self] request in
+            let result = try await send(request)
+            return (result.items ?? [], result.totalRecordCount)
+        }
         var ids: [MediaItem.ID] = []
         var seen: Set<MediaItem.ID> = []
-        var startIndex = 0
-        while true {
-            parameters.startIndex = startIndex
-            let items = try await send(Paths.getItems(parameters: parameters)).items ?? []
-            // An item added or removed between pages can shift one onto the next page twice.
-            for item in items where keep(item) {
-                if let id = item.id, seen.insert(id).inserted {
-                    ids.append(id)
-                }
+        // An item added or removed between pages can shift one onto the next page twice.
+        for item in pages.joined() where keep(item) {
+            if let id = item.id, seen.insert(id).inserted {
+                ids.append(id)
             }
-            guard items.count >= pageSize else { return ids }
-            startIndex += items.count
         }
+        return ids
+    }
+
+    /// Every page of a list, `size` at a time from the start, until one comes back short. The
+    /// first page is asked for alone, with the list's count, so the pages up to that count can
+    /// go out `width` at a time; any past it (added meanwhile) follow one at a time, as every
+    /// page does when the server doesn't count.
+    ///
+    /// - Parameters:
+    ///   - request: the request for the page from `startIndex`, asking for the count when
+    ///     `counts` says to.
+    ///   - fetch: sends a page's request, for its items and the count, if it has one.
+    static func allPages<Page: Sendable, Item: Sendable>(
+        size: Int,
+        width: Int,
+        request: (_ startIndex: Int, _ counts: Bool) -> Page,
+        fetch: @escaping @Sendable (Page) async throws -> (items: [Item], count: Int?),
+    ) async throws -> [[Item]] {
+        let first = try await fetch(request(0, true))
+        var pages = [first.items]
+        if first.items.count >= size, let count = first.count {
+            let requests = stride(from: size, to: count, by: size).map { request($0, false) }
+            pages += try await withThrowingTaskGroup(of: (Int, [Item]).self) { group in
+                var next = requests.indices.makeIterator()
+                func addNext() {
+                    guard let index = next.next() else { return }
+                    group.addTask { try await (index, fetch(requests[index]).items) }
+                }
+                for _ in 0 ..< width {
+                    addNext()
+                }
+                var rest = [[Item]](repeating: [], count: requests.count)
+                while let (index, items) = try await group.next() {
+                    rest[index] = items
+                    addNext()
+                }
+                return rest
+            }
+        }
+        while let last = pages.last, last.count >= size {
+            try await pages.append(fetch(request(pages.count * size, false)).items)
+        }
+        return pages
     }
 }

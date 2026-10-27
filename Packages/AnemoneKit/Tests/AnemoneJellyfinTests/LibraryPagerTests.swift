@@ -8,11 +8,15 @@ struct LibraryPagerTests {
     /// A fake library of `count` items that records which pages were asked for.
     private final class FakeLibrary: Sendable {
         let count: Int
+        /// Counted, but left out of their pages, as items removed since the count are, or those
+        /// that can't be read.
+        let missing: Set<Int>
         let requests = Mutex<[Int]>([])
         let failures = Mutex<Set<Int>>([])
 
-        init(count: Int) {
+        init(count: Int, missing: Set<Int> = []) {
             self.count = count
+            self.missing = missing
         }
 
         func load(startIndex: Int, limit: Int, includeTotalCount: Bool) throws -> LibraryPage {
@@ -20,7 +24,7 @@ struct LibraryPagerTests {
             if failures.withLock({ $0.remove(startIndex) }) != nil {
                 throw URLError(.timedOut)
             }
-            let items = (startIndex ..< min(startIndex + limit, count)).map { index in
+            let items = (startIndex ..< min(startIndex + limit, count)).filter { !missing.contains($0) }.map { index in
                 LibraryEntry(item: MediaItem(id: "i\(index)", name: "Item \(index)", kind: .movie), sortName: nil)
             }
             return LibraryPage(items: items, totalCount: includeTotalCount ? count : nil)
@@ -111,5 +115,70 @@ struct LibraryPagerTests {
         #expect(pager.item(at: 211)?.id == "i211")
         #expect(pager.error == nil)
         #expect(library.requests.withLock { $0 } == [0, 200, 200])
+    }
+
+    @Test func `pages that come back short close up, so every place gets an item`() async throws {
+        let missing: Set = [3, 50, 99, 140, 260]
+        let library = FakeLibrary(count: 300, missing: missing)
+        let pager = pager(library)
+
+        try await pager.start()
+        // The first page left out three of the hundred it counted.
+        #expect(pager.count == 297)
+        #expect(pager.item(at: 96)?.id == "i98")
+        // The second page starts here now, and isn't in yet.
+        #expect(pager.item(at: 97) == nil)
+
+        var shown: [MediaItem.ID] = []
+        var index = 0
+        while index < pager.count {
+            try shown.append(#require(await pager.load(at: index)).id)
+            index += 1
+        }
+
+        #expect(pager.count == 295)
+        #expect(shown == (0 ..< 300).filter { !missing.contains($0) }.map { "i\($0)" })
+        #expect(library.requests.withLock { $0 } == [0, 100, 200])
+    }
+
+    @Test func `a jump past a page that comes back short lands on the item now there`() async throws {
+        // The second page lost 60 of its hundred since the count.
+        let library = FakeLibrary(count: 300, missing: Set(100 ..< 160))
+        let pager = pager(library)
+        try await pager.start()
+
+        let item = try await pager.load(at: 150)
+
+        // Place 150 was on the second page, which closed up to 40; it's now the third page's
+        // eleventh item.
+        #expect(item?.id == "i210")
+        #expect(pager.count == 240)
+        #expect(library.requests.withLock { $0 } == [0, 100, 200])
+    }
+
+    @Test func `cards past a page that came back short ask for the page they're now on`() async throws {
+        let library = FakeLibrary(count: 300, missing: Set(100 ..< 180))
+        let pager = pager(library)
+        try await pager.start()
+
+        // Before the second page is in, card 130 is on it, and not past its middle.
+        await pager.prefetch(around: 130)
+
+        #expect(pager.count == 220)
+        #expect(pager.item(at: 130)?.id == "i210")
+        #expect(library.requests.withLock { $0 } == [0, 100, 200])
+    }
+
+    @Test func `a page that comes back empty is passed over`() async throws {
+        let library = FakeLibrary(count: 250, missing: Set(100 ..< 200))
+        let pager = pager(library)
+        try await pager.start()
+
+        let item = try await pager.load(at: 100)
+
+        #expect(item?.id == "i200")
+        #expect(pager.count == 150)
+        #expect(pager.item(at: 149)?.id == "i249")
+        #expect(pager.item(at: 150) == nil)
     }
 }

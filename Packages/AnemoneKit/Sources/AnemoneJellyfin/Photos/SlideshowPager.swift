@@ -2,7 +2,8 @@ import Foundation
 import Observation
 
 /// A slideshow's photos, fetched a page at a time as the slideshow reaches them, like Wholphin's
-/// `ApiRequestPager`. Loaded pages are kept, so going back never waits.
+/// `ApiRequestPager`. Loaded pages are kept, so going back never waits. A page that comes back
+/// short closes up (`PagedItems`), so the slideshow never stops on a photo that will never come.
 @MainActor
 @Observable
 public final class SlideshowPager {
@@ -14,35 +15,40 @@ public final class SlideshowPager {
     ) async throws -> SlideshowPage
 
     public let pageSize: Int
-    /// How many photos the slideshow holds, as the first page reported it.
-    public private(set) var count = 0
-    private var pages: [Int: [SlideshowItem]] = [:]
+    private var items: PagedItems<SlideshowItem>
     @ObservationIgnored private var loads: [Int: Task<[SlideshowItem], any Error>] = [:]
     @ObservationIgnored private let loader: Loader
 
     public init(pageSize: Int = 100, loader: @escaping Loader) {
         self.pageSize = pageSize
         self.loader = loader
+        items = PagedItems(pageSize: pageSize)
+    }
+
+    /// How many photos the slideshow holds: those the first page counted, less any that pages
+    /// loaded since left out.
+    public var count: Int {
+        items.count
     }
 
     /// Loads the first page and the total count. Call once, before showing anything.
     public func start() async throws {
         let first = try await loader(0, pageSize, true)
-        pages[0] = first.items
-        count = first.totalCount ?? first.items.count
+        items.start(first.items, counted: first.totalCount ?? first.items.count)
     }
 
     /// The photo at `index`, or `nil` while its page is loading.
     public func item(at index: Int) -> SlideshowItem? {
-        let page = index / pageSize
-        guard index >= 0, let items = pages[page] else { return nil }
-        let offset = index - page * pageSize
-        return items.indices.contains(offset) ? items[offset] : nil
+        items.item(at: index)
     }
 
     /// The photo at `index`, loading its page first if needed.
     public func load(at index: Int) async throws -> SlideshowItem? {
-        try await load(page: index / pageSize)
+        // A page that comes back short moves the photos after it up, which can put `index` on a
+        // page not loaded yet; each turn loads one more page, so this ends.
+        while let page = items.page(holding: index), items.items(onPage: page) == nil {
+            try await load(page: page)
+        }
         return item(at: index)
     }
 
@@ -51,13 +57,13 @@ public final class SlideshowPager {
     /// since the slideshow leaves out the albums and clips the grid shows.
     public func index(of id: MediaItem.ID, near hint: Int) async throws -> Int? {
         guard count > 0 else { return nil }
-        let lastPage = (count - 1) / pageSize
+        let lastPage = items.pageCount - 1
         let hintPage = min(max(hint, 0) / pageSize, lastPage)
         let order = Array(stride(from: hintPage, through: 0, by: -1)) + Array((hintPage + 1) ..< (lastPage + 1))
         for page in order {
-            let items = try await load(page: page)
-            if let offset = items.firstIndex(where: { $0.id == id }) {
-                return page * pageSize + offset
+            let loaded = try await load(page: page)
+            if let offset = loaded.firstIndex(where: { $0.id == id }) {
+                return items.index(of: offset, onPage: page)
             }
         }
         return nil
@@ -66,19 +72,19 @@ public final class SlideshowPager {
     /// Fetches a page unless it's loaded or on its way.
     @discardableResult
     private func load(page: Int) async throws -> [SlideshowItem] {
-        if let items = pages[page] {
-            return items
+        if let loaded = items.items(onPage: page) {
+            return loaded
         }
-        guard page >= 0, page * pageSize < count else { return [] }
+        guard items.hasPage(page) else { return [] }
         let task = loads[page] ?? Task { [loader, pageSize] in
             try await loader(page * pageSize, pageSize, false).items
         }
         loads[page] = task
         do {
-            let items = try await task.value
-            pages[page] = items
+            let loaded = try await task.value
+            items.set(loaded, onPage: page)
             loads[page] = nil
-            return items
+            return loaded
         } catch {
             // Dropped so the next ask tries again.
             loads[page] = nil

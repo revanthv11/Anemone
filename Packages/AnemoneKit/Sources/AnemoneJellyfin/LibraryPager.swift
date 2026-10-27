@@ -3,7 +3,8 @@ import Observation
 
 /// A library's items, fetched a page at a time as the grid reaches them, like Wholphin's
 /// `ApiRequestPager`. Loaded pages are kept, so scrolling back never shows placeholders again;
-/// even a 20,000-item library is only a few megabytes.
+/// even a 20,000-item library is only a few megabytes. A page that comes back short closes up
+/// (`PagedItems`), so no card waits for an item that will never come.
 @MainActor
 @Observable
 public final class LibraryPager {
@@ -18,50 +19,51 @@ public final class LibraryPager {
     public static let defaultPageSize = 100
 
     public let pageSize: Int
-    /// How many items the library holds, as the first page reported it.
-    public private(set) var count = 0
     /// The most recent failure to load a page; cleared when a page loads.
     public private(set) var error: (any Error)?
-    private var pages: [Int: [LibraryEntry]] = [:]
+    private var items: PagedItems<LibraryEntry>
     @ObservationIgnored private var loads: [Int: Task<[LibraryEntry], any Error>] = [:]
     @ObservationIgnored private let loader: Loader
 
     public init(pageSize: Int = defaultPageSize, loader: @escaping Loader) {
         self.pageSize = pageSize
         self.loader = loader
+        items = PagedItems(pageSize: pageSize)
+    }
+
+    /// How many items the grid holds: those the first page counted, less any that pages loaded
+    /// since left out.
+    public var count: Int {
+        items.count
     }
 
     /// Loads the first page and the total count. Call once, before showing the grid.
     public func start() async throws {
         let first = try await loader(0, pageSize, true)
-        pages[0] = first.items
-        count = first.totalCount ?? first.items.count
+        items.start(first.items, counted: first.totalCount ?? first.items.count)
     }
 
     /// The item at `index`, or `nil` while its page is loading.
     public func item(at index: Int) -> LibraryEntry? {
-        let page = index / pageSize
-        guard let items = pages[page] else { return nil }
-        let offset = index - page * pageSize
-        return items.indices.contains(offset) ? items[offset] : nil
+        items.item(at: index)
     }
 
     /// Called as cards come on screen: loads the page holding `index`, and the next one once
     /// `index` is past the middle of its page, so it's there before focus gets to it.
     public func prefetch(around index: Int) async {
-        let page = index / pageSize
-        var wanted = [page]
-        if index % pageSize >= pageSize / 2 {
-            wanted.append(page + 1)
-        }
-        for page in wanted {
-            _ = try? await load(page: page)
+        _ = try? await load(at: index)
+        if let page = items.page(holding: index), index - items.index(of: 0, onPage: page) >= pageSize / 2 {
+            _ = try? await load(page: page + 1)
         }
     }
 
     /// The item at `index`, loading its page first if needed; for jumps and random picks.
     public func load(at index: Int) async throws -> LibraryEntry? {
-        try await load(page: index / pageSize)
+        // A page that comes back short moves the items after it up, which can put `index` on a
+        // page not loaded yet; each turn loads one more page, so this ends.
+        while let page = items.page(holding: index), items.items(onPage: page) == nil {
+            try await load(page: page)
+        }
         return item(at: index)
     }
 
@@ -69,20 +71,20 @@ public final class LibraryPager {
     /// so a card scrolling away doesn't cancel a page other cards need.
     @discardableResult
     private func load(page: Int) async throws -> [LibraryEntry] {
-        if let items = pages[page] {
-            return items
+        if let loaded = items.items(onPage: page) {
+            return loaded
         }
-        guard page >= 0, page * pageSize < count else { return [] }
+        guard items.hasPage(page) else { return [] }
         let task = loads[page] ?? Task { [loader, pageSize] in
             try await loader(page * pageSize, pageSize, false).items
         }
         loads[page] = task
         do {
-            let items = try await task.value
-            pages[page] = items
+            let loaded = try await task.value
+            items.set(loaded, onPage: page)
             loads[page] = nil
             error = nil
-            return items
+            return loaded
         } catch {
             // Dropped so the next card to ask tries again.
             loads[page] = nil
