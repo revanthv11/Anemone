@@ -3,6 +3,7 @@ import AnemoneJellyfin
 @testable import AnemonePlayback
 import Foundation
 import JellyfinAPI
+import Synchronization
 import Testing
 
 /// Whether a switch happens in the stream that's playing.
@@ -193,6 +194,34 @@ struct PlaybackReloadTests {
         #expect(requests.sent.map(\.audioStreamIndex) == [1, 2])
         #expect(requests.sent.map(\.mediaSourceID) == [nil, "src-m1"])
         #expect(requests.sent.first?.profile == engine.deviceProfile)
+    }
+
+    @Test func `a reload keeps the overlay's previews and takes the new stream`() async {
+        let engine = FakeEngine()
+        let fetches = Mutex(0)
+        let details = PlaybackDetails { _, _ in
+            fetches.withLock { $0 += 1 }
+            return SeekPreviews()
+        }
+        let loads = Mutex(0)
+        let playback = PlaybackController(
+            request: PlaybackRequest(.item("m1")),
+            engine: engine,
+            features: [details],
+        ) { request in
+            // The reload gets a remux, to tell the streams apart.
+            let count = loads.withLock { $0 += 1; return $0 }
+            return FakeStreams.stream(request.itemID, method: count == 1 ? .directPlay : .directStream)
+        }
+        await playback.start()
+        details.loadSeekPreviews()
+        _ = await eventually { details.previews != nil }
+
+        playback.reload()
+
+        #expect(await eventually { details.stream?.method == .directStream })
+        #expect(details.previews != nil)
+        #expect(fetches.withLock(\.self) == 1)
     }
 
     @Test func `a reload keeps what Up Next and segment skipping did for the entry`() async throws {
