@@ -36,12 +36,12 @@ private struct FavoritesContentView: View {
     @State private var focusedItem: ItemDetails?
     /// Follows `focusedItem` after a pause, like the home page's backdrop.
     @State private var backdropItem: ItemDetails?
+    /// The last favourite changed from a card's menu that the rows include.
+    @State private var seenFavoriteChange = 0
 
-    /// What the page is loaded from. A change, such as a favourite removed from a card's menu,
-    /// loads it again.
+    /// What the page is loaded from.
     private struct Load: Equatable {
         let isSelected: Bool
-        let revision: Int
         let libraries: [Library.ID]
     }
 
@@ -75,11 +75,17 @@ private struct FavoritesContentView: View {
             guard !Task.isCancelled else { return }
             backdropItem = focusedItem
         }
-        .pageTask(id: Load(isSelected: isSelected, revision: actions.revision, libraries: browse.libraries.map(\.id))) {
-            // Like Home: loads again when the page shows again, and after a card's menu changes
-            // something. Leaving it cancels a load still under way.
+        .pageTask(id: Load(isSelected: isSelected, libraries: browse.libraries.map(\.id))) {
+            // Like Home: loads again when the page shows again. Leaving it cancels a load still
+            // under way.
             guard isSelected else { return }
             await load()
+        }
+        .task(id: actions.favoriteChange) {
+            // A favourite added or removed from a card's menu: only its row loads again. Changed
+            // on another page, it's picked up when this one shows again.
+            guard isSelected, let change = actions.favoriteChange, change.serial > seenFavoriteChange else { return }
+            await reloadRow(change)
         }
     }
 
@@ -118,14 +124,16 @@ private struct FavoritesContentView: View {
     }
 
     private func load() async {
+        let change = actions.favoriteChange?.serial ?? 0
         do {
             let loaded = try await browse.session.favorites(for: browse.libraries)
             guard !Task.isCancelled else { return }
-            content = loaded
+            show(loaded)
             problem = nil
-            // The header keeps describing the focused card, with its new state, until it's gone.
-            focusedItem = focusedItem.flatMap { focused in
-                loaded.sections.lazy.flatMap(\.items).first { $0.id == focused.id }
+            seenFavoriteChange = max(seenFavoriteChange, change)
+            if let latest = actions.favoriteChange, latest.serial > change {
+                // Changed while the rows loaded, which may have missed it.
+                await reloadRow(latest)
             }
         } catch {
             // A failed reload keeps the rows already showing.
@@ -133,6 +141,34 @@ private struct FavoritesContentView: View {
             if content == nil {
                 problem = message
             }
+        }
+    }
+
+    /// Loads the row of the item a card's menu changed, which is all a favourite can change.
+    private func reloadRow(_ change: FavoriteChange) async {
+        // Without rows yet, the load under way, or the next, includes the change.
+        guard content != nil else { return }
+        guard FavoritesSection.kinds(for: browse.libraries).contains(change.kind) else {
+            // The page has no row for this type.
+            seenFavoriteChange = change.serial
+            return
+        }
+        do {
+            let items = try await browse.session.favorites(of: change.kind)
+            guard !Task.isCancelled, let content else { return }
+            show(content.replacing(change.kind, with: items))
+            seenFavoriteChange = max(seenFavoriteChange, change.serial)
+        } catch {
+            // Keeps the row as it was; the page loads again when it next shows.
+            _ = browse.problem(with: error, doing: "load your favorites")
+        }
+    }
+
+    private func show(_ loaded: FavoritesContent) {
+        content = loaded
+        // The header keeps describing the focused card, with its new state, until it's gone.
+        focusedItem = focusedItem.flatMap { focused in
+            loaded.sections.lazy.flatMap(\.items).first { $0.id == focused.id }
         }
     }
 }

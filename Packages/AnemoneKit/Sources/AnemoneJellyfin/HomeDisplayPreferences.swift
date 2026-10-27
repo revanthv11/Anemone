@@ -30,10 +30,18 @@ public struct HomeSettingsResolution: Hashable, Sendable {
     /// `nil` for the default rows, which depend on the libraries.
     public var settings: HomePageSettings?
     public var source: HomeSettingsSource
+    /// The series taken out of Next Up, read from the same entry as the saved rows, so loading
+    /// the page needn't read it again. `nil` when the entry couldn't be read.
+    public var removedFromNextUp: RemovedFromNextUp?
 
-    public init(settings: HomePageSettings?, source: HomeSettingsSource) {
+    public init(
+        settings: HomePageSettings?,
+        source: HomeSettingsSource,
+        removedFromNextUp: RemovedFromNextUp? = nil,
+    ) {
         self.settings = settings
         self.source = source
+        self.removedFromNextUp = removedFromNextUp
     }
 }
 
@@ -51,22 +59,41 @@ public extension JellyfinSession {
     /// Finds the rows to show the way Wholphin's `loadInOrder` does, minus its device-only copy:
     /// those saved on the server for this user, then the server plugin's, then none (the
     /// default). A source that fails is skipped, but a revoked token isn't.
-    func resolveHomeSettings() async throws -> HomeSettingsResolution {
-        if let settings = try await skippingFailures({ try await savedHomePageSettings() }) {
-            return HomeSettingsResolution(settings: settings, source: .server)
+    ///
+    /// Anemone's entry is read once, for the rows and the series removed from Next Up. Whether
+    /// the server has the plugin is asked once per `cache`, which lasts the session.
+    func resolveHomeSettings(cache: HomeCache? = nil) async throws -> HomeSettingsResolution {
+        let prefs = try await skippingFailures { try await customPrefs(client: HomeDisplayPreferences.anemoneClient) }
+        let removed = prefs.map(RemovedFromNextUp.init(customPrefs:))
+        let saved = try await skippingFailures {
+            try prefs?[HomeDisplayPreferences.homeSettingsKey].map(HomePageSettings.init(json:))
         }
-        if await isServerPluginInstalled(),
+        if let saved {
+            return HomeSettingsResolution(settings: saved, source: .server, removedFromNextUp: removed)
+        }
+        if await hasServerPlugin(cache: cache),
            let settings = try await skippingFailures({ try await serverPluginHomePageSettings() })
         {
-            return HomeSettingsResolution(settings: settings, source: .plugin)
+            return HomeSettingsResolution(settings: settings, source: .plugin, removedFromNextUp: removed)
         }
-        return HomeSettingsResolution(settings: nil, source: .default)
+        return HomeSettingsResolution(settings: nil, source: .default, removedFromNextUp: removed)
     }
 
     /// One DisplayPreferences entry's `customPrefs` that have a value. An entry that was never
     /// saved comes back empty.
     func customPrefs(client: String, id: String = HomeDisplayPreferences.id) async throws -> [String: String] {
         try await displayPreferences(client: client, id: id).customPrefs
+    }
+
+    /// Whether the server has the plugin, kept in `cache` once known. When the server couldn't be
+    /// asked, it counts as no, as in Wholphin, and is asked again next time.
+    private func hasServerPlugin(cache: HomeCache?) async -> Bool {
+        if let known = await cache?.isServerPluginInstalled {
+            return known
+        }
+        guard let installed = try? await serverPluginProbe() else { return false }
+        await cache?.setServerPluginInstalled(installed)
+        return installed
     }
 
     private func skippingFailures<Value>(_ load: () async throws -> Value?) async throws -> Value? {
@@ -100,6 +127,11 @@ public actor HomePreferencesWriter {
     public func save(_ settings: HomePageSettings) async throws {
         let json = try settings.json()
         try await update { $0[HomeDisplayPreferences.homeSettingsKey] = json }
+    }
+
+    /// Forgets the saved rows, Wholphin's "Reset", keeping the entry's other keys.
+    public func forgetHomePageSettings() async throws {
+        try await update { $0[HomeDisplayPreferences.homeSettingsKey] = nil }
     }
 
     /// Changes the entry's `customPrefs`, after any change already under way.
