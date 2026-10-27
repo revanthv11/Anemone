@@ -1,4 +1,5 @@
 import AnemonePlayback
+import AnemoneUI
 import AVFoundation
 import SwiftUI
 import UIKit
@@ -44,6 +45,7 @@ private struct OverlayHost: UIViewControllerRepresentable {
     func makeUIViewController(context _: Context) -> OverlayViewController {
         let content = OverlayView(playback: playback, overlay: overlay, session: browse.session)
             .environment(browse)
+            .appTheme()
         return OverlayViewController(
             playback: playback,
             overlay: overlay,
