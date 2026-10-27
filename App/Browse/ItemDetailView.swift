@@ -33,6 +33,7 @@ struct ItemDetailView: View {
         .pageTask(id: item.id) {
             await load()
         }
+        .themeMusic(for: details)
     }
 
     private func load() async {

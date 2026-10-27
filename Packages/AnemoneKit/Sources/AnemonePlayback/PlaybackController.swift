@@ -20,7 +20,7 @@ public final class PlaybackController: Identifiable {
     typealias StreamLoader = @Sendable (StreamRequest) async throws -> PlaybackStream
 
     public private(set) var queue: PlaybackQueue
-    public private(set) var state = State.loading
+    public internal(set) var state = State.loading
     /// What features show in the player.
     public let accessories = PlayerAccessories()
     /// Whether the player closes when an entry plays to the end and no feature has played
@@ -45,16 +45,14 @@ public final class PlaybackController: Identifiable {
     /// Finds the rest of the queue once the first entry is loading; see `PlaybackRequest`.
     @ObservationIgnored private var following: PlaybackRequest.Following?
     @ObservationIgnored private var followingLoad: Task<Void, Never>?
+    /// Finds what plays before the first entry; see `PlaybackRequest`.
+    @ObservationIgnored private var intros: PlaybackRequest.Intros?
     /// How often features hear where playback is.
     @ObservationIgnored private let positionInterval: Duration
     /// What's loaded in the engine.
-    @ObservationIgnored private var stream: PlaybackStream?
-    /// What `reload()` keeps for the current entry.
-    @ObservationIgnored private var reloading = Reloading()
-    /// Where the loaded stream starts, until the engine is ready there: the engine's time says 0 until then.
-    @ObservationIgnored private var pendingStart: Duration?
-    /// Whether the loaded stream stays paused once it's ready, as after a reload while paused.
-    @ObservationIgnored private var staysPaused = false
+    @ObservationIgnored var stream: PlaybackStream?
+    /// What `reload()` keeps for the current entry, in `Tracks/Reloading.swift`.
+    @ObservationIgnored var reloading = Reloading()
     /// Whether the loaded stream's play session is open, so features hear `stopped` once.
     @ObservationIgnored private var isSessionOpen = false
     /// The last session's `stopped`, which a later stop waits for.
@@ -63,8 +61,8 @@ public final class PlaybackController: Identifiable {
     @ObservationIgnored private var loads = 0
     /// Tasks following the loaded stream, cancelled when it's replaced or playback stops.
     @ObservationIgnored private var watchers: [Task<Void, Never>] = []
-    @ObservationIgnored private var status = PlayerStatus.paused
-    @ObservationIgnored private var isUnderWay = false
+    @ObservationIgnored var status = PlayerStatus.paused
+    @ObservationIgnored var isUnderWay = false
     @ObservationIgnored private var wasPaused = false
     @ObservationIgnored private var hasStarted = false
     /// What features asked to do once the player closes; see `whenStopped(_:)`.
@@ -95,6 +93,7 @@ public final class PlaybackController: Identifiable {
         }
         self.queue = queue
         following = request.following
+        intros = request.intros
         self.engine = engine
         self.features = features
         self.positionInterval = positionInterval
@@ -106,6 +105,10 @@ public final class PlaybackController: Identifiable {
     public func start() async {
         guard !hasStarted else { return }
         hasStarted = true
+        // What the request's `intros` finds plays first; a failure plays the queue as it is.
+        if let intros, let found = try? await intros(queue.current), !isStopped {
+            queue.insertBeforeCurrent(found)
+        }
         loadFollowing()
         await load(allowsDirect: true, from: queue.current.startPosition, as: beginLoad())
     }
@@ -143,8 +146,7 @@ public final class PlaybackController: Identifiable {
         engine.pause()
         queue.currentIndex = index
         stream = nil
-        staysPaused = false
-        reloading.hasReloaded = false
+        reloading.startEntry()
         state = .loading
         let attempt = beginLoad()
         Task {
@@ -153,28 +155,10 @@ public final class PlaybackController: Identifiable {
         }
     }
 
-    /// Does nothing at the end of the queue.
+    /// Plays `queue.next`, passing over intros; does nothing at the end of the queue.
     public func playNext() {
-        play(entryAt: queue.currentIndex + 1)
-    }
-
-    /// Asks the server for the current entry again, after ending its play session, and plays the
-    /// new stream on from where the old one was, for tracks the stream doesn't carry, as Wholphin's
-    /// `changeStreams` does. Features hear `reloaded`, not `loaded`: it's the same entry. Paused,
-    /// it stays paused until playback resumes; while the server is asked, it waits (`Reloading`).
-    public func reload() {
-        guard !isStopped, !hasEnded, stream != nil, reloading.starts() else { return }
-        let position = currentPosition
-        // As the user left it; before it's under way, as the last load was going to.
-        staysPaused = isUnderWay ? status == .paused : staysPaused
-        stopWatching()
-        engine.pause()
-        state = .loading
-        let attempt = beginLoad()
-        Task {
-            await endSession(at: position)
-            await load(allowsDirect: reloading.allowsDirect, from: position, as: attempt)
-        }
+        guard let index = queue.nextIndex else { return }
+        play(entryAt: index)
     }
 
     /// Closes the player, as at the end of the queue; for features such as pass-out protection.
@@ -204,13 +188,13 @@ public final class PlaybackController: Identifiable {
         }
     }
 
-    private func beginLoad() -> Int {
+    func beginLoad() -> Int {
         reloading.isAsking = true
         loads += 1
         return loads
     }
 
-    private func load(allowsDirect: Bool, from position: Duration?, as attempt: Int) async {
+    func load(allowsDirect: Bool, from position: Duration?, as attempt: Int) async {
         guard !isStopped else { return }
         let entry = queue.current
         reloading.allowsDirect = allowsDirect
@@ -235,6 +219,10 @@ public final class PlaybackController: Identifiable {
         } catch {
             guard !isStopped, attempt == loads else { return }
             reloading.isAsking = false
+            // An intro the server won't offer is passed over (Phase 5c).
+            if let afterIntro = queue.afterIntroIndex {
+                return play(entryAt: afterIntro)
+            }
             state = .failed(error)
             await publish(.failed(error))
         }
@@ -246,7 +234,7 @@ public final class PlaybackController: Identifiable {
         status = .paused
         isUnderWay = false
         wasPaused = false
-        pendingStart = position ?? .zero
+        reloading.pendingStart = position ?? .zero
         let events = engine.load(stream.url, from: position, metadata: entry.metadata)
         isSessionOpen = true
         await publish(reloading.hasReloaded ? .reloaded(stream) : .loaded(stream, entry))
@@ -263,7 +251,11 @@ public final class PlaybackController: Identifiable {
         // Unless a feature moved on meanwhile.
         guard !isStopped, attempt == loads else { return }
         guard stream.method != .transcode else {
-            state = .failed(error)
+            if let afterIntro = queue.afterIntroIndex {
+                play(entryAt: afterIntro)
+            } else {
+                state = .failed(error)
+            }
             return
         }
         let position = currentPosition
@@ -278,6 +270,11 @@ public final class PlaybackController: Identifiable {
 
     private func finished() async {
         guard !isStopped else { return }
+        // An intro plays straight into what follows, as in Wholphin: features don't hear it end,
+        // so Up Next doesn't offer what's next.
+        if let afterIntro = queue.afterIntroIndex {
+            return play(entryAt: afterIntro)
+        }
         stopWatching()
         let attempt = loads
         await publish(.ended)
@@ -293,7 +290,7 @@ public final class PlaybackController: Identifiable {
 
     /// Ends the loaded stream's play session, if it's open, and waits until features have heard.
     /// Runs on its own, so a stop report isn't cancelled with whatever asked for it.
-    private func endSession(at position: Duration) async {
+    func endSession(at position: Duration) async {
         if isSessionOpen {
             isSessionOpen = false
             let previous = sessionEnding
@@ -312,15 +309,15 @@ public final class PlaybackController: Identifiable {
     }
 
     /// Where playback is: until the loaded stream is ready, where it's to start.
-    private var currentPosition: Duration {
-        pendingStart ?? engine.currentTime
+    var currentPosition: Duration {
+        reloading.pendingStart ?? engine.currentTime
     }
 
     private var progress: PlaybackProgress {
         PlaybackProgress(position: currentPosition, isPaused: status == .paused)
     }
 
-    private func stopWatching() {
+    func stopWatching() {
         watchers.forEach { $0.cancel() }
         watchers = []
     }
@@ -333,7 +330,8 @@ private extension PlaybackController {
         watchers = [
             Task { [weak self] in
                 for await event in events {
-                    guard let self else { return }
+                    // Cancelled, it still gets what the replaced stream buffered, such as its pause.
+                    guard let self, !Task.isCancelled else { return }
                     switch event {
                     case .ready:
                         ready()
@@ -357,10 +355,10 @@ private extension PlaybackController {
     }
 
     func ready() {
-        pendingStart = nil
+        reloading.pendingStart = nil
         guard !isStopped else { return }
         state = .playing
-        guard !staysPaused else { return }
+        guard !reloading.staysPaused else { return }
         engine.play()
     }
 
@@ -372,7 +370,7 @@ private extension PlaybackController {
         guard isUnderWay else {
             guard status == .playing, case .playing = state else { return }
             isUnderWay = true
-            staysPaused = false
+            reloading.staysPaused = false
             await publish(.started(progress))
             // Unless the stream was replaced meanwhile.
             guard !Task.isCancelled else { return }

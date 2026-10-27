@@ -87,8 +87,9 @@ public final class NowPlaying: PlaybackFeature {
             position: entry.startPosition ?? .zero,
             duration: controller.engine.duration,
             rate: controller.engine.rate,
-            queueIndex: queue.currentIndex,
-            queueCount: queue.entries.count,
+            // Intros aren't counted (Phase 5c).
+            queueIndex: queue.indexWithoutIntros,
+            queueCount: queue.countWithoutIntros,
         )
         center.publish(info)
         handleCommands(for: queue)
@@ -101,16 +102,17 @@ public final class NowPlaying: PlaybackFeature {
     }
 
     /// Next only when there's an entry after this one; Previous whenever the queue has several,
-    /// since on the first entry it goes back to the start.
+    /// since on the first entry it goes back to the start. Intros don't count, but Next during
+    /// one moves on to what it leads into.
     static func commands(for queue: PlaybackQueue) -> Set<RemoteCommand> {
         var commands: Set<RemoteCommand> = [
             .play, .pause, .togglePlayPause, .skipForward, .skipBackward, .changePosition,
         ]
-        if queue.entries.count > 1 {
+        if queue.countWithoutIntros > 1 {
             commands.insert(.previousTrack)
-            if queue.next != nil {
-                commands.insert(.nextTrack)
-            }
+        }
+        if queue.next != nil {
+            commands.insert(.nextTrack)
         }
         return commands
     }
@@ -124,9 +126,9 @@ public final class NowPlaying: PlaybackFeature {
         info.rate = engine.rate
         // An episode's queue grows once the episodes after it are found, so Next can come on.
         let queue = controller.queue
-        if info.queueCount != queue.entries.count {
-            info.queueCount = queue.entries.count
-            info.queueIndex = queue.currentIndex
+        if info.queueCount != queue.countWithoutIntros {
+            info.queueCount = queue.countWithoutIntros
+            info.queueIndex = queue.indexWithoutIntros
             handleCommands(for: queue)
         }
         publish(info)
@@ -172,10 +174,10 @@ public final class NowPlaying: PlaybackFeature {
         return true
     }
 
+    /// The entry before, passing over intros.
     private func playPrevious(in controller: PlaybackController) {
-        let index = controller.queue.currentIndex
-        if controller.engine.currentTime < Self.previousEntryWindow, index > 0 {
-            controller.play(entryAt: index - 1)
+        if controller.engine.currentTime < Self.previousEntryWindow, let index = controller.queue.previousIndex {
+            controller.play(entryAt: index)
         } else {
             seek(to: .zero)
         }

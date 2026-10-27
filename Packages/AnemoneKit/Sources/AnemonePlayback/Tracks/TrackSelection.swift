@@ -60,7 +60,8 @@ public final class TrackSelection: PlaybackFeature {
             server: Server(
                 itemTracks: { try await session.itemTracks(for: $0) },
                 profileSettings: { try await session.profileTrackSettings() },
-                pickedVersion: { MediaVersionChoices.standard.choice(for: $0, userID: session.userID) },
+                // The choices playback goes by, as `playbackStream(forPickedVersionOf:)` reads them.
+                pickedVersion: { MediaVersionChoices.current.choice(for: $0, userID: session.userID) },
             ),
             store: TrackChoiceStore(userID: session.userID, defaults: defaults),
             defaults: defaults,
