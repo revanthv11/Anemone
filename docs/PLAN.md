@@ -191,7 +191,19 @@ Not yet: Wholphin's live preview beside the settings, display presets, and loadi
 
 #### 2f: library tabs and layouts
 
-Not started. Wholphin's other library tabs (Recommended, Collections, Genres, Studios), list layouts, the details header and backdrop options, page jumps with the remote, and remembered tabs.
+- [x] Movie libraries get Wholphin's tabs Recommended, Library, Collections and Genres; TV libraries Recommended, Library, Genres and Studios. Selecting a tab shows it, and the tabs tuck away while focus is past the first row, as in Wholphin. Other libraries keep the grid alone
+- [x] Recommended: Continue Watching, Next Up (TV), Recently Released, Recently Added, Top Unwatched and Suggestions, under a header for the focused title over its backdrop. Suggestions are Wholphin's mix of unwatched titles in the genres of the last three watched, new ones and random ones, worked out when the tab opens rather than in the background
+- [x] Collections: the box sets holding the library's movies, in the library grid with sort, filter and view options of its own
+- [x] Genres and Studios: 16:9 cards with the alphabet bar. A genre's card shows a random title's backdrop under the genre's own colour, kept for two hours; a studio's shows its image, or its name. Each opens the library's titles in it ("Drama Movies"), with options shared by all of a library's genres, or all its studios
+- [x] View options on library pages: grid, list and dense list layouts; the focused title's details over the grid or beside the list; its backdrop behind the page. Grid cards now show Wholphin's watched and favourite marks and unwatched counts
+- [x] Page jumps with the remote: page up and page down (channel up and down on remotes that have them) move six rows, or more in big libraries, in grids and lists
+- [x] "Remember selected tab" in Settings › Sidebar, off as in Wholphin: each library opens on the tab last chosen there. Kept per profile in UserDefaults
+
+Tested live in the simulator against the Jellyfin 12.3 demo server, read-only: every tab of the movie and TV libraries; all five of the movie library's Recommended rows, and the TV library's Continue Watching, Recently Released and Recently Added (with one series, the demo data has nothing for its other rows); choosing a genre and coming Back to the card that opened it; the Library tab's grid moving, Back to the top, and paging with page up and down; the list and dense list, the details beside them and over the grid, and the backdrop; the tabs tucking away past the first row and coming back; and a remembered tab across a relaunch, then Recommended again with the setting off. The demo server has no collections and its series lists no studios, so the Collections tab was checked with made-up collections (the `-libraryMockCollections YES` launch argument, Debug builds only) and its empty message, and the Studios tab only with its empty message; neither has been checked against a server that has them. Paging was also checked on the Phase 2b spike's 500-item grid, and the spike's own grid test still passes. Page presses came from XCUITest's remote; the Siri Remote has no page buttons.
+
+tvOS 26 places a page 49 points lower under the sidebar's title when it doesn't treat the page's top as a scroll view, which differs between Recommended and the grids, so the tabs are padded to stay at one height.
+
+Not yet: "View more" at the end of Recommended rows, refreshing Recommended after Back, Wholphin's on-screen jump buttons (switched off in Wholphin too), long-pressing Back to return to where a jump started, the list's spacing option, and server sync of the remembered tab.
 
 #### 2g: item page extras: trailers, extras, chapters, delete, collection options
 
