@@ -248,6 +248,21 @@ struct HomeSettingsTests {
         #expect(split[2].viewOptions == look)
     }
 
+    @Test func `combining beside a combined row keeps just the one`() {
+        var look = HomeRowViewOptions()
+        look.showTitles = true
+        let rows = [
+            HomeRowConfig(.continueWatchingCombined, viewOptions: look),
+            HomeRowConfig(.recentlyAdded(parentID: "movies")),
+            HomeRowConfig(.nextUp),
+        ]
+
+        let combined = rows.combiningWatchingRows()
+
+        #expect(combined.map(\.kind) == [.continueWatchingCombined, .recentlyAdded(parentID: "movies")])
+        #expect(combined[0].viewOptions == look)
+    }
+
     @Test func `row IDs are stable and readable`() {
         let ids = HomeRowConfig.rowIDs(for: [
             HomeRowConfig(.continueWatchingCombined),
