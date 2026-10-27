@@ -163,20 +163,6 @@ struct QueuesTests {
         #expect(request.query["sortBy"] == nil)
     }
 
-    /// Answers a collection's `/Items` requests: everything in it (`recursive=true`), or what its
-    /// page lists. Records the last of each.
-    private func registerCollection(host: String, everything: String, page: String) -> Requests {
-        let requests = Requests()
-        MockServer.register(host: host) { request in
-            guard request.url?.path() == "/Items" else { return nil }
-            let sent = SentRequest(request)
-            let isEverything = sent.query["recursive"] == "true"
-            requests.sent.withLock { $0[isEverything ? "everything" : "page"] = sent }
-            return .json(isEverything ? everything : page)
-        }
-        return requests
-    }
-
     @Test func `a collection plays its videos in its own order and counts the rest`() async throws {
         let contents = Self.items([
             #"{"Id":"m1","Name":"Film","Type":"Movie"}"#,
@@ -311,6 +297,22 @@ struct QueuesTests {
          "ParentIndexNumber":\#(season),"IndexNumber":\#(number),"LocationType":"\#(location)",
          "UserData":{"Key":"\#(id)","PlaybackPositionTicks":\#(resumeTicks),"Played":false}}
         """#
+    }
+}
+
+private extension QueuesTests {
+    /// Answers a collection's `/Items` requests: everything in it (`recursive=true`), or what its
+    /// page lists. Records the last of each.
+    func registerCollection(host: String, everything: String, page: String) -> Requests {
+        let requests = Requests()
+        MockServer.register(host: host) { request in
+            guard request.url?.path() == "/Items" else { return nil }
+            let sent = SentRequest(request)
+            let isEverything = sent.query["recursive"] == "true"
+            requests.sent.withLock { $0[isEverything ? "everything" : "page"] = sent }
+            return .json(isEverything ? everything : page)
+        }
+        return requests
     }
 }
 
