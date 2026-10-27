@@ -278,3 +278,62 @@ private final class PathRecorder: Sendable {
         sent.withLock { $0[path] }
     }
 }
+
+/// Reloading the Extras row after one of its extras has played.
+extension ItemExtrasTests {
+    @Test func `after an extra plays, only the special features' user state is asked for again`() async throws {
+        let paths = register(host: "extras-reload.test", replies: [
+            "/Items/m1/SpecialFeatures": .json(#"""
+            [
+              {"Id":"x1","Name":"Making Of","Type":"Video","ExtraType":"BehindTheScenes",
+               "UserData":{"Key":"x1","Played":true}},
+              {"Id":"x2","Name":"Part One","Type":"Video","ExtraType":"Featurette",
+               "UserData":{"Key":"x2","PlaybackPositionTicks":300000000,"PlayedPercentage":25}}
+            ]
+            """#),
+        ])
+        let making = ItemDetails(item: MediaItem(id: "x1", name: "Making Of", kind: .video))
+        let partOne = ItemDetails(item: MediaItem(id: "x2", name: "Part One", kind: .video))
+        let partTwo = ItemDetails(
+            item: MediaItem(id: "x3", name: "Part Two", kind: .video),
+            userState: .init(isPlayed: true),
+        )
+        var extras = ItemExtras(
+            itemID: "m1",
+            chapters: [Chapter(itemID: "m1", index: 0, name: "Opening", start: .zero)],
+            features: [
+                ExtrasEntry(kind: .featurette, items: [partOne, partTwo]),
+                ExtrasEntry(kind: .behindTheScenes, items: [making]),
+            ],
+            canDelete: true,
+        )
+
+        try await extras.updateFeatures(session(host: "extras-reload.test").specialFeatureStates(id: "m1"))
+
+        #expect(paths.sent.withLock { $0.keys.sorted() } == ["/Items/m1/SpecialFeatures"])
+        #expect(extras.features.map(\.kind) == [.featurette, .behindTheScenes])
+        #expect(extras.features[1].isPlayed)
+        let reloaded = extras.features[0].items
+        #expect(reloaded.map(\.userState.resumePosition) == [.seconds(30), nil])
+        #expect(reloaded.map(\.item.progress) == [0.25, nil])
+        // The server didn't name it, so it keeps what it had.
+        #expect(reloaded[1].userState.isPlayed)
+        // The rest of the extras stay as they were.
+        #expect(extras.chapters.count == 1)
+        #expect(extras.canDelete)
+    }
+
+    @Test func `a failed special features reload throws, so the row can keep its extras`() async throws {
+        _ = register(host: "extras-reload-fails.test", replies: [
+            "/Items/m1/SpecialFeatures": MockServer.Reply(status: 500, body: ""),
+        ])
+        MockServer.register(host: "extras-reload-revoked.test") { _ in .unauthorized }
+
+        await #expect(throws: (any Error).self) {
+            try await session(host: "extras-reload-fails.test").specialFeatureStates(id: "m1")
+        }
+        await #expect(throws: SessionError.signedOut) {
+            try await session(host: "extras-reload-revoked.test").specialFeatureStates(id: "m1")
+        }
+    }
+}

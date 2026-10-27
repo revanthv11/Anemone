@@ -103,6 +103,41 @@ struct PlaylistEditingTests {
         #expect(sent.last?.query["entryIds"] == "entry-7")
     }
 
+    @Test func `taking an item out finds its entry however the server writes its ID`() async throws {
+        let server = HomeServer("playlist-take-out-dashed.test") { path, request in
+            switch (path, request.method) {
+            case ("/Playlists/pl1/Items", "GET"):
+                .homeItems(#"{"Id":"0F5E1B9A-2C3D-4E5F-6A7B-8C9D0E1F2A3B","Type":"Movie","PlaylistItemId":"e9"}"#)
+            case ("/Playlists/pl1/Items", "DELETE"):
+                MockServer.Reply(status: 204, body: "")
+            default:
+                nil
+            }
+        }
+
+        try await server.session().removeFromPlaylist("pl1", itemID: "0f5e1b9a2c3d4e5f6a7b8c9d0e1f2a3b")
+
+        #expect(server.requests(to: "/Playlists/pl1/Items").last?.query["entryIds"] == "e9")
+    }
+
+    @Test func `taking out an item the playlist doesn't hold fails without removing anything`() async throws {
+        let server = HomeServer("playlist-take-out-missing.test") { path, request in
+            switch (path, request.method) {
+            case ("/Playlists/pl1/Items", "GET"):
+                .homeItems(#"{"Id":"m2","Name":"Other","Type":"Movie","PlaylistItemId":"entry-3"}"#)
+            case ("/Playlists/pl1/Items", "DELETE"):
+                MockServer.Reply(status: 204, body: "")
+            default:
+                nil
+            }
+        }
+
+        await #expect(throws: PlaylistEditingError.notInPlaylist) {
+            try await server.session().removeFromPlaylist("pl1", itemID: "m1")
+        }
+        #expect(server.requests(to: "/Playlists/pl1/Items").map(\.method) == ["GET"])
+    }
+
     @Test func `adds an item to the end of a playlist`() async throws {
         let sent = Recorder()
         MockServer.register(host: "playlist-add.test") { request in

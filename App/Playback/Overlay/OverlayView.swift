@@ -11,6 +11,8 @@ enum OverlayFocus: Hashable {
     case menu(PlayerMenu.ID)
     case option(menu: PlayerMenu.ID, option: PlayerMenu.Option.ID)
     case action(PlayerAction.ID)
+    /// The controls' button that skips the rest of the segment playing.
+    case skipSegment
     /// The row titles under the transport and the chapter row, which show their row when focus
     /// reaches them, as in Wholphin.
     case chaptersTitle
@@ -110,8 +112,10 @@ struct OverlayView: View {
         .animation(.easeInOut(duration: 0.25), value: overlay.controlsVisible)
         .animation(.easeInOut(duration: 0.25), value: overlay.showsSeekBar)
         .animation(.easeInOut(duration: 0.25), value: overlay.page)
-        .task {
-            // Wholphin's seek bar reads the player's position every 250 ms.
+        .task(id: overlay.showsPosition) {
+            // Wholphin's seek bar reads the player's position every 250 ms while it shows. With
+            // nothing showing it, reading it would only redraw the overlay for nothing.
+            guard overlay.showsPosition else { return }
             while !Task.isCancelled {
                 overlay.seeker.refresh()
                 try? await Task.sleep(for: .milliseconds(250))
