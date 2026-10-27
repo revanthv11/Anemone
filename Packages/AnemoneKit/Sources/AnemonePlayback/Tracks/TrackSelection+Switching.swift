@@ -5,8 +5,8 @@ import AnemoneJellyfin
 extension TrackSelection {
     /// Shows the entry's tracks: in the stream that's playing when it can (over AVPlayer, text
     /// subtitles that come as files of their own are drawn), else by asking the server for
-    /// another stream.
-    func switchTracks(from previous: Entry, in controller: PlaybackController) async {
+    /// another stream, unless a request for one prepared since `pick` was made has it already.
+    func switchTracks(from previous: Entry, pick: Int, in controller: PlaybackController) async {
         guard let entry, let stream = entry.stream else { return }
         let engine = controller.engine
         var reloads = false
@@ -19,8 +19,7 @@ extension TrackSelection {
                 to: entry.subtitle,
                 in: stream,
                 options: engine.tracks(.subtitle),
-                burnsInStyled: burnsInStyledSubtitles,
-                drawsFiles: Self.drawsFiles(in: engine),
+                rendering: Self.rendering(in: engine),
             )
             reloads = reloads || change == .reload
         }
@@ -30,6 +29,8 @@ extension TrackSelection {
             self.entry = previous
             showMenus(in: controller)
         } else if reloads {
+            // Picked while features prepared a request for a stream, which has it.
+            guard pick > requestedPicks else { return }
             applying?.cancel()
             controller.reload()
         } else {

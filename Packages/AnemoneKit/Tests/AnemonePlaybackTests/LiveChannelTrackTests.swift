@@ -72,6 +72,58 @@ struct LiveChannelTrackTests {
         #expect(store.itemChoice(for: "ch1") == nil)
     }
 
+    /// Without the channel's item, its PlaybackInfo still says it's live: the server opened a
+    /// live stream for it.
+    @Test func `a channel that couldn't be looked up is still left to the server`() async throws {
+        let selection = TrackSelection(
+            server: TrackSelection.Server(
+                itemTracks: { _ in throw URLError(.badServerResponse) },
+                profileSettings: { .english },
+            ),
+            store: store,
+            defaults: defaults,
+        )
+        let playback = PlaybackController(
+            request: PlaybackRequest(.item("ch1")),
+            engine: engine,
+            features: [selection, log],
+        ) { [requests] request in
+            requests.append(request)
+            let hls = PlaybackStream.hls(
+                request.itemID,
+                TrackRequest(audioIndex: 1, subtitleIndex: 4),
+                method: .directStream,
+            )
+            return PlaybackStream(
+                itemID: hls.itemID,
+                url: hls.url,
+                method: hls.method,
+                playSessionID: hls.playSessionID,
+                mediaSourceID: "live-source",
+                liveStreamID: "live1",
+                audioStreamIndex: hls.audioStreamIndex,
+                subtitleStreamIndex: hls.subtitleStreamIndex,
+                tracks: hls.tracks,
+            )
+        }
+
+        await playback.start()
+        engine.send(.ready)
+        _ = await eventually { log.events.contains { $0.hasPrefix("started") } }
+
+        // Only what switches in the player, and no Only forced, as for any channel.
+        #expect(menu("audio", in: playback) == nil)
+        #expect(menu("subtitles", in: playback)?.options.map(\.id) == [
+            "subtitles.off", "subtitles.4", "subtitles.5", "subtitles.6",
+        ])
+        try #require(menu("subtitles", in: playback)?.options.first { $0.id == "subtitles.6" }).select()
+        #expect(await eventually { engine.selected[.subtitle] == 2 })
+        // A retry asks for no version or tracks, and nothing is remembered.
+        #expect(await selection.request(for: "ch1", mediaSourceID: "live-source") == nil)
+        #expect(requests.sent.count == 1)
+        #expect(store.itemChoice(for: "ch1") == nil)
+    }
+
     @Test func `a channel's PlaybackInfo names no version and no tracks`() async throws {
         let host = "live-channel.test"
         let server = ChannelServer.register(host: host)
