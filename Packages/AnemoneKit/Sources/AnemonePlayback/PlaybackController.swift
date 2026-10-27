@@ -69,15 +69,15 @@ public final class PlaybackController: Identifiable {
 
     /// A player for `request` on `session`'s server, with the features every player gets.
     public convenience init(session: JellyfinSession, request: PlaybackRequest) {
-        // AVPlayer for everything until the MPV engine (Phase 4) chooses per item.
-        let engine = AVPlayerEngine()
-        let profile = engine.deviceProfile
+        let engine = PlayerChoice.engine(for: session)
+        let profiles = DeviceProfileSource(engine)
         self.init(
             request: request,
             engine: engine,
             features: Self.features(for: session),
         ) { itemID, allowsDirect, mediaSourceID in
             let maxBitrate = AVPlayerProfile.maxBitrate
+            let profile = await profiles.current
             // A retry keeps the version playing.
             if let mediaSourceID {
                 return try await session.playbackStream(
@@ -213,6 +213,11 @@ public final class PlaybackController: Identifiable {
     private func load(allowsDirect: Bool, from position: Duration?, as attempt: Int) async {
         guard !isStopped else { return }
         let entry = queue.current
+        // A new entry may need the other engine, as with "Prefer MPV"; a retry keeps it.
+        if stream == nil, let engine = engine as? any PerEntryEngine {
+            await engine.prepare(for: entry)
+            guard !isStopped, attempt == loads else { return }
+        }
         do {
             let stream = try await loadStream(entry.itemID, allowsDirect, stream?.mediaSourceID)
             guard !isStopped, attempt == loads else {
