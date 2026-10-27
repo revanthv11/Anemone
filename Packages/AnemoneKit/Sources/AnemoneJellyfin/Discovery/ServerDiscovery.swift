@@ -17,7 +17,8 @@ public enum ServerDiscoveryError: Error, Equatable, Sendable {
 ///
 /// jellyfin-sdk-swift 3.3.0 has `JellyfinClient.discover()`, but it always broadcasts on every
 /// network interface, so tests couldn't point it at a responder of their own. Here the port and
-/// the addresses can be set, and tests answer on 127.0.0.1 without touching the real network.
+/// the addresses can be set, and tests answer on 127.0.0.1 without touching the real network, or
+/// stand in for the socket so no network or second thread is involved at all.
 ///
 /// iOS needs Apple's multicast entitlement (`com.apple.developer.networking.multicast`), which
 /// Apple grants on request, to send a broadcast; whether tvOS does too is the multicast spike's
@@ -37,6 +38,8 @@ public struct ServerDiscovery: Sendable {
     public let port: UInt16
     public let broadcastAddresses: [String]?
     public let duration: Duration
+    /// Opens the socket a search sends its probe from and hears the replies on.
+    private let openSocket: @Sendable () throws(POSIXError) -> any DiscoverySocket
 
     /// - Parameters:
     ///   - port: Where servers listen: Jellyfin's port, or a test responder's.
@@ -44,9 +47,22 @@ public struct ServerDiscovery: Sendable {
     ///     address on this device, then 255.255.255.255, read when the search starts.
     ///   - duration: How long to listen for replies; jellyfin-sdk-swift also listens for 5 s.
     public init(port: UInt16 = jellyfinPort, broadcastAddresses: [String]? = nil, duration: Duration = .seconds(5)) {
+        self.init(port: port, broadcastAddresses: broadcastAddresses, duration: duration) { () throws(POSIXError) in
+            try UDPSocket(broadcast: true)
+        }
+    }
+
+    /// A search that opens its socket with `openSocket`, so tests can stand in for the network.
+    init(
+        port: UInt16 = jellyfinPort,
+        broadcastAddresses: [String]?,
+        duration: Duration,
+        openSocket: @escaping @Sendable () throws(POSIXError) -> any DiscoverySocket,
+    ) {
         self.port = port
         self.broadcastAddresses = broadcastAddresses
         self.duration = duration
+        self.openSocket = openSocket
     }
 
     /// Searches once: yields each server as it first answers, so a list can fill in while the
@@ -80,9 +96,9 @@ public struct ServerDiscovery: Sendable {
             UDPSocket.address($0, port: port)
         }
         guard !targets.isEmpty else { throw .noBroadcastAddress }
-        let socket: UDPSocket
+        let socket: any DiscoverySocket
         do throws(POSIXError) {
-            socket = try UDPSocket(broadcast: true)
+            socket = try openSocket()
         } catch {
             throw .socketUnavailable(error.code)
         }
@@ -104,6 +120,17 @@ public struct ServerDiscovery: Sendable {
         }
     }
 }
+
+/// What a search needs from its socket: a `UDPSocket`, or a test's stand-in. It's only used on the
+/// search's own thread.
+protocol DiscoverySocket: AnyObject {
+    /// Sends one datagram. Returns the error when it couldn't be sent.
+    func send(_ data: Data, to address: sockaddr_in) -> POSIXError?
+    /// Waits up to `timeout` for a datagram and reads it.
+    func receive(timeout: Duration) -> UDPSocket.Datagram?
+}
+
+extension UDPSocket: DiscoverySocket {}
 
 /// Tells the search, on its Dispatch thread, that nobody is listening any more.
 private final class StopSignal: Sendable {
