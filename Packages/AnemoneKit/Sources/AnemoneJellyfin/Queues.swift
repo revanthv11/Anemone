@@ -6,19 +6,29 @@ import JellyfinAPI
 public struct PlayableItems: Hashable, Sendable {
     public var items: [ItemDetails]
     public var skippedCount: Int
+    /// How many more items there were than a queue holds (`JellyfinSession.queueLimit`), left out
+    /// at the end.
+    public var overLimitCount: Int
 
-    public init(items: [ItemDetails], skippedCount: Int = 0) {
+    public init(items: [ItemDetails], skippedCount: Int = 0, overLimitCount: Int = 0) {
         self.items = items
         self.skippedCount = skippedCount
+        self.overLimitCount = overLimitCount
     }
 
     /// The kinds the video player plays.
     public static let videoKinds: Set<MediaItem.Kind> = [.movie, .episode, .video, .musicVideo]
 
-    init(_ dtos: [BaseItemDto]?) {
-        let items = (dtos ?? []).filter(\.isAvailable).compactMap(ItemDetails.init)
+    /// - Parameter total: how many items the server has for the query, when it asked for fewer.
+    init(_ dtos: [BaseItemDto]?, total: Int? = nil) {
+        let found = dtos ?? []
+        let items = found.filter(\.isAvailable).compactMap(ItemDetails.init)
         let videos = items.filter { Self.videoKinds.contains($0.item.kind) }
-        self.init(items: videos, skippedCount: items.count - videos.count)
+        self.init(
+            items: videos,
+            skippedCount: items.count - videos.count,
+            overLimitCount: max(0, (total ?? found.count) - found.count),
+        )
     }
 }
 
@@ -32,7 +42,9 @@ public extension JellyfinSession {
     /// Series Play, like Wholphin's: the episode next up (the one to resume, or the one after the
     /// last watched), or the first episode when there's none, then the episodes after it in
     /// order across seasons, without the specials. Jellyfin's next up can be a special the server
-    /// places between seasons; Play starts at the regular episode after it instead.
+    /// places between seasons; Play starts at the regular episode after it instead. A special
+    /// next up after the last season plays, with any specials after it, as in Wholphin, rather
+    /// than the series starting over.
     func seriesQueue(seriesID: MediaItem.ID) async throws -> [ItemDetails] {
         let parameters = Paths.GetNextUpParameters(
             userID: userID,
@@ -42,9 +54,13 @@ public extension JellyfinSession {
             enableUserData: true,
         )
         if let nextUp = try await send(Paths.getNextUp(parameters: parameters)).items?.first?.id {
-            let episodes = try await orderedEpisodes(ofSeries: seriesID, from: nextUp).filter { !$0.isSpecial }
-            if !episodes.isEmpty {
-                return episodes
+            let fromNextUp = try await orderedEpisodes(ofSeries: seriesID, from: nextUp)
+            let regular = fromNextUp.filter { !$0.isSpecial }
+            if !regular.isEmpty {
+                return regular
+            }
+            if !fromNextUp.isEmpty {
+                return fromNextUp
             }
         }
         return try await episodes(ofSeries: seriesID, from: nil)
@@ -91,7 +107,8 @@ public extension JellyfinSession {
 
     /// Play or Shuffle for a collection: everything in it that plays, with the episodes of any
     /// series in it, like Wholphin. In the order and with the filters its page shows, as
-    /// Wholphin's Play takes them, or at random.
+    /// Wholphin's Play takes them, or at random. Up to `queueLimit` items, as in Wholphin, which
+    /// leaves out the rest without a word; this counts them, so the player can say so.
     func collectionQueue(
         id: MediaItem.ID,
         shuffled: Bool,
@@ -113,9 +130,11 @@ public extension JellyfinSession {
         parameters.filters = [.isNotFolder]
         parameters.excludeLocationTypes = [.virtual]
         parameters.limit = Self.queueLimit
+        parameters.enableTotalRecordCount = true
         parameters.fields = Self.queueFields
         parameters.enableUserData = true
-        return try await PlayableItems(send(Paths.getItems(parameters: parameters)).items)
+        let found = try await send(Paths.getItems(parameters: parameters))
+        return PlayableItems(found.items, total: found.totalRecordCount)
     }
 
     /// Play for a playlist: its entries in the playlist's order, from `/Playlists/{id}/Items`. All

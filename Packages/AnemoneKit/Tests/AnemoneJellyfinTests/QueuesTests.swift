@@ -85,25 +85,21 @@ struct QueuesTests {
         #expect(queue.map(\.id) == ["e4", "e5"])
     }
 
-    @Test func `a special next up at the very end starts the series again`() async throws {
-        let special = Self.items([Self.episode("sp1", season: 0, number: 1)])
-        let all = Self.items([
-            Self.episode("e1", season: 1, number: 1),
-            Self.episode("e2", season: 1, number: 2),
-            Self.episode("sp1", season: 0, number: 1),
+    @Test func `a special next up after the last season plays from there, as in Wholphin`() async throws {
+        let sent = register(host: "queue-last.test", replies: [
+            "/Shows/NextUp": Self.items([Self.episode("sp1", season: 0, number: 1)]),
+            // The server lists the series from the special on: it and the one after it.
+            "/Shows/s1/Episodes": Self.items([
+                Self.episode("sp1", season: 0, number: 1),
+                Self.episode("sp2", season: 0, number: 2),
+            ]),
         ])
-        MockServer.register(host: "queue-last.test") { request in
-            let fromSpecial = request.url?.queryValues["startItemId"] == "sp1"
-            return switch request.url?.path() {
-            case "/Shows/NextUp": .json(special)
-            case "/Shows/s1/Episodes": .json(fromSpecial ? special : all)
-            default: nil
-            }
-        }
 
         let queue = try await session(host: "queue-last.test").seriesQueue(seriesID: "s1")
 
-        #expect(queue.map(\.id) == ["e1", "e2"])
+        // Not the series again from its first episode.
+        #expect(queue.map(\.id) == ["sp1", "sp2"])
+        #expect(sent["/Shows/s1/Episodes"]?.query["startItemId"] == "sp1")
     }
 
     @Test func `a series of specials alone still plays`() async throws {
@@ -189,9 +185,25 @@ struct QueuesTests {
         #expect(request.query["excludeLocationTypes"] == "Virtual")
         #expect(request.query["sortBy"] == "Default")
         #expect(request.query["limit"] == "100")
+        #expect(request.query["enableTotalRecordCount"] == "true")
+        #expect(found.overLimitCount == 0)
 
         _ = try await session.collectionQueue(id: "c1", shuffled: true)
         #expect(sent["/Items"]?.query["sortBy"] == "Random")
+    }
+
+    @Test func `a collection larger than a queue counts what's left out`() async throws {
+        // The first 100 of 130 items, which the server counts in TotalRecordCount.
+        let movies = (1 ... 100).map { #"{"Id":"m\#($0)","Name":"Film \#($0)","Type":"Movie"}"# }
+        _ = register(host: "queue-collection-big.test", replies: [
+            "/Items": #"{"Items":[\#(movies.joined(separator: ","))],"TotalRecordCount":130}"#,
+        ])
+
+        let found = try await session(host: "queue-collection-big.test").collectionQueue(id: "c1", shuffled: false)
+
+        #expect(found.items.count == 100)
+        #expect(found.skippedCount == 0)
+        #expect(found.overLimitCount == 30)
     }
 
     @Test func `a collection plays in the sort and with the filters its page shows`() async throws {
