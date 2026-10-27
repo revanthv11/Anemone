@@ -180,7 +180,7 @@ struct HomeRowOptionsPage: View {
     }
 
     /// Wholphin's `BoxSetSortOptions`, by Jellyfin's names.
-    private static let sortFields = [
+    private static let sortFields: [(String, LocalizedStringResource)] = [
         ("Default", "Default"), ("SortName", "Name"), ("PremiereDate", "Date Released"),
         ("DateCreated", "Date Added"), ("CommunityRating", "Community Rating"), ("CriticRating", "Critic Rating"),
         ("Random", "Random"),

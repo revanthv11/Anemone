@@ -47,7 +47,7 @@ struct LiveTVHomeCard<Label: View>: View {
             do {
                 shownProgram = try await browse.session.liveTVProgram(id: item.id)
             } catch {
-                if let message = browse.problem(with: error, doing: "load \(item.name)") {
+                if let message = browse.problem(with: error, failure: "Couldn't load \(item.name).") {
                     actions.alert = .failed(message)
                 }
             }

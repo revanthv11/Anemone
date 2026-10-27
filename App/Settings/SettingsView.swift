@@ -34,31 +34,38 @@ struct SettingsView: View {
                     .accessibilityIdentifier("settings.signOut")
                 }
                 Section {
-                    page("Sidebar", systemImage: "sidebar.left", id: "sidebar") {
+                    page(String(localized: "Sidebar"), systemImage: "sidebar.left", id: "sidebar") {
                         SidebarSettingsView()
                     }
-                    page("Home", systemImage: "house", id: "home") {
+                    page(String(localized: "Home"), systemImage: "house", id: "home") {
                         HomeSettingsPage()
                     }
-                    page("Playback", systemImage: "play.rectangle", id: "playback") {
+                    page(String(localized: "Playback"), systemImage: "play.rectangle", id: "playback") {
                         PlaybackSettingsPage()
                     }
-                    page("Subtitles", systemImage: "captions.bubble", id: "subtitles") {
+                    page(String(localized: "Subtitles"), systemImage: "captions.bubble", id: "subtitles") {
                         SubtitlesSettingsPage()
                     }
-                    page("Interface", systemImage: "music.note.tv", id: "interface") {
+                    page(String(localized: "Interface"), systemImage: "music.note.tv", id: "interface") {
                         InterfaceSettingsPage()
                     }
-                    page("Appearance", systemImage: "paintpalette", id: "appearance", value: themeColors.title) {
+                    page(
+                        String(localized: "Appearance"),
+                        systemImage: "paintpalette",
+                        id: "appearance",
+                        value: String(localized: themeColors.title),
+                    ) {
                         AppearanceSettingsPage()
                     }
-                    page("Screensaver", systemImage: "sparkles.tv", id: "screensaver") {
+                    page(String(localized: "Screensaver"), systemImage: "sparkles.tv", id: "screensaver") {
                         ScreensaverSettingsPage()
                     }
                     #if ANEMONE_SEERR
-                        page("Seerr", systemImage: "sparkle.magnifyingglass", id: "seerr") { SeerrSettingsPage() }
+                        page(String(localized: "Seerr"), systemImage: "sparkle.magnifyingglass", id: "seerr") {
+                            SeerrSettingsPage()
+                        }
                     #endif
-                    page("About", systemImage: "info.circle", id: "about") {
+                    page(String(localized: "About"), systemImage: "info.circle", id: "about") {
                         AboutSettingsPage()
                     }
                 }

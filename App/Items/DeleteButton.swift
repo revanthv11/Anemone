@@ -17,7 +17,7 @@ struct DeleteButton: View {
 
     var body: some View {
         if canDelete {
-            ActionButton(title: "Delete", systemImage: "trash") {
+            ActionButton(title: String(localized: "Delete"), systemImage: "trash") {
                 confirming = true
             }
             .accessibilityIdentifier("action.delete")
@@ -46,7 +46,7 @@ struct DeleteButton: View {
                 dismiss()
             }
         } catch {
-            problem = browse.problem(with: error, doing: "delete \(item.item.name)").map(ItemAlert.failed)
+            problem = browse.problem(with: error, failure: "Couldn't delete \(item.item.name).").map(ItemAlert.failed)
         }
     }
 }

@@ -96,8 +96,8 @@ public struct Trailer: Hashable, Identifiable, Sendable {
     /// Where it comes from, as Wholphin's trailer list says it: "Local", "YouTube" or "External".
     public var sourceName: String {
         switch source {
-        case .local: "Local"
-        case .remote: youTubeAppURL == nil ? "External" : "YouTube"
+        case .local: String(localized: "Local", bundle: .module)
+        case .remote: youTubeAppURL == nil ? String(localized: "External", bundle: .module) : "YouTube"
         }
     }
 
@@ -131,36 +131,36 @@ public enum ExtraKind: Hashable, CaseIterable, Sendable {
     /// Wholphin's name for several, such as "Featurettes".
     public var title: String {
         switch self {
-        case .trailer: "Trailers"
-        case .featurette: "Featurettes"
-        case .short: "Shorts"
-        case .clip: "Clips"
-        case .scene: "Scenes"
-        case .sample: "Samples"
-        case .deletedScene: "Deleted Scenes"
-        case .interview: "Interviews"
-        case .behindTheScenes: "Behind the Scenes"
-        case .themeSong: "Theme Songs"
-        case .themeVideo: "Theme Videos"
-        case .other: "Other"
+        case .trailer: String(localized: "Trailers", bundle: .module)
+        case .featurette: String(localized: "Featurettes", bundle: .module)
+        case .short: String(localized: "Shorts", bundle: .module)
+        case .clip: String(localized: "Clips", bundle: .module)
+        case .scene: String(localized: "Scenes", bundle: .module)
+        case .sample: String(localized: "Samples", bundle: .module)
+        case .deletedScene: String(localized: "Deleted Scenes", bundle: .module)
+        case .interview: String(localized: "Interviews", bundle: .module)
+        case .behindTheScenes: String(localized: "Behind the Scenes", bundle: .module)
+        case .themeSong: String(localized: "Theme Songs", bundle: .module)
+        case .themeVideo: String(localized: "Theme Videos", bundle: .module)
+        case .other: String(localized: "Other", bundle: .module)
         }
     }
 
     /// Wholphin's name for one, such as "Featurette".
     public var singularTitle: String {
         switch self {
-        case .trailer: "Trailer"
-        case .featurette: "Featurette"
-        case .short: "Short"
-        case .clip: "Clip"
-        case .scene: "Scene"
-        case .sample: "Sample"
-        case .deletedScene: "Deleted scene"
-        case .interview: "Interview"
-        case .behindTheScenes: "Behind the scenes"
-        case .themeSong: "Theme song"
-        case .themeVideo: "Theme video"
-        case .other: "Other"
+        case .trailer: String(localized: "Trailer", bundle: .module)
+        case .featurette: String(localized: "Featurette", bundle: .module)
+        case .short: String(localized: "Short", bundle: .module)
+        case .clip: String(localized: "Clip", bundle: .module)
+        case .scene: String(localized: "Scene", bundle: .module)
+        case .sample: String(localized: "Sample", bundle: .module)
+        case .deletedScene: String(localized: "Deleted scene", bundle: .module)
+        case .interview: String(localized: "Interview", bundle: .module)
+        case .behindTheScenes: String(localized: "Behind the scenes", bundle: .module)
+        case .themeSong: String(localized: "Theme song", bundle: .module)
+        case .themeVideo: String(localized: "Theme video", bundle: .module)
+        case .other: String(localized: "Other", bundle: .module)
         }
     }
 }
@@ -334,7 +334,7 @@ extension Trailer {
     static func remote(_ links: [NamedURL]) -> [Trailer] {
         links.compactMap { link in
             guard let url = link.url.flatMap(URL.init(string:)) else { return nil }
-            let name = link.name.flatMap { $0.isEmpty ? nil : $0 } ?? "Trailer"
+            let name = link.name.flatMap { $0.isEmpty ? nil : $0 } ?? String(localized: "Trailer", bundle: .module)
             return Trailer(name: name, source: .remote(url))
         }
         .sorted { ($0.rank, $0.name) < ($1.rank, $1.name) }

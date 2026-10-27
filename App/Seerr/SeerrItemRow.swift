@@ -47,7 +47,13 @@ extension View {
             VStack(alignment: .leading, spacing: 0) {
                 if !found.isEmpty {
                     // Wholphin's title for the row.
-                    DiscoverItemsRow(id: "discover", title: "Discover", items: found, focus: focus, memory: memory)
+                    DiscoverItemsRow(
+                        id: "discover",
+                        title: String(localized: "Discover"),
+                        items: found,
+                        focus: focus,
+                        memory: memory,
+                    )
                 }
             }
             .task(id: Lookup(itemID: item.id, tmdbID: item.tmdbID, server: seerr?.connection?.serverURL)) {

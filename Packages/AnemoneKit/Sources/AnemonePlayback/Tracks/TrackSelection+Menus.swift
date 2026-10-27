@@ -28,7 +28,7 @@ extension TrackSelection {
             }
             controller.accessories.show(PlayerMenu(
                 id: "audio",
-                title: "Audio",
+                title: String(localized: "Audio", bundle: .module),
                 systemImage: "speaker.wave.2",
                 options: options,
             ))
@@ -40,16 +40,18 @@ extension TrackSelection {
             controller.accessories.removeMenu("subtitles")
             return
         }
-        var options = [subtitleOption("subtitles.off", "Off", .off, controller)]
+        let off = String(localized: "Off", bundle: .module)
+        let onlyForced = String(localized: "Only forced", bundle: .module)
+        var options = [subtitleOption("subtitles.off", off, .off, controller)]
         if !entry.isLive, subtitles.contains(where: \.isForcedOrSigns) {
-            options.append(subtitleOption("subtitles.forced", "Only forced", .onlyForced, controller))
+            options.append(subtitleOption("subtitles.forced", onlyForced, .onlyForced, controller))
         }
         options += subtitles.map { track in
             subtitleOption("subtitles.\(track.index)", track.menuTitle, .track(index: track.index), controller)
         }
         controller.accessories.show(PlayerMenu(
             id: "subtitles",
-            title: "Subtitles",
+            title: String(localized: "Subtitles", bundle: .module),
             systemImage: "captions.bubble",
             options: options,
         ))

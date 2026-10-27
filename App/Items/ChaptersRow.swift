@@ -17,8 +17,14 @@ struct ChaptersRow: View {
 
     var body: some View {
         if !chapters.isEmpty {
-            CardRow(id: rowID, title: "Chapters", elements: chapters, focus: focus, memory: memory) { chapter in
-                let name = chapter.name ?? "Chapter \(chapter.index + 1)"
+            CardRow(
+                id: rowID,
+                title: String(localized: "Chapters"),
+                elements: chapters,
+                focus: focus,
+                memory: memory,
+            ) { chapter in
+                let name = chapter.name ?? String(localized: "Chapter \(chapter.index + 1)")
                 Button {
                     play(chapter.start)
                 } label: {

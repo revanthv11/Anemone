@@ -134,7 +134,7 @@ struct SeasonPage: View {
             .padding(.vertical, 20)
         }
         .scrollClipDisabled()
-        .accessibilityRow("Seasons")
+        .accessibilityRow(String(localized: "Seasons"))
         .focusSection()
         // Entering the tabs lands on the season being shown.
         .defaultFocus($focus, .tab(currentSeasonID), priority: .userInitiated)
@@ -170,7 +170,7 @@ struct SeasonPage: View {
             CardRow(
                 id: Self.episodeRow,
                 title: nil,
-                spokenTitle: "Episodes",
+                spokenTitle: String(localized: "Episodes"),
                 elements: episodes,
                 focus: $focus,
                 memory: memory,
@@ -308,7 +308,7 @@ private extension SeasonPage {
         case let .success(series):
             self.series = series
         case let .failure(error):
-            let message = browse.problem(with: error, doing: "load this series from \(browse.server.name)")
+            let message = browse.problem(with: error, failure: "Couldn't load this series from \(browse.server.name).")
             if self.series == nil {
                 problem = message
             }
@@ -345,7 +345,7 @@ private extension SeasonPage {
                 focus = episodeFocus(selected)
             }
         } catch {
-            let message = browse.problem(with: error, doing: "load this season's episodes")
+            let message = browse.problem(with: error, failure: "Couldn't load this season's episodes.")
             if !isRefresh {
                 episodesProblem = message
             }

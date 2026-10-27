@@ -376,10 +376,11 @@ private struct TrackSummary: View {
             let subtitles = await playback.engine.tracks(.subtitle)
             var parts: [String] = []
             if let track = audio.first(where: \.isSelected) ?? audio.first, audio.count > 1 || !track.title.isEmpty {
-                parts.append("Audio: \(track.title)")
+                parts.append(String(localized: "Audio: \(track.title)"))
             }
             if !subtitles.isEmpty {
-                parts.append("Subtitles: \(subtitles.first(where: \.isSelected)?.title ?? "Off")")
+                let chosen = subtitles.first(where: \.isSelected)?.title ?? String(localized: "Off")
+                parts.append(String(localized: "Subtitles: \(chosen)"))
             }
             summary = parts.isEmpty ? nil : parts.joined(separator: " · ")
         }

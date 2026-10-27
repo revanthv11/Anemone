@@ -94,12 +94,18 @@
         @ViewBuilder
         private var rows: some View {
             if !similar.isEmpty {
-                DiscoverItemsRow(id: "similar", title: "Similar", items: similar, focus: $focus, memory: memory)
+                DiscoverItemsRow(
+                    id: "similar",
+                    title: String(localized: "Similar"),
+                    items: similar,
+                    focus: $focus,
+                    memory: memory,
+                )
             }
             if !recommended.isEmpty {
                 DiscoverItemsRow(
                     id: "recommended",
-                    title: "Recommended",
+                    title: String(localized: "Recommended"),
                     items: recommended,
                     focus: $focus,
                     memory: memory,
@@ -133,12 +139,12 @@
                         requestButton(details, connection: connection, as: .request)
                     }
                 case .blocklisted, .deleted:
-                    ActionButton(title: "Unavailable", systemImage: "xmark.circle") {}
+                    ActionButton(title: String(localized: "Unavailable"), systemImage: "xmark.circle") {}
                         .focused($focus, equals: .action(.play))
                         .disabled(true)
                 }
                 if let request = connection.requestToCancel(in: details) {
-                    ActionButton(title: "Cancel Request", systemImage: "trash") {
+                    ActionButton(title: String(localized: "Cancel Request"), systemImage: "trash") {
                         Task { await cancel(request) }
                     }
                     .accessibilityIdentifier("action.cancelRequest")
@@ -159,7 +165,7 @@
             let canRequest = details.item.kind == .movie
                 ? connection.canRequestMovies || connection.canRequest4KMovies
                 : connection.canRequestSeries || connection.canRequest4KSeries
-            ActionButton(title: "Request", systemImage: "arrow.down.circle") {
+            ActionButton(title: String(localized: "Request"), systemImage: "arrow.down.circle") {
                 requestedFrom = action
                 request(details, connection: connection)
             }
@@ -175,13 +181,16 @@
         private func requestedButton(_ details: DiscoverDetails, connection: SeerrConnection) -> some View {
             let canRequestMore = details.item.kind == .series
                 && (connection.canRequestSeries || connection.canRequest4KSeries)
-            return ActionButton(title: details.item.availability.label ?? "Requested", systemImage: "clock") {
+            return ActionButton(
+                title: details.item.availability.label ?? String(localized: "Requested"),
+                systemImage: "clock",
+            ) {
                 if canRequestMore {
                     requestedFrom = .play
                     request(details, connection: connection)
                 }
             }
-            .accessibilityHint(canRequestMore ? "Choose seasons to request" : "")
+            .accessibilityHint(canRequestMore ? String(localized: "Choose seasons to request") : "")
             .accessibilityIdentifier("action.requested")
         }
 
@@ -195,8 +204,13 @@
                 .accessibilityIdentifier("action.goTo")
             } else {
                 // Wholphin says the Jellyfin ID is missing; this says what to do.
-                ActionButton(title: "Go To", systemImage: "play.fill") {
-                    alert = .failed("Seerr says \(details.item.title) is on the server, but didn't say where.")
+                ActionButton(title: String(localized: "Go To"), systemImage: "play.fill") {
+                    alert =
+                        .failed(
+                            String(
+                                localized: "Seerr says \(details.item.title) is on the server, but didn't say where.",
+                            ),
+                        )
                 }
             }
         }
@@ -205,7 +219,7 @@
 
         private func load() async {
             guard let connection = seerr?.connection else {
-                problem = "Seerr isn't connected. Check Settings › Seerr."
+                problem = String(localized: "Seerr isn't connected. Check Settings › Seerr.")
                 return
             }
             async let similar = try? connection.similar(to: item.tmdbID, kind: item.kind)
@@ -221,7 +235,7 @@
                 problem = nil
             } catch {
                 if !Task.isCancelled, details == nil {
-                    problem = "Couldn't load \(item.title) from Seerr. \(error.seerrReason)"
+                    problem = String(localized: "Couldn't load \(item.title) from Seerr. \(error.seerrReason)")
                 }
             }
         }
@@ -239,33 +253,37 @@
         }
 
         private func requestMovie(is4K: Bool) async {
-            await perform("request \(item.title)") { connection in
+            await perform(failure: "Couldn't request \(item.title).") { connection in
                 try await connection.requestMovie(item.tmdbID, is4K: is4K)
             }
         }
 
         private func requestSeries(_ seasons: [Int], is4K: Bool) async {
             guard let details, !seasons.isEmpty else { return }
-            await perform("request \(item.title)") { connection in
+            await perform(failure: "Couldn't request \(item.title).") { connection in
                 try await connection.requestSeries(details, seasons: seasons, is4K: is4K)
             }
         }
 
         private func cancel(_ request: SeerrRequest) async {
             requestedFrom = .play
-            await perform("cancel the request") { connection in
+            await perform(failure: "Couldn't cancel the request.") { connection in
                 try await connection.cancelRequest(request)
             }
         }
 
         /// Runs a change on Seerr, then shows the title as it is now, as Wholphin reloads it.
-        private func perform(_ what: String, _ change: (SeerrConnection) async throws -> Void) async {
+        /// `failure` is what the alert says first if the change fails, a whole sentence.
+        private func perform(
+            failure: LocalizedStringResource,
+            _ change: (SeerrConnection) async throws -> Void,
+        ) async {
             guard let connection = seerr?.connection else { return }
             isWorking = true
             do {
                 try await change(connection)
             } catch {
-                alert = .failed("Couldn't \(what). \(error.seerrReason)")
+                alert = .failed([String(localized: failure), error.seerrReason].joined(separator: " "))
             }
             await reload(connection)
             // The buttons take focus again only once they're enabled.
@@ -334,11 +352,17 @@
                 if spoken {
                     parts.append(Duration.seconds(runtime * 60).spokenLength)
                 } else {
-                    parts.append(runtime >= 60 ? "\(runtime / 60)h \(runtime % 60)m" : "\(runtime)m")
+                    parts.append(Duration.seconds(runtime * 60).lengthText)
                 }
             }
             if let rating, rating > 0 {
-                parts.append(String(format: spoken ? "Community rating %.1f out of 10" : "★ %.1f", rating))
+                // The item page's words, so both read a rating alike.
+                let format = FloatingPointFormatStyle<Double>.number.precision(.fractionLength(1))
+                parts.append(
+                    spoken
+                        ? String(localized: "Community rating \(rating, format: format) out of 10")
+                        : "★ \(rating.formatted(format))",
+                )
             }
             if let label = item.availability.label {
                 parts.append(label)

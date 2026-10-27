@@ -22,11 +22,11 @@ struct MusicLibraryView: View {
 
         var title: String {
             switch self {
-            case .recommended: "Recommended"
-            case .albums: "Albums"
-            case .artists: "Artists"
-            case .genres: "Genres"
-            case .songs: "Songs"
+            case .recommended: String(localized: "Recommended")
+            case .albums: String(localized: "Albums")
+            case .artists: String(localized: "Artists")
+            case .genres: String(localized: "Genres")
+            case .songs: String(localized: "Songs")
             }
         }
     }
@@ -208,7 +208,7 @@ private struct AlbumSongPage: View {
             case let .success(details):
                 album = details
             case let .failure(error):
-                problem = browse.problem(with: error, doing: "load the album from \(browse.server.name)")
+                problem = browse.problem(with: error, failure: "Couldn't load the album from \(browse.server.name).")
             }
         }
     }

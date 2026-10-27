@@ -14,23 +14,32 @@ struct AutoplaySettingsPage: View {
     var body: some View {
         List {
             Section {
-                ChoiceRow(title: "Show Up Next", selection: $timing, choices: UpNextTiming.allCases, name: \.title)
-                    .accessibilityIdentifier("autoplay.timing")
+                ChoiceRow(
+                    title: String(localized: "Show Up Next"),
+                    selection: $timing,
+                    choices: UpNextTiming.allCases,
+                    name: \.title,
+                )
+                .accessibilityIdentifier("autoplay.timing")
             } footer: {
                 Text("During the credits needs the server to know where they start; otherwise it shows at the end.")
             }
             Section {
                 Toggle("Autoplay next", isOn: $autoPlayNext)
                     .accessibilityIdentifier("autoplay.enabled")
-                ChoiceRow(title: "Countdown", selection: $countdown, choices: Self.countdowns) { seconds in
-                    seconds == 0 ? "Immediate" : "\(seconds) seconds"
+                ChoiceRow(
+                    title: String(localized: "Countdown"),
+                    selection: $countdown,
+                    choices: Self.countdowns,
+                ) { seconds in
+                    seconds == 0 ? String(localized: "Immediate") : String(localized: "\(seconds) seconds")
                 }
                 .disabled(!autoPlayNext)
                 .accessibilityIdentifier("autoplay.countdown")
             }
             Section {
                 ChoiceRow(
-                    title: "Ask \"Still watching?\"",
+                    title: String(localized: "Ask \"Still watching?\""),
                     selection: $passOutCount,
                     choices: Self.passOutCounts,
                     name: Self.passOutText,
@@ -38,8 +47,10 @@ struct AutoplaySettingsPage: View {
                 .disabled(!autoPlayNext)
                 .accessibilityIdentifier("autoplay.stillWatching")
             } footer: {
-                Text("Asks once this many videos in a row have played on their own, with no press on the remote, "
-                    + "and stops playback when nobody answers.")
+                Text("""
+                Asks once this many videos in a row have played on their own, with no press on the remote, \
+                and stops playback when nobody answers.
+                """)
             }
         }
         .navigationTitle("Autoplay")
@@ -50,11 +61,8 @@ struct AutoplaySettingsPage: View {
     private static let passOutCounts = Array(0 ... 5)
 
     private static func passOutText(_ count: Int) -> String {
-        switch count {
-        case 0: "Never"
-        case 1: "After 1 autoplay"
-        default: "After \(count) autoplays"
-        }
+        // One key with plural forms in the String Catalog, not "1 autoplay" spelled out.
+        count == 0 ? String(localized: "Never") : String(localized: "After \(count) autoplays")
     }
 }
 
@@ -109,8 +117,8 @@ private struct Choices<Value: Hashable>: View {
 private extension UpNextTiming {
     var title: String {
         switch self {
-        case .endOfPlayback: "At the end"
-        case .duringCredits: "During the credits"
+        case .endOfPlayback: String(localized: "At the end")
+        case .duringCredits: String(localized: "During the credits")
         }
     }
 }

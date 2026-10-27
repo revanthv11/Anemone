@@ -104,7 +104,7 @@ struct CollectionPage: View {
             problem = nil
         } catch {
             // A failed refresh keeps the rows already showing.
-            let message = browse.problem(with: error, doing: "load what's in \(collection.item.name)")
+            let message = browse.problem(with: error, failure: "Couldn't load what's in \(collection.item.name).")
             if items == nil {
                 problem = message
             }
@@ -152,12 +152,12 @@ struct CollectionPage: View {
     /// Wholphin's `CollectionButtons`.
     private var buttons: some View {
         HStack(spacing: 24) {
-            ActionButton(title: "Play", systemImage: "play.fill") {
+            ActionButton(title: String(localized: "Play"), systemImage: "play.fill") {
                 play(shuffled: false)
             }
             .focused($focus, equals: .action(.play))
             .accessibilityIdentifier("action.play")
-            ActionButton(title: "Shuffle", systemImage: "shuffle") {
+            ActionButton(title: String(localized: "Shuffle"), systemImage: "shuffle") {
                 play(shuffled: true)
             }
             .focused($focus, equals: .action(.shuffle))
@@ -248,14 +248,14 @@ private extension CollectionSection {
 
     var title: String {
         switch kind {
-        case .movie: "Movies"
-        case .series: "TV Shows"
-        case .episode: "Episodes"
-        case .video: "Videos"
-        case .collection: "Collections"
-        case .musicAlbum: "Albums"
-        case .musicVideo: "Music Videos"
-        default: "Other"
+        case .movie: String(localized: "Movies")
+        case .series: String(localized: "TV Shows")
+        case .episode: String(localized: "Episodes")
+        case .video: String(localized: "Videos")
+        case .collection: String(localized: "Collections")
+        case .musicAlbum: String(localized: "Albums")
+        case .musicVideo: String(localized: "Music Videos")
+        default: String(localized: "Other")
         }
     }
 }

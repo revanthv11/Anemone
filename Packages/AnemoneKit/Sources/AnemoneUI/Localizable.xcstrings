@@ -1,0 +1,45 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%@ watched" : {
+
+    },
+    "%lld unwatched" : {
+
+    },
+    "Black" : {
+
+    },
+    "Blue" : {
+
+    },
+    "Bold Blue" : {
+
+    },
+    "Brown" : {
+
+    },
+    "Couldn't load this photo." : {
+
+    },
+    "Favorite" : {
+
+    },
+    "Green" : {
+
+    },
+    "Orange" : {
+
+    },
+    "Purple" : {
+
+    },
+    "Red" : {
+
+    },
+    "Watched" : {
+
+    }
+  },
+  "version" : "1.0"
+}

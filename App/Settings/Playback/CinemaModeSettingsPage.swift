@@ -13,8 +13,10 @@ struct CinemaModeSettingsPage: View {
                 Toggle("Cinema mode", isOn: $cinemaMode)
                     .accessibilityIdentifier("settings.cinemaMode")
             } footer: {
-                Text("Plays the intros the server has, such as trailers or pre-rolls, before what you play from "
-                    + "the beginning. The server's admin sets them up, for example with the Local Intros plugin.")
+                Text("""
+                Plays the intros the server has, such as trailers or pre-rolls, before what you play from \
+                the beginning. The server's admin sets them up, for example with the Local Intros plugin.
+                """)
             }
         }
         .navigationTitle("Cinema Mode")

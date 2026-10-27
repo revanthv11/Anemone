@@ -65,7 +65,7 @@ struct PlaylistPicker: View {
         do {
             playlists = try await browse.session.editablePlaylists(for: item.id)
         } catch {
-            problem = browse.problem(with: error, doing: "load your playlists")
+            problem = browse.problem(with: error, failure: "Couldn't load your playlists.")
         }
     }
 
@@ -82,10 +82,12 @@ struct PlaylistPicker: View {
         } catch PlaylistEditingError.notInPlaylist {
             // Taken out elsewhere since the list loaded: says so, and shows the playlists as
             // they are now.
-            problem = "\(item.name) isn't in \(playlist.name.isEmpty ? "that playlist" : playlist.name) any more."
+            problem = playlist.name.isEmpty
+                ? String(localized: "\(item.name) isn't in that playlist any more.")
+                : String(localized: "\(item.name) isn't in \(playlist.name) any more.")
             await load()
         } catch {
-            problem = browse.problem(with: error, doing: "change \(playlist.name)")
+            problem = browse.problem(with: error, failure: "Couldn't change \(playlist.name).")
         }
     }
 }
@@ -99,9 +101,9 @@ private struct PlaylistLabel: View {
             Image(systemName: playlist.holdsItem ? "checkmark" : "plus")
                 .frame(width: 40)
                 .accessibilityHidden(true)
-            Text(playlist.name.isEmpty ? "Untitled" : playlist.name)
+            Text(playlist.name.isEmpty ? String(localized: "Untitled") : playlist.name)
             Spacer()
-            Text(playlist.itemCount == 1 ? "1 item" : "\(playlist.itemCount) items")
+            Text("\(playlist.itemCount) items")
                 .foregroundStyle(.secondary)
         }
     }

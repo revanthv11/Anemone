@@ -68,7 +68,9 @@ final class AppModel {
         authenticator = Authenticator(identity: identity)
         connector = ServerConnector(identity: identity)
         if isStorageUnavailable {
-            notice = "Couldn't read the sign-ins saved on this Apple TV. Changes won't be kept until Anemone restarts."
+            notice = String(localized: """
+            Couldn't read the sign-ins saved on this Apple TV. Changes won't be kept until Anemone restarts.
+            """)
         }
     }
 
@@ -205,14 +207,14 @@ final class AppModel {
             guard let current = try await authenticator.currentUser(on: server.url, token: token) else {
                 accounts.signOut(userID: user.id, on: server.id)
                 persist()
-                notice = "\(user.name) was signed out by the server. Sign in again."
+                notice = String(localized: "\(user.name) was signed out by the server. Sign in again.")
                 screen = .users(server)
                 return .needsSignIn
             }
             enterHome(server: server, user: current)
             return .signedIn
         } catch {
-            notice = "Couldn't reach \(server.name)."
+            notice = String(localized: "Couldn't reach \(server.name).")
             return .unreachable
         }
     }
@@ -257,7 +259,7 @@ final class AppModel {
         do {
             try repository.save(accounts)
         } catch {
-            notice = "Couldn't save your sign-in on this Apple TV."
+            notice = String(localized: "Couldn't save your sign-in on this Apple TV.")
         }
     }
 }
@@ -266,16 +268,18 @@ extension ServerConnectionError {
     var message: String {
         switch self {
         case .invalidAddress:
-            "That doesn't look like a server address."
+            String(localized: "That doesn't look like a server address.")
         case .unreachable:
-            "Couldn't find a Jellyfin server at that address."
+            String(localized: "Couldn't find a Jellyfin server at that address.")
         case let .unsupportedVersion(version):
-            "This server runs Jellyfin \(version). " +
-                "Anemone needs Jellyfin \(ServerVersion.minimumSupported.major) or later."
+            String(localized: """
+            This server runs Jellyfin \(version). \
+            Anemone needs Jellyfin \(ServerVersion.minimumSupported.major) or later.
+            """)
         case .setupIncomplete:
-            "This server hasn't finished its setup. Finish it in a web browser first."
+            String(localized: "This server hasn't finished its setup. Finish it in a web browser first.")
         case let .notJellyfin(product):
-            "That address is a \(product), not a Jellyfin server."
+            String(localized: "That address is a \(product), not a Jellyfin server.")
         }
     }
 }

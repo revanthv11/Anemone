@@ -38,7 +38,7 @@ public struct SlideshowPhoto: View {
             if url != nil, url != shown, url != failed {
                 ProgressView()
             } else if url != nil, url == failed {
-                Text("Couldn't load this photo.")
+                Text("Couldn't load this photo.", bundle: .module)
                     .foregroundStyle(.secondary)
             }
         }

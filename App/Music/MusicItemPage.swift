@@ -98,7 +98,7 @@ struct SongPlayback: ViewModifier {
             player.play([item])
             showsNowPlaying = true
         case let .failure(error):
-            problem = browse.problem(with: error, doing: "play \(song.item.name)")
+            problem = browse.problem(with: error, failure: "Couldn't play \(song.item.name).")
         }
     }
 }

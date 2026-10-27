@@ -68,7 +68,10 @@ final class LiveTVGuideModel {
             state = channels.isEmpty ? .noChannels : .loaded
         } catch {
             guard load == loads,
-                  let problem = browse.problem(with: error, doing: "load the guide from \(browse.server.name)")
+                  let problem = browse.problem(
+                      with: error,
+                      failure: "Couldn't load the guide from \(browse.server.name).",
+                  )
             else { return }
             if state != .loaded {
                 state = .failed(problem)

@@ -30,7 +30,7 @@ struct InterfaceSettingsPage: View {
             Section("Photos") {
                 Picker("Slideshow duration", selection: $slideshowDuration) {
                     ForEach(Self.durations, id: \.self) { seconds in
-                        Text(seconds == 1 ? "1 second" : "\(seconds) seconds").tag(seconds * 1000)
+                        Text("\(seconds) seconds").tag(seconds * 1000)
                     }
                     // A time set elsewhere, kept as it is.
                     if !Self.durations.contains(slideshowDuration / 1000) || slideshowDuration % 1000 != 0 {
@@ -47,7 +47,8 @@ struct InterfaceSettingsPage: View {
     }
 
     private static func label(milliseconds: Int) -> String {
-        (Double(milliseconds) / 1000).formatted(.number.precision(.fractionLength(0 ... 2))) + " seconds"
+        let seconds = (Double(milliseconds) / 1000).formatted(.number.precision(.fractionLength(0 ... 2)))
+        return String(localized: "\(seconds) seconds")
     }
 }
 
@@ -55,12 +56,12 @@ private extension ThemeMusicVolume {
     /// Wholphin's names.
     var title: String {
         switch self {
-        case .disabled: "Disabled"
-        case .lowest: "Lowest"
-        case .low: "Low"
-        case .medium: "Medium"
-        case .high: "High"
-        case .highest: "Full"
+        case .disabled: String(localized: "Disabled")
+        case .lowest: String(localized: "Lowest")
+        case .low: String(localized: "Low")
+        case .medium: String(localized: "Medium")
+        case .high: String(localized: "High")
+        case .highest: String(localized: "Full")
         }
     }
 }

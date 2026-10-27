@@ -95,8 +95,8 @@ struct HomeSettingsPage: View {
                 run {
                     let imported = try await browse.importHomeRowsFromWholphin()
                     notice = imported
-                        ? "Imported the rows Wholphin saved for you."
-                        : "Wholphin hasn't saved rows for you on \(browse.server.name)."
+                        ? String(localized: "Imported the rows Wholphin saved for you.")
+                        : String(localized: "Wholphin hasn't saved rows for you on \(browse.server.name).")
                 }
             }
             .accessibilityIdentifier("settings.home.importWholphin")
@@ -113,9 +113,9 @@ struct HomeSettingsPage: View {
 
     private var sourceDescription: String {
         switch browse.homeRowsSource {
-        case .server: "Saved for you on \(browse.server.name)."
-        case .plugin: "Set for everyone by \(browse.server.name)'s Wholphin plugin."
-        case .default: "Anemone's default rows."
+        case .server: String(localized: "Saved for you on \(browse.server.name).")
+        case .plugin: String(localized: "Set for everyone by \(browse.server.name)'s Wholphin plugin.")
+        case .default: String(localized: "Anemone's default rows.")
         }
     }
 
@@ -140,7 +140,7 @@ struct HomeSettingsPage: View {
             do {
                 try await action()
             } catch {
-                notice = browse.problem(with: error, doing: "update your rows on \(browse.server.name)")
+                notice = browse.problem(with: error, failure: "Couldn't update your rows on \(browse.server.name).")
             }
             isWorking = false
         }

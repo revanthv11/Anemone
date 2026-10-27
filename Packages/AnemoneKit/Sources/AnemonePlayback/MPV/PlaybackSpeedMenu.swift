@@ -23,12 +23,12 @@ public final class PlaybackSpeedMenu: PlaybackFeature {
         let current = controller.engine.rate
         controller.accessories.show(PlayerMenu(
             id: Self.menuID,
-            title: "Speed",
+            title: String(localized: "Speed", bundle: .module),
             systemImage: "gauge.with.dots.needle.67percent",
             options: Self.speeds.map { speed in
                 PlayerMenu.Option(
                     id: Self.label(speed),
-                    title: speed == 1 ? "Normal" : Self.label(speed),
+                    title: speed == 1 ? String(localized: "Normal", bundle: .module) : Self.label(speed),
                     isSelected: abs(speed - current) < 0.01,
                 ) { [weak self, weak controller] in
                     guard let controller else { return }

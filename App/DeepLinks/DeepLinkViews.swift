@@ -192,7 +192,7 @@ private struct DeepLinkPage: View {
             }
             playback = browse.playback(of: details, from: from)
         } catch {
-            problem = browse.problem(with: error, doing: "open this item on \(browse.server.name)")
+            problem = browse.problem(with: error, failure: "Couldn't open this item on \(browse.server.name).")
         }
     }
 }

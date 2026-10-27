@@ -1,0 +1,2401 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "" : {
+
+    },
+    " " : {
+
+    },
+    "%@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@"
+          }
+        }
+      }
+    },
+    "%@ %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$lld"
+          }
+        }
+      }
+    },
+    "%@ (%@)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ (%2$@)"
+          }
+        }
+      }
+    },
+    "%@ (%lld)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ (%2$lld)"
+          }
+        }
+      }
+    },
+    "%@ (copy %lld)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ (copy %2$lld)"
+          }
+        }
+      }
+    },
+    "%@ Check that %@ is running, then try again." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ Check that %2$@ is running, then try again."
+          }
+        }
+      }
+    },
+    "%@ Mbps" : {
+
+    },
+    "%@ and %lld more" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ and %2$lld more"
+          }
+        }
+      }
+    },
+    "%@ couldn't find a way to send this that Apple TV can play." : {
+
+    },
+    "%@ didn't send anything to play." : {
+
+    },
+    "%@ doesn't allow you to play this. Its admin can allow playback or transcoding for your account." : {
+
+    },
+    "%@ has nothing to play." : {
+
+    },
+    "%@ isn't in %@ any more." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ isn't in %2$@ any more."
+          }
+        }
+      }
+    },
+    "%@ isn't in that playlist any more." : {
+
+    },
+    "%@ left" : {
+
+    },
+    "%@ of %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ of %2$@"
+          }
+        }
+      }
+    },
+    "%@ on %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ on %2$@"
+          }
+        }
+      }
+    },
+    "%@ seconds" : {
+
+    },
+    "%@ signed you out. Go back to sign in again." : {
+
+    },
+    "%@ signed you out. Go to Home to sign in again." : {
+
+    },
+    "%@ signed you out. Sign in again to continue." : {
+
+    },
+    "%@ was signed out by the server. Sign in again." : {
+
+    },
+    "%@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "%@ · Jellyfin %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · Jellyfin %2$@"
+          }
+        }
+      }
+    },
+    "%@'s license" : {
+
+    },
+    "%@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@"
+          }
+        }
+      }
+    },
+    "%@, +%lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, +%2$lld"
+          }
+        }
+      }
+    },
+    "%lld" : {
+
+    },
+    "%lld / %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld / %2$lld"
+          }
+        }
+      }
+    },
+    "%lld by %lld pixels" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld by %2$lld pixels"
+          }
+        }
+      }
+    },
+    "%lld days" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld day"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld days"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld episodes" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld episode"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld episodes"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld genres" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld genre"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld genres"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld items" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld item"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld items"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld kbps" : {
+
+    },
+    "%lld min" : {
+
+    },
+    "%lld of %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld of %2$lld"
+          }
+        }
+      }
+    },
+    "%lld of %lld, slideshow playing" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld of %2$lld, slideshow playing"
+          }
+        }
+      }
+    },
+    "%lld or higher" : {
+
+    },
+    "%lld s" : {
+
+    },
+    "%lld seconds" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld second"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld seconds"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld selected" : {
+
+    },
+    "%lld songs" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld song"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld songs"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld studios" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld studio"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld studios"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld%%" : {
+
+    },
+    "%lld." : {
+
+    },
+    "4:3" : {
+
+    },
+    "4K" : {
+      "localizations" : {
+
+      }
+    },
+    "API key" : {
+
+    },
+    "About" : {
+
+    },
+    "Account" : {
+
+    },
+    "Active Recordings" : {
+
+    },
+    "Add %@ to a playlist" : {
+
+    },
+    "Add Seerr Server" : {
+
+    },
+    "Add Server" : {
+
+    },
+    "Add a server" : {
+
+    },
+    "Add media to your libraries in Jellyfin, or ask the server's admin for access to them." : {
+
+    },
+    "Add row" : {
+
+    },
+    "Add server" : {
+
+    },
+    "Add to Favorites" : {
+
+    },
+    "Add to Queue" : {
+
+    },
+    "Add to favorites" : {
+
+    },
+    "Add to playlist" : {
+
+    },
+    "Add your Jellyfin server to get started." : {
+
+    },
+    "After %lld autoplays" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "After %lld autoplay"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "After %lld autoplays"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Album" : {
+
+    },
+    "Album Artist" : {
+
+    },
+    "Albums" : {
+
+    },
+    "All" : {
+
+    },
+    "All Seasons" : {
+
+    },
+    "Always" : {
+
+    },
+    "Anemone" : {
+
+    },
+    "Anemone %@" : {
+
+    },
+    "Anemone is free software: you can redistribute it and modify it under the terms of the GNU General Public License, version 3. The source code of every App Store and TestFlight build is tagged in that repository; this one is %@." : {
+
+    },
+    "Anemone's controls" : {
+
+    },
+    "Anemone's default rows." : {
+
+    },
+    "Animate" : {
+
+    },
+    "Another tab" : {
+
+    },
+    "Any" : {
+
+    },
+    "Any channel" : {
+
+    },
+    "Any language" : {
+
+    },
+    "Any time" : {
+
+    },
+    "Appearance" : {
+
+    },
+    "Appears On" : {
+
+    },
+    "Apple TV couldn't play the stream from %@." : {
+
+    },
+    "Apple TV couldn't play the stream from %@. %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Apple TV couldn't play the stream from %1$@. %2$@"
+          }
+        }
+      }
+    },
+    "Apple TV's own player, with its scrubbing and info panel." : {
+
+    },
+    "Apple's player: Dolby Vision, Dolby Atmos and frame-rate matching. The server converts what it can't play, such as DTS audio or styled subtitles." : {
+
+    },
+    "Application Theme" : {
+
+    },
+    "Approved" : {
+
+    },
+    "Artist" : {
+
+    },
+    "Artists" : {
+
+    },
+    "Ask \"Still watching?\"" : {
+
+    },
+    "Ask to skip" : {
+
+    },
+    "Asks once this many videos in a row have played on their own, with no press on the remote, and stops playback when nobody answers." : {
+
+    },
+    "Aspect ratio" : {
+
+    },
+    "At beginning" : {
+
+    },
+    "At the end" : {
+
+    },
+    "Audio and Subtitles" : {
+
+    },
+    "Audio language" : {
+
+    },
+    "Audio: %@" : {
+
+    },
+    "Autoplay" : {
+
+    },
+    "Autoplay next" : {
+
+    },
+    "Available" : {
+
+    },
+    "Back 10 seconds" : {
+
+    },
+    "Back to chapters" : {
+
+    },
+    "Back to controls" : {
+
+    },
+    "Background" : {
+
+    },
+    "Based on" : {
+
+    },
+    "Behind each line" : {
+
+    },
+    "Birthplace: %@" : {
+
+    },
+    "Blocklisted" : {
+
+    },
+    "Blu-ray" : {
+
+    },
+    "Bold" : {
+
+    },
+    "Born: %@" : {
+
+    },
+    "Born: %@ (%lld years old)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Born: %1$@ (%2$lld years old)"
+          }
+        }
+      }
+    },
+    "Can't play this" : {
+
+    },
+    "Can't play this trailer" : {
+
+    },
+    "Cancel" : {
+
+    },
+    "Cancel Recording" : {
+
+    },
+    "Cancel Request" : {
+
+    },
+    "Cancel Series Recording" : {
+
+    },
+    "Card shape" : {
+
+    },
+    "Cards" : {
+
+    },
+    "Cast & Crew" : {
+
+    },
+    "Change server" : {
+
+    },
+    "Channels" : {
+
+    },
+    "Chapter %lld" : {
+
+    },
+    "Chapters" : {
+
+    },
+    "Check that %@ is running, then try again." : {
+
+    },
+    "Check that the Seerr server is running, then try again." : {
+
+    },
+    "Choose Version" : {
+
+    },
+    "Choose a %lld-digit PIN" : {
+
+    },
+    "Choose seasons to request" : {
+
+    },
+    "Choose the types to include in View Options." : {
+
+    },
+    "Cinema Mode" : {
+
+    },
+    "Cinema mode" : {
+
+    },
+    "Clear Recent Searches" : {
+
+    },
+    "Clear all filters" : {
+
+    },
+    "Collections" : {
+
+    },
+    "Color" : {
+
+    },
+    "Color Code Programs" : {
+
+    },
+    "Columns" : {
+
+    },
+    "Combine Continue Watching & Next Up" : {
+
+    },
+    "Combined search results" : {
+
+    },
+    "Commercials" : {
+
+    },
+    "Community Rating" : {
+
+    },
+    "Community rating %@ out of 10" : {
+
+    },
+    "Completed" : {
+
+    },
+    "Connect" : {
+
+    },
+    "Connecting…" : {
+
+    },
+    "Continue Watching" : {
+
+    },
+    "Continue watching" : {
+
+    },
+    "Controls" : {
+
+    },
+    "Controls what it takes to switch to %@ on this Apple TV." : {
+
+    },
+    "Couldn't add the server. %@" : {
+
+    },
+    "Couldn't cancel %@." : {
+
+    },
+    "Couldn't cancel the request." : {
+
+    },
+    "Couldn't change %@." : {
+
+    },
+    "Couldn't change the recording on %@." : {
+
+    },
+    "Couldn't delete %@." : {
+
+    },
+    "Couldn't find a Jellyfin server at that address." : {
+
+    },
+    "Couldn't find what to play in %@." : {
+
+    },
+    "Couldn't jump to where you left off. Restart plays from the beginning." : {
+
+    },
+    "Couldn't load %@ from %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Couldn't load %1$@ from %2$@."
+          }
+        }
+      }
+    },
+    "Couldn't load %@ from Seerr. %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Couldn't load %1$@ from Seerr. %2$@"
+          }
+        }
+      }
+    },
+    "Couldn't load %@." : {
+
+    },
+    "Couldn't load recommendations for %@ from %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Couldn't load recommendations for %1$@ from %2$@."
+          }
+        }
+      }
+    },
+    "Couldn't load the album from %@." : {
+
+    },
+    "Couldn't load the channels from %@." : {
+
+    },
+    "Couldn't load the choices from %@." : {
+
+    },
+    "Couldn't load the genres from %@." : {
+
+    },
+    "Couldn't load the genres in %@ from %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Couldn't load the genres in %1$@ from %2$@."
+          }
+        }
+      }
+    },
+    "Couldn't load the guide from %@." : {
+
+    },
+    "Couldn't load the photos from %@." : {
+
+    },
+    "Couldn't load the recording schedule from %@." : {
+
+    },
+    "Couldn't load the series removed from Next Up." : {
+
+    },
+    "Couldn't load the songs from %@." : {
+
+    },
+    "Couldn't load the studios in %@ from %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Couldn't load the studios in %1$@ from %2$@."
+          }
+        }
+      }
+    },
+    "Couldn't load this list from %@." : {
+
+    },
+    "Couldn't load this season's episodes." : {
+
+    },
+    "Couldn't load this series from %@." : {
+
+    },
+    "Couldn't load what's in %@." : {
+
+    },
+    "Couldn't load your favorites from %@." : {
+
+    },
+    "Couldn't load your favorites." : {
+
+    },
+    "Couldn't load your home page" : {
+
+    },
+    "Couldn't load your playlists." : {
+
+    },
+    "Couldn't load your requests. %@" : {
+
+    },
+    "Couldn't make a mix on %@." : {
+
+    },
+    "Couldn't move %@." : {
+
+    },
+    "Couldn't open this item on %@." : {
+
+    },
+    "Couldn't play %@." : {
+
+    },
+    "Couldn't play this clip." : {
+
+    },
+    "Couldn't play this song." : {
+
+    },
+    "Couldn't reach %@." : {
+
+    },
+    "Couldn't reach the server." : {
+
+    },
+    "Couldn't read the sign-ins saved on this Apple TV. Changes won't be kept until Anemone restarts." : {
+
+    },
+    "Couldn't remove the server from this Apple TV." : {
+
+    },
+    "Couldn't request %@." : {
+
+    },
+    "Couldn't save your rows on %@." : {
+
+    },
+    "Couldn't save your sign-in on this Apple TV." : {
+
+    },
+    "Couldn't search %@. Check that it's running, then try again." : {
+
+    },
+    "Couldn't search Seerr. %@" : {
+
+    },
+    "Couldn't sign in to %@" : {
+
+    },
+    "Couldn't sign in to Seerr at %@. %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Couldn't sign in to Seerr at %1$@. %2$@"
+          }
+        }
+      }
+    },
+    "Couldn't sign in: %@" : {
+
+    },
+    "Couldn't start playback. Check that %@ is running, then try again." : {
+
+    },
+    "Couldn't update %@." : {
+
+    },
+    "Couldn't update Next Up." : {
+
+    },
+    "Couldn't update your rows on %@." : {
+
+    },
+    "Countdown" : {
+
+    },
+    "Critic Rating" : {
+
+    },
+    "Critic rating %lld%%" : {
+
+    },
+    "DVD" : {
+
+    },
+    "Date Added" : {
+
+    },
+    "Date Episode Added" : {
+
+    },
+    "Date Played" : {
+
+    },
+    "Date Released" : {
+
+    },
+    "Date Taken" : {
+
+    },
+    "Decade" : {
+
+    },
+    "Declined" : {
+
+    },
+    "Default" : {
+
+    },
+    "Delete" : {
+
+    },
+    "Delete %@?" : {
+
+    },
+    "Deleted" : {
+
+    },
+    "Dense list" : {
+
+    },
+    "Descending" : {
+
+    },
+    "Died: %@" : {
+
+    },
+    "Died: %@ (%lld years old)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Died: %1$@ (%2$lld years old)"
+          }
+        }
+      }
+    },
+    "Directed by %@" : {
+
+    },
+    "Disabled" : {
+
+    },
+    "Discover" : {
+
+    },
+    "Discover and the Discover rows go until a server is added again." : {
+
+    },
+    "Drop shadow" : {
+
+    },
+    "During the credits" : {
+
+    },
+    "During the credits needs the server to know where they start; otherwise it shows at the end." : {
+
+    },
+    "Each picture for" : {
+
+    },
+    "Edge" : {
+
+    },
+    "Email" : {
+
+    },
+    "Enable rewatching in Next Up" : {
+
+    },
+    "Ends at %@" : {
+
+    },
+    "Enter the PIN again" : {
+
+    },
+    "Enter the PIN for %@" : {
+
+    },
+    "Episode %lld" : {
+
+    },
+    "Episodes" : {
+
+    },
+    "Every row" : {
+
+    },
+    "Extras" : {
+
+    },
+    "Failed" : {
+
+    },
+    "Favorite" : {
+
+    },
+    "Favorite %@" : {
+
+    },
+    "Favorite Channels at Beginning" : {
+
+    },
+    "Favorites" : {
+
+    },
+    "Filter" : {
+
+    },
+    "Filter (%lld)" : {
+
+    },
+    "Filter, %lld active" : {
+
+    },
+    "Font" : {
+
+    },
+    "For all ages" : {
+
+    },
+    "For episodes" : {
+
+    },
+    "For example 192.168.1.20:8096 or https://jellyfin.example.com" : {
+
+    },
+    "For text subtitles such as SRT. ASS subtitles keep their own styling." : {
+
+    },
+    "For the subtitles MPV draws. ASS subtitles keep their own styling." : {
+
+    },
+    "Forget picked tracks" : {
+
+    },
+    "Forward 30 seconds" : {
+
+    },
+    "From your Jellyfin profile" : {
+
+    },
+    "Full" : {
+
+    },
+    "Genres" : {
+
+    },
+    "Go To" : {
+
+    },
+    "Go to" : {
+
+    },
+    "Go to %@" : {
+
+    },
+    "Go to Album" : {
+
+    },
+    "Go to series" : {
+
+    },
+    "Goes back a little whenever playback resumes after a pause." : {
+
+    },
+    "Grid" : {
+
+    },
+    "Grid options" : {
+
+    },
+    "Guest Stars" : {
+
+    },
+    "Guide" : {
+
+    },
+    "HD" : {
+
+    },
+    "HDR Subtitle Style" : {
+
+    },
+    "HDR subtitle style" : {
+
+    },
+    "Has this item" : {
+
+    },
+    "Height" : {
+
+    },
+    "Hide controls after" : {
+
+    },
+    "High" : {
+
+    },
+    "Home" : {
+
+    },
+    "Home rows (%lld)" : {
+
+    },
+    "Ignore" : {
+
+    },
+    "Image type" : {
+
+    },
+    "Immediate" : {
+
+    },
+    "Import from Wholphin" : {
+
+    },
+    "Imported the rows Wholphin saved for you." : {
+
+    },
+    "Include Types" : {
+
+    },
+    "Include types" : {
+
+    },
+    "Instant Mix" : {
+
+    },
+    "Instrumental" : {
+
+    },
+    "Interface" : {
+
+    },
+    "Intros" : {
+
+    },
+    "Italic" : {
+
+    },
+    "Jellyfin account" : {
+
+    },
+    "Jellyfin profile (%@)" : {
+
+    },
+    "Landscape" : {
+
+    },
+    "Layout" : {
+
+    },
+    "Libraries" : {
+
+    },
+    "Libraries you switch off move to More in the sidebar." : {
+
+    },
+    "Library" : {
+
+    },
+    "Library pages" : {
+
+    },
+    "License" : {
+
+    },
+    "License text" : {
+
+    },
+    "List" : {
+
+    },
+    "Live TV" : {
+
+    },
+    "Live TV is on, but %@ has no channels." : {
+
+    },
+    "Loading" : {
+
+    },
+    "Locked" : {
+
+    },
+    "Low" : {
+
+    },
+    "Lowest" : {
+
+    },
+    "MPV" : {
+
+    },
+    "MPV plays nearly anything as it is, including MKV, DTS, TrueHD and styled ASS and PGS subtitles, with Anemone's controls. No Dolby Vision." : {
+
+    },
+    "MPV, except HDR and Dolby Vision video, which plays in AVPlayer." : {
+
+    },
+    "Managed by server" : {
+
+    },
+    "Margin" : {
+
+    },
+    "Mark as unwatched" : {
+
+    },
+    "Mark as watched" : {
+
+    },
+    "Mark the entire series as unwatched?" : {
+
+    },
+    "Mark the entire series as watched?" : {
+
+    },
+    "Match Content" : {
+
+    },
+    "Max Bitrate" : {
+
+    },
+    "Max age rating" : {
+
+    },
+    "Max bitrate" : {
+
+    },
+    "Max days in Next Up" : {
+
+    },
+    "Max items on home page rows" : {
+
+    },
+    "Medium" : {
+
+    },
+    "More" : {
+
+    },
+    "More Like This" : {
+
+    },
+    "Move Earlier" : {
+
+    },
+    "Move Later" : {
+
+    },
+    "Move down" : {
+
+    },
+    "Move up" : {
+
+    },
+    "Movie and TV libraries open on the tab you chose there last, instead of Recommended." : {
+
+    },
+    "Movies" : {
+
+    },
+    "Movies and shows to request" : {
+
+    },
+    "Movies, shows, people and more" : {
+
+    },
+    "Music Videos" : {
+
+    },
+    "Name" : {
+
+    },
+    "Never" : {
+
+    },
+    "New episodes only" : {
+
+    },
+    "Next" : {
+
+    },
+    "Next Up" : {
+
+    },
+    "No Seerr server answered at that address." : {
+
+    },
+    "No Seerr server is set up. Add one to discover movies and shows and ask for them." : {
+
+    },
+    "No collections hold titles from %@." : {
+
+    },
+    "No genres in %@." : {
+
+    },
+    "No limit" : {
+
+    },
+    "No lock" : {
+
+    },
+    "No more photos" : {
+
+    },
+    "No requests yet." : {
+
+    },
+    "No results" : {
+
+    },
+    "No scheduled recordings" : {
+
+    },
+    "No search types selected" : {
+
+    },
+    "No series have been removed from Next Up." : {
+
+    },
+    "No subtitles unless you pick some" : {
+
+    },
+    "None" : {
+
+    },
+    "Not favorites" : {
+
+    },
+    "Nothing found for “%@”." : {
+
+    },
+    "Nothing here matches the filters." : {
+
+    },
+    "Nothing in this collection matches the filters." : {
+
+    },
+    "Nothing is listed for this time." : {
+
+    },
+    "Nothing is playing." : {
+
+    },
+    "Nothing matches “%@”." : {
+
+    },
+    "Nothing to filter by in %@." : {
+
+    },
+    "Nothing to play" : {
+
+    },
+    "Nothing to recommend in %@ yet." : {
+
+    },
+    "Nothing to show yet" : {
+
+    },
+    "Nothing to show." : {
+
+    },
+    "Now Playing" : {
+
+    },
+    "OK" : {
+
+    },
+    "Off" : {
+
+    },
+    "On" : {
+
+    },
+    "On a phone or computer that's signed in to %@, open Quick Connect and enter this code." : {
+
+    },
+    "One" : {
+
+    },
+    "One box" : {
+
+    },
+    "Only forced" : {
+
+    },
+    "Only forced subtitles, such as for signs" : {
+
+    },
+    "Only videos play here for now, so nothing in %@ can." : {
+
+    },
+    "Opacity" : {
+
+    },
+    "Options" : {
+
+    },
+    "Other" : {
+
+    },
+    "Other user" : {
+
+    },
+    "Outline" : {
+
+    },
+    "Outros" : {
+
+    },
+    "PIN" : {
+
+    },
+    "Parental Rating" : {
+
+    },
+    "Partly available" : {
+
+    },
+    "Password" : {
+
+    },
+    "Pause" : {
+
+    },
+    "Paused" : {
+
+    },
+    "People" : {
+
+    },
+    "Photo" : {
+
+    },
+    "Photo Albums" : {
+
+    },
+    "Photos" : {
+
+    },
+    "Play" : {
+
+    },
+    "Play Count" : {
+
+    },
+    "Play Next" : {
+
+    },
+    "Play slideshow" : {
+
+    },
+    "Play theme music" : {
+
+    },
+    "Play trailer" : {
+
+    },
+    "Play videos during slideshow" : {
+
+    },
+    "Playback" : {
+
+    },
+    "Playback backend" : {
+
+    },
+    "Played" : {
+
+    },
+    "Player" : {
+
+    },
+    "Player Controls" : {
+
+    },
+    "Player controls" : {
+
+    },
+    "Playing" : {
+
+    },
+    "Playlists" : {
+
+    },
+    "Plays from this chapter" : {
+
+    },
+    "Plays from this line" : {
+
+    },
+    "Plays on the pages of movies, shows and collections that have a theme song on the server." : {
+
+    },
+    "Plays the episode" : {
+
+    },
+    "Plays the intros the server has, such as trailers or pre-rolls, before what you play from the beginning. The server's admin sets them up, for example with the Local Intros plugin." : {
+
+    },
+    "Popular Songs" : {
+
+    },
+    "Position" : {
+
+    },
+    "Poster" : {
+
+    },
+    "Prefer MPV" : {
+
+    },
+    "Preview" : {
+
+    },
+    "Previews" : {
+
+    },
+    "Previous" : {
+
+    },
+    "Primary" : {
+
+    },
+    "Processing" : {
+
+    },
+    "Profile lock" : {
+
+    },
+    "Queue" : {
+
+    },
+    "Queued" : {
+
+    },
+    "Quick Connect" : {
+
+    },
+    "Quick Connect stopped. Try again." : {
+
+    },
+    "Random" : {
+
+    },
+    "Rated %@" : {
+
+    },
+    "Recaps" : {
+
+    },
+    "Recent Searches" : {
+
+    },
+    "Recently Added" : {
+
+    },
+    "Recently Released" : {
+
+    },
+    "Recommended" : {
+
+    },
+    "Record" : {
+
+    },
+    "Record Series" : {
+
+    },
+    "Recording" : {
+
+    },
+    "Remember selected tab" : {
+
+    },
+    "Remove" : {
+
+    },
+    "Remove Server" : {
+
+    },
+    "Remove from Continue Watching" : {
+
+    },
+    "Remove from Favorites" : {
+
+    },
+    "Remove from Next Up" : {
+
+    },
+    "Remove from Queue" : {
+
+    },
+    "Remove from favorites" : {
+
+    },
+    "Remove from this Apple TV" : {
+
+    },
+    "Remove server" : {
+
+    },
+    "Remove the Seerr server?" : {
+
+    },
+    "Removed %@" : {
+
+    },
+    "Removed from Next Up" : {
+
+    },
+    "Repeat" : {
+
+    },
+    "Request" : {
+
+    },
+    "Request %lld Seasons" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Request %lld Season"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Request %lld Seasons"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Request in 4K" : {
+
+    },
+    "Requested" : {
+
+    },
+    "Requests" : {
+
+    },
+    "Require sign-in" : {
+
+    },
+    "Reset" : {
+
+    },
+    "Reset Home's rows?" : {
+
+    },
+    "Reset to default" : {
+
+    },
+    "Reset to defaults" : {
+
+    },
+    "Restart" : {
+
+    },
+    "Results" : {
+
+    },
+    "Resume" : {
+
+    },
+    "Resume from %@" : {
+
+    },
+    "Retry" : {
+
+    },
+    "Rotate left" : {
+
+    },
+    "Rotate right" : {
+
+    },
+    "Row %lld of %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Row %1$lld of %2$lld"
+          }
+        }
+      }
+    },
+    "Runtime" : {
+
+    },
+    "SD" : {
+
+    },
+    "Saved for you on %@." : {
+
+    },
+    "Saved rows" : {
+
+    },
+    "Schedule" : {
+
+    },
+    "Screensaver" : {
+
+    },
+    "Search" : {
+
+    },
+    "Search your libraries for movies, shows, episodes, people and more." : {
+
+    },
+    "Searches for this again" : {
+
+    },
+    "Searching…" : {
+
+    },
+    "Season %lld" : {
+
+    },
+    "Season %lld, episode %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Season %1$lld, episode %2$lld"
+          }
+        }
+      }
+    },
+    "Season %lld, episode %lld, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Season %1$lld, episode %2$lld, %3$@"
+          }
+        }
+      }
+    },
+    "Seasons" : {
+
+    },
+    "Seasons (%lld)" : {
+
+    },
+    "Section" : {
+
+    },
+    "Seek" : {
+
+    },
+    "Seek, with a thumbnail" : {
+
+    },
+    "Seerr" : {
+
+    },
+    "Seerr account" : {
+
+    },
+    "Seerr answered with error %lld." : {
+
+    },
+    "Seerr didn't accept the username and password or API key." : {
+
+    },
+    "Seerr didn't suggest anything. Check that it's running, then try again." : {
+
+    },
+    "Seerr isn't connected. Check Settings › Seerr." : {
+
+    },
+    "Seerr says %@ is on the server, but didn't say where." : {
+
+    },
+    "Seerr says this account isn't allowed to do that." : {
+
+    },
+    "Segments come from the server, when a plugin there finds them." : {
+
+    },
+    "Separate types" : {
+
+    },
+    "Series Recordings" : {
+
+    },
+    "Series recording" : {
+
+    },
+    "Series removed from Next Up" : {
+
+    },
+    "Server address" : {
+
+    },
+    "Servers" : {
+
+    },
+    "Set for everyone by %@'s Wholphin plugin." : {
+
+    },
+    "Set up a Seerr server in Settings › Seerr to discover and request movies and shows." : {
+
+    },
+    "Settings" : {
+
+    },
+    "Show Details" : {
+
+    },
+    "Show Subtitles" : {
+
+    },
+    "Show Up Next" : {
+
+    },
+    "Show album cover" : {
+
+    },
+    "Show all results in a single grid" : {
+
+    },
+    "Show backdrop" : {
+
+    },
+    "Show clock" : {
+
+    },
+    "Show details" : {
+
+    },
+    "Show lyrics" : {
+
+    },
+    "Show playback debug info" : {
+
+    },
+    "Show results by type" : {
+
+    },
+    "Show subtitles" : {
+
+    },
+    "Show titles" : {
+
+    },
+    "Shows the backdrops of random movies and shows once the remote has been left alone, but never while a video plays." : {
+
+    },
+    "Shows the details and controls" : {
+
+    },
+    "Shows the series in Next Up again" : {
+
+    },
+    "Shows the whole overview" : {
+
+    },
+    "Shuffle" : {
+
+    },
+    "Sidebar" : {
+
+    },
+    "Sign in" : {
+
+    },
+    "Sign in again" : {
+
+    },
+    "Sign in as %@" : {
+
+    },
+    "Sign in by approving a code from a phone or computer that's already signed in." : {
+
+    },
+    "Sign in with" : {
+
+    },
+    "Sign out" : {
+
+    },
+    "Signed in as %@" : {
+
+    },
+    "Signed out" : {
+
+    },
+    "Signing in…" : {
+
+    },
+    "Similar" : {
+
+    },
+    "Size" : {
+
+    },
+    "Skip Back on Resume" : {
+
+    },
+    "Skip Segments" : {
+
+    },
+    "Skip automatically" : {
+
+    },
+    "Skip back" : {
+
+    },
+    "Skip back %@" : {
+
+    },
+    "Skip back when resuming playback" : {
+
+    },
+    "Skip forward" : {
+
+    },
+    "Skip forward %@" : {
+
+    },
+    "Slideshow duration" : {
+
+    },
+    "Smart" : {
+
+    },
+    "Some items couldn't be loaded from %@." : {
+
+    },
+    "Some of your favorites couldn't be loaded. They'll be tried again next time." : {
+
+    },
+    "Some rows couldn't be loaded." : {
+
+    },
+    "Something went wrong" : {
+
+    },
+    "Songs" : {
+
+    },
+    "Sort" : {
+
+    },
+    "Sort Channels by Recently Watched" : {
+
+    },
+    "Sort by" : {
+
+    },
+    "Sort by %@" : {
+
+    },
+    "Sort by %@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Sort by %1$@, %2$@"
+          }
+        }
+      }
+    },
+    "Sort by %@, ascending" : {
+
+    },
+    "Sort by %@, descending" : {
+
+    },
+    "Source" : {
+
+    },
+    "Source code" : {
+
+    },
+    "Spacing" : {
+
+    },
+    "Spike library" : {
+
+    },
+    "Split into separate rows" : {
+
+    },
+    "Square" : {
+
+    },
+    "Start after" : {
+
+    },
+    "Start screensaver" : {
+
+    },
+    "Stop" : {
+
+    },
+    "Stop recording %@?" : {
+
+    },
+    "Stop slideshow" : {
+
+    },
+    "Stopped" : {
+
+    },
+    "Streaming and Display" : {
+
+    },
+    "Studios" : {
+
+    },
+    "Style" : {
+
+    },
+    "Subtitle Style" : {
+
+    },
+    "Subtitle language" : {
+
+    },
+    "Subtitle style" : {
+
+    },
+    "Subtitles" : {
+
+    },
+    "Subtitles in your language whenever there are some" : {
+
+    },
+    "Subtitles marked default or forced in the file" : {
+
+    },
+    "Subtitles when the audio is in another language, otherwise forced ones" : {
+
+    },
+    "Subtitles: %@" : {
+
+    },
+    "Suggestions" : {
+
+    },
+    "Switch user" : {
+
+    },
+    "System" : {
+
+    },
+    "TV Shows" : {
+
+    },
+    "Tall (2:3)" : {
+
+    },
+    "That address is a %@, not a Jellyfin server." : {
+
+    },
+    "That doesn't look like a server address." : {
+
+    },
+    "That isn't a server address." : {
+
+    },
+    "The PINs didn't match. Start again." : {
+
+    },
+    "The colours of backgrounds, focused cards, progress bars and badges." : {
+
+    },
+    "The frame rate and dynamic range follow Match Content in the Apple TV's Settings, under Video and Audio." : {
+
+    },
+    "The quick brown fox jumps over the lazy dog" : {
+
+    },
+    "Theme music" : {
+
+    },
+    "There are no genres in %@." : {
+
+    },
+    "There are no photos here." : {
+
+    },
+    "There are no studios in %@." : {
+
+    },
+    "There's nothing in %@ yet." : {
+
+    },
+    "There's nothing in this collection yet." : {
+
+    },
+    "This build is missing its NOTICE.md; the credits are at %@." : {
+
+    },
+    "This build is missing the license's text." : {
+
+    },
+    "This deletes it from %@ for everyone, and can't be undone." : {
+
+    },
+    "This forgets the rows saved for you on %@." : {
+
+    },
+    "This playlist is empty." : {
+
+    },
+    "This row is no longer on Home." : {
+
+    },
+    "This season has no episodes." : {
+
+    },
+    "This server hasn't finished its setup. Finish it in a web browser first." : {
+
+    },
+    "This server runs Jellyfin %@. Anemone needs Jellyfin %lld or later." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "This server runs Jellyfin %1$@. Anemone needs Jellyfin %2$lld or later."
+          }
+        }
+      }
+    },
+    "This trailer is on YouTube. Install the YouTube app to watch it." : {
+
+    },
+    "This trailer is on a website, and Apple TV can only open YouTube trailers." : {
+
+    },
+    "Thumb" : {
+
+    },
+    "Top Unwatched" : {
+
+    },
+    "Tracks you pick in the player win over these, for that item and, for an episode, the rest of its season and series." : {
+
+    },
+    "Trailers" : {
+
+    },
+    "Transcodes non-stereo audio to AC3/Dolby Digital. Takes effect from the next song." : {
+
+    },
+    "Try again" : {
+
+    },
+    "Unavailable" : {
+
+    },
+    "Unknown" : {
+
+    },
+    "Unplayed" : {
+
+    },
+    "Untitled" : {
+
+    },
+    "Up to age %lld" : {
+
+    },
+    "Use AC3 for surround sound audio" : {
+
+    },
+    "Use Quick Connect" : {
+
+    },
+    "Use a different style for HDR" : {
+
+    },
+    "Use exactly %lld digits." : {
+
+    },
+    "Use gpu-next" : {
+
+    },
+    "Use hardware decoding" : {
+
+    },
+    "Use in-app screensaver" : {
+
+    },
+    "Use series image" : {
+
+    },
+    "Use thumb images" : {
+
+    },
+    "Username" : {
+
+    },
+    "Version" : {
+
+    },
+    "Video" : {
+
+    },
+    "Videos" : {
+
+    },
+    "Videos above this are converted to a lower bitrate by the server." : {
+
+    },
+    "View" : {
+
+    },
+    "View Options" : {
+
+    },
+    "Waiting for approval" : {
+
+    },
+    "Watch Live" : {
+
+    },
+    "Watched" : {
+
+    },
+    "Who's watching?" : {
+
+    },
+    "Wholphin hasn't saved rows for you on %@." : {
+
+    },
+    "Wholphin's controls: hold left or right to seek faster, with trickplay thumbnails, chapters and the queue." : {
+
+    },
+    "Wholphin's rows are copied once; changes in either app afterwards stay in that app." : {
+
+    },
+    "Wide (16:9)" : {
+
+    },
+    "Wrong PIN." : {
+
+    },
+    "Wrong username or password." : {
+
+    },
+    "Year" : {
+
+    },
+    "You have no favorites yet. Add them with the heart on an item's page, or hold Select on a card." : {
+
+    },
+    "You have no playlists you can change." : {
+
+    },
+    "You're already playing as many streams as %@ allows. Stop one, then try again." : {
+
+    },
+    "Your libraries appear here once they've loaded." : {
+
+    },
+    "Your rows appear here once Home has loaded." : {
+
+    },
+    "Zoom in" : {
+
+    },
+    "Zoom out" : {
+
+    },
+    "any" : {
+
+    },
+    "loading-card focus: %lld" : {
+
+    },
+    "seerr.example.com" : {
+
+    },
+    "starts at %@" : {
+
+    },
+    "•" : {
+
+    }
+  },
+  "version" : "1.0"
+}

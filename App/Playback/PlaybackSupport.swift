@@ -46,8 +46,8 @@ extension BrowseModel {
             guard var queue = PlaybackQueue(entries: entries) else {
                 failed(.nothingToPlay(
                     found.skippedCount > 0
-                        ? "Only videos play here for now, so nothing in \(container.item.name) can."
-                        : "\(container.item.name) has nothing to play.",
+                        ? String(localized: "Only videos play here for now, so nothing in \(container.item.name) can.")
+                        : String(localized: "\(container.item.name) has nothing to play."),
                 ))
                 return
             }
@@ -56,7 +56,7 @@ extension BrowseModel {
             // Playlists are shuffled here; the server shuffles the rest.
             play(request(queue, shuffles: shuffled && container.item.kind == .playlist))
         } catch {
-            if let message = problem(with: error, doing: "find what to play in \(container.item.name)") {
+            if let message = problem(with: error, failure: "Couldn't find what to play in \(container.item.name).") {
                 failed(.failed(message))
             }
         }
@@ -75,23 +75,33 @@ extension BrowseModel {
         switch error {
         case SessionError.signedOut:
             noteSignedOut()
-            return "\(server.name) signed you out. Go back to sign in again."
+            return String(localized: "\(server.name) signed you out. Go back to sign in again.")
         case PlaybackError.notAllowed:
-            return "\(server.name) doesn't allow you to play this. Its admin can allow playback or transcoding "
-                + "for your account."
+            return String(localized: """
+            \(server.name) doesn't allow you to play this. Its admin can allow playback or transcoding \
+            for your account.
+            """)
         case PlaybackError.noCompatibleStream:
-            return "\(server.name) couldn't find a way to send this that Apple TV can play."
+            return String(localized: "\(server.name) couldn't find a way to send this that Apple TV can play.")
         case PlaybackError.rateLimitExceeded:
-            return "You're already playing as many streams as \(server.name) allows. Stop one, then try again."
+            return String(localized: """
+            You're already playing as many streams as \(server.name) allows. Stop one, then try again.
+            """)
         case PlaybackError.nothingToPlay:
-            return "\(server.name) didn't send anything to play."
+            return String(localized: "\(server.name) didn't send anything to play.")
         case PlayerError.resumeFailed:
-            return "Couldn't jump to where you left off. Restart plays from the beginning."
+            return String(localized: "Couldn't jump to where you left off. Restart plays from the beginning.")
         case let PlayerError.streamFailed(underlying):
-            let reason = underlying.map { " \($0.localizedDescription)" } ?? ""
-            return "Apple TV couldn't play the stream from \(server.name).\(reason)"
+            guard let underlying else {
+                return String(localized: "Apple TV couldn't play the stream from \(server.name).")
+            }
+            return String(localized: """
+            Apple TV couldn't play the stream from \(server.name). \(underlying.localizedDescription)
+            """)
         default:
-            return "Couldn't start playback. Check that \(server.name) is running, then try again."
+            return String(localized: """
+            Couldn't start playback. Check that \(server.name) is running, then try again.
+            """)
         }
     }
 }

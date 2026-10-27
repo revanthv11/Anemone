@@ -103,7 +103,9 @@ private struct FavoritesContentView: View {
                     .accessibilityIdentifier("favorites.empty")
             }
             if !content.failedKinds.isEmpty {
-                NoticeText("Some of your favorites couldn't be loaded. They'll be tried again next time.")
+                NoticeText(
+                    String(localized: "Some of your favorites couldn't be loaded. They'll be tried again next time."),
+                )
             }
             ForEach(content.sections) { section in
                 ItemRow(
@@ -138,7 +140,10 @@ private struct FavoritesContentView: View {
             }
         } catch {
             // A failed reload keeps the rows already showing.
-            let message = browse.problem(with: error, doing: "load your favorites from \(browse.server.name)")
+            let message = browse.problem(
+                with: error,
+                failure: "Couldn't load your favorites from \(browse.server.name).",
+            )
             if content == nil {
                 problem = message
             }
@@ -161,7 +166,7 @@ private struct FavoritesContentView: View {
             seenFavoriteChange = max(seenFavoriteChange, change.serial)
         } catch {
             // Keeps the row as it was; the page loads again when it next shows.
-            _ = browse.problem(with: error, doing: "load your favorites")
+            _ = browse.problem(with: error, failure: "Couldn't load your favorites.")
         }
     }
 
@@ -182,7 +187,7 @@ private struct FavoritesHeader: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(item?.cardTitle ?? "Favorites")
+            Text(item?.cardTitle ?? String(localized: "Favorites"))
                 .font(.title2.bold())
                 .lineLimit(1)
                 .accessibilityAddTraits(.isHeader)
@@ -207,19 +212,19 @@ private extension FavoritesSection {
     /// Wholphin's tab names.
     var title: String {
         switch kind {
-        case .movie: "Movies"
-        case .series: "TV Shows"
-        case .episode: "Episodes"
-        case .collection: "Collections"
-        case .person: "People"
-        case .musicAlbum: "Albums"
-        case .musicArtist: "Artists"
-        case .audio: "Songs"
-        case .musicVideo: "Music Videos"
-        case .playlist: "Playlists"
-        case .video: "Videos"
-        case .photo: "Photos"
-        case .season, .folder, .other: "Other"
+        case .movie: String(localized: "Movies")
+        case .series: String(localized: "TV Shows")
+        case .episode: String(localized: "Episodes")
+        case .collection: String(localized: "Collections")
+        case .person: String(localized: "People")
+        case .musicAlbum: String(localized: "Albums")
+        case .musicArtist: String(localized: "Artists")
+        case .audio: String(localized: "Songs")
+        case .musicVideo: String(localized: "Music Videos")
+        case .playlist: String(localized: "Playlists")
+        case .video: String(localized: "Videos")
+        case .photo: String(localized: "Photos")
+        case .season, .folder, .other: String(localized: "Other")
         }
     }
 }

@@ -21,7 +21,13 @@ struct ExtrasRow: View {
 
     var body: some View {
         if !extras.features.isEmpty {
-            CardRow(id: "extras", title: "Extras", elements: extras.features, focus: focus, memory: memory) { entry in
+            CardRow(
+                id: "extras",
+                title: String(localized: "Extras"),
+                elements: extras.features,
+                focus: focus,
+                memory: memory,
+            ) { entry in
                 Button {
                     if let extra = entry.items.first, entry.items.count == 1 {
                         play(extra)

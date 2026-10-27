@@ -77,11 +77,11 @@ private struct BehaviorChoices: View {
 private extension MediaSegment.Kind {
     var settingTitle: String {
         switch self {
-        case .intro: "Intros"
-        case .outro: "Outros"
-        case .commercial: "Commercials"
-        case .preview: "Previews"
-        case .recap: "Recaps"
+        case .intro: String(localized: "Intros")
+        case .outro: String(localized: "Outros")
+        case .commercial: String(localized: "Commercials")
+        case .preview: String(localized: "Previews")
+        case .recap: String(localized: "Recaps")
         }
     }
 }
@@ -90,9 +90,9 @@ private extension SkipSegmentBehavior {
     /// Wholphin's names for the choices.
     var title: String {
         switch self {
-        case .ignore: "Ignore"
-        case .ask: "Ask to skip"
-        case .autoSkip: "Skip automatically"
+        case .ignore: String(localized: "Ignore")
+        case .ask: String(localized: "Ask to skip")
+        case .autoSkip: String(localized: "Skip automatically")
         }
     }
 }

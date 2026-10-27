@@ -1,0 +1,204 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "A queue holds up to %lld items." : {
+
+    },
+    "Audio" : {
+
+    },
+    "Black" : {
+
+    },
+    "Blue" : {
+
+    },
+    "Cancel" : {
+
+    },
+    "Couldn't download the subtitles" : {
+
+    },
+    "Couldn't search for subtitles" : {
+
+    },
+    "Cyan" : {
+
+    },
+    "Dark gray" : {
+
+    },
+    "Download subtitles" : {
+
+    },
+    "Downloading %@…" : {
+
+    },
+    "Forced" : {
+
+    },
+    "Green" : {
+
+    },
+    "Keep Watching" : {
+
+    },
+    "Light gray" : {
+
+    },
+    "Machine-translated" : {
+
+    },
+    "Magenta" : {
+
+    },
+    "Matches this file" : {
+
+    },
+    "Next: %@\nStopping in %lld s" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Next: %1$@\nStopping in %2$lld s"
+          }
+        }
+      }
+    },
+    "No delay" : {
+
+    },
+    "None found in %@" : {
+
+    },
+    "Normal" : {
+
+    },
+    "OK" : {
+
+    },
+    "Off" : {
+
+    },
+    "Only forced" : {
+
+    },
+    "Only videos play here for now." : {
+
+    },
+    "Play Now" : {
+
+    },
+    "Playing %lld of %lld items" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Playing %1$lld of %2$lld items"
+          }
+        }
+      }
+    },
+    "Plays in %lld s" : {
+
+    },
+    "Red" : {
+
+    },
+    "Search in %@" : {
+
+    },
+    "Searching in %@…" : {
+
+    },
+    "Showing %@" : {
+
+    },
+    "Skip Ads" : {
+
+    },
+    "Skip Intro" : {
+
+    },
+    "Skip Outro" : {
+
+    },
+    "Skip Preview" : {
+
+    },
+    "Skip Recap" : {
+
+    },
+    "Skipping %lld items" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Skipping %lld item"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Skipping %lld items"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Speed" : {
+
+    },
+    "Still watching?" : {
+
+    },
+    "Stop" : {
+
+    },
+    "Subtitle delay: %@" : {
+
+    },
+    "Subtitles" : {
+
+    },
+    "The MPV player couldn't load the stream." : {
+
+    },
+    "The MPV player couldn't start." : {
+
+    },
+    "The MPV player stopped the stream." : {
+
+    },
+    "The server is taking too long to add them" : {
+
+    },
+    "The stream stopped before its end." : {
+
+    },
+    "The stream was an empty playlist." : {
+
+    },
+    "Track %lld" : {
+
+    },
+    "Unknown" : {
+
+    },
+    "Up Next" : {
+
+    },
+    "White" : {
+
+    },
+    "Yellow" : {
+
+    }
+  },
+  "version" : "1.0"
+}

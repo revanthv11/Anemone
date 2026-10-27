@@ -25,7 +25,8 @@ struct CardRow<Element: Identifiable, Card: View>: View where Element.ID == Stri
                 Text(title)
                     .font(.headline)
                     .foregroundStyle(theme.onBackground)
-                    .accessibilityAddTraits(.isHeader)
+                    // The row's label reads the title as focus moves in, so it's said once.
+                    .accessibilityHidden(true)
             }
             ScrollView(.horizontal) {
                 LazyHStack(alignment: .top, spacing: ItemLayout.cardSpacing) {
@@ -111,7 +112,7 @@ struct ItemCard: View {
 /// Cast and crew, each opening their person page.
 struct PeopleRow: View {
     let id: String
-    let title: String
+    let title: LocalizedStringResource
     let people: [Credit]
     let focus: FocusState<ItemFocus?>.Binding
     let memory: RowMemory
@@ -120,7 +121,7 @@ struct PeopleRow: View {
     @Environment(\.displayScale) private var displayScale
 
     var body: some View {
-        CardRow(id: id, title: title, elements: people, focus: focus, memory: memory) { credit in
+        CardRow(id: id, title: String(localized: title), elements: people, focus: focus, memory: memory) { credit in
             NavigationLink(value: credit.person) {
                 PersonCard(
                     name: credit.name,

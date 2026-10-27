@@ -170,7 +170,8 @@ struct NowPlayingPage: View {
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("nowPlaying.title")
                 if player.status == .failed {
-                    Text(player.failure.map(browse.playbackProblem(with:)) ?? "Couldn't play this song.")
+                    Text(player.failure
+                        .map(browse.playbackProblem(with:)) ?? String(localized: "Couldn't play this song."))
                         .font(.callout)
                         .foregroundStyle(theme.secondaryText)
                         .frame(maxWidth: 600, alignment: .leading)

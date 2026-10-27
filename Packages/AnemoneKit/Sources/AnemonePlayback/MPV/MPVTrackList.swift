@@ -39,6 +39,6 @@ enum MPVTrackList {
         if let language, let name = Locale.current.localizedString(forLanguageCode: language) {
             return name
         }
-        return "Track \(id)"
+        return String(localized: "Track \(id)", bundle: .module)
     }
 }

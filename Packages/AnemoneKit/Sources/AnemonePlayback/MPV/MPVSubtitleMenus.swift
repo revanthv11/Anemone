@@ -83,12 +83,12 @@ public final class MPVSubtitleMenus: PlaybackFeature {
         let steps = Self.delaySteps.reversed().map { .zero - $0 } + [.zero] + Self.delaySteps
         return PlayerMenu(
             id: Self.delayMenuID,
-            title: "Subtitle delay: \(Self.delayText(delay))",
+            title: String(localized: "Subtitle delay: \(Self.delayText(delay))", bundle: .module),
             systemImage: "timer",
             options: steps.map { step in
                 PlayerMenu.Option(
                     id: step == .zero ? "reset" : Self.delayText(step),
-                    title: step == .zero ? "No delay" : Self.delayText(step),
+                    title: step == .zero ? String(localized: "No delay", bundle: .module) : Self.delayText(step),
                     isSelected: step == .zero && delay == .zero,
                 ) { [weak self] in
                     self?.changeDelay(by: step)
@@ -126,12 +126,18 @@ public final class MPVSubtitleMenus: PlaybackFeature {
 
     private var searchTitle: String {
         switch state {
-        case .idle: "Download subtitles"
-        case let .searching(language): "Searching in \(Self.languageName(language))…"
-        case let .found(results, language) where results.isEmpty: "None found in \(Self.languageName(language))"
-        case .found: "Download subtitles"
-        case let .downloading(name): "Downloading \(name)…"
-        case let .added(name): "Showing \(name)"
+        case .idle: String(localized: "Download subtitles", bundle: .module)
+        case let .searching(language): String(
+                localized: "Searching in \(Self.languageName(language))…",
+                bundle: .module,
+            )
+        case let .found(results, language) where results.isEmpty: String(
+                localized: "None found in \(Self.languageName(language))",
+                bundle: .module,
+            )
+        case .found: String(localized: "Download subtitles", bundle: .module)
+        case let .downloading(name): String(localized: "Downloading \(name)…", bundle: .module)
+        case let .added(name): String(localized: "Showing \(name)", bundle: .module)
         case let .failed(message): message
         }
     }
@@ -140,7 +146,7 @@ public final class MPVSubtitleMenus: PlaybackFeature {
         let searches = languages.map { language in
             PlayerMenu.Option(
                 id: "search.\(language)",
-                title: "Search in \(Self.languageName(language))",
+                title: String(localized: "Search in \(Self.languageName(language))", bundle: .module),
                 isSelected: false,
             ) { [weak self] in
                 self?.search(in: language)
@@ -173,7 +179,7 @@ public final class MPVSubtitleMenus: PlaybackFeature {
                 self?.state = .found(results, language: language)
             } catch {
                 guard !Task.isCancelled else { return }
-                self?.state = .failed("Couldn't search for subtitles")
+                self?.state = .failed(String(localized: "Couldn't search for subtitles", bundle: .module))
             }
             self?.showMenus()
         }
@@ -201,7 +207,10 @@ public final class MPVSubtitleMenus: PlaybackFeature {
                 guard let new,
                       let url = session.subtitleURL(for: new, of: stream.itemID, mediaSourceID: mediaSourceID)
                 else {
-                    self?.state = .failed("The server is taking too long to add them")
+                    self?.state = .failed(String(
+                        localized: "The server is taking too long to add them",
+                        bundle: .module,
+                    ))
                     self?.showMenus()
                     return
                 }
@@ -209,7 +218,7 @@ public final class MPVSubtitleMenus: PlaybackFeature {
                 self?.state = .added(new.title)
             } catch {
                 guard !Task.isCancelled else { return }
-                self?.state = .failed("Couldn't download the subtitles")
+                self?.state = .failed(String(localized: "Couldn't download the subtitles", bundle: .module))
             }
             self?.showMenus()
         }
@@ -220,7 +229,7 @@ public final class MPVSubtitleMenus: PlaybackFeature {
     static func describe(_ subtitle: RemoteSubtitle) -> String {
         var parts = [subtitle.name]
         if subtitle.isHashMatch {
-            parts.append("Matches this file")
+            parts.append(String(localized: "Matches this file", bundle: .module))
         }
         if let provider = subtitle.provider {
             parts.append(provider)
@@ -232,13 +241,13 @@ public final class MPVSubtitleMenus: PlaybackFeature {
             parts.append("\(downloads) downloads")
         }
         if subtitle.isForced {
-            parts.append("Forced")
+            parts.append(String(localized: "Forced", bundle: .module))
         }
         if subtitle.isHearingImpaired {
             parts.append("SDH")
         }
         if subtitle.isMachineTranslated {
-            parts.append("Machine-translated")
+            parts.append(String(localized: "Machine-translated", bundle: .module))
         }
         return parts.joined(separator: " · ")
     }

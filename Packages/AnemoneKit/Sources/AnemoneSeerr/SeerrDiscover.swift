@@ -11,11 +11,11 @@
 
         public var title: String {
             switch self {
-            case .trending: "Trending"
-            case .popularMovies: "Movies"
-            case .upcomingMovies: "Upcoming Movies"
-            case .popularSeries: "TV Shows"
-            case .upcomingSeries: "Upcoming TV Shows"
+            case .trending: String(localized: "Trending", bundle: .module)
+            case .popularMovies: String(localized: "Movies", bundle: .module)
+            case .upcomingMovies: String(localized: "Upcoming Movies", bundle: .module)
+            case .popularSeries: String(localized: "TV Shows", bundle: .module)
+            case .upcomingSeries: String(localized: "Upcoming TV Shows", bundle: .module)
             }
         }
     }

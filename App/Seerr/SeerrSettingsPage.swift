@@ -116,7 +116,7 @@
                 try seerr?.remove()
                 problem = nil
             } catch {
-                problem = "Couldn't remove the server from this Apple TV."
+                problem = String(localized: "Couldn't remove the server from this Apple TV.")
             }
         }
     }
@@ -210,7 +210,7 @@
                 )
                 dismiss()
             } catch {
-                problem = "Couldn't add the server. \(error.seerrReason)"
+                problem = String(localized: "Couldn't add the server. \(error.seerrReason)")
             }
         }
     }

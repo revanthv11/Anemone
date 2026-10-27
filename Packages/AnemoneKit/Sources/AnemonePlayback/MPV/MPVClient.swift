@@ -138,16 +138,25 @@ public struct MPVError: LocalizedError, Equatable {
     }
 
     /// libmpv itself couldn't start.
-    public static let unavailable = Self(reason: "The MPV player couldn't start.")
+    public static let unavailable = Self(reason: String(localized: "The MPV player couldn't start.", bundle: .module))
     /// libmpv wouldn't take the stream to load.
-    public static let refused = Self(reason: "The MPV player couldn't load the stream.")
+    public static let refused = Self(reason: String(
+        localized: "The MPV player couldn't load the stream.",
+        bundle: .module,
+    ))
     /// libmpv stopped the stream without being asked to, such as while shutting down.
-    public static let stopped = Self(reason: "The MPV player stopped the stream.")
+    public static let stopped = Self(reason: String(localized: "The MPV player stopped the stream.", bundle: .module))
     /// The stream was a playlist with nothing in it.
-    public static let emptyPlaylist = Self(reason: "The stream was an empty playlist.")
+    public static let emptyPlaylist = Self(reason: String(
+        localized: "The stream was an empty playlist.",
+        bundle: .module,
+    ))
     /// The stream ran out well before its duration, as when the connection drops: with
     /// `keep-open`, libmpv reports that as the end of the file.
-    public static let endedEarly = Self(reason: "The stream stopped before its end.")
+    public static let endedEarly = Self(reason: String(
+        localized: "The stream stopped before its end.",
+        bundle: .module,
+    ))
 
     public var errorDescription: String? {
         reason

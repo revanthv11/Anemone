@@ -18,7 +18,7 @@ struct StreamingSettingsPage: View {
             Section {
                 NavigationLink {
                     ChoiceList(
-                        title: "Max Bitrate",
+                        title: String(localized: "Max Bitrate"),
                         choices: AVPlayerProfile.bitrateChoices,
                         selection: $maxBitrate,
                         label: \.bitrateText,
@@ -33,7 +33,7 @@ struct StreamingSettingsPage: View {
             Section {
                 NavigationLink {
                     ChoiceList(
-                        title: "Skip Back on Resume",
+                        title: String(localized: "Skip Back on Resume"),
                         choices: Self.skipBackChoices,
                         selection: $skipBack,
                         label: Self.skipBackText,
@@ -51,10 +51,10 @@ struct StreamingSettingsPage: View {
                     .focusable()
                     .accessibilityIdentifier("settings.matchContent")
             } footer: {
-                Text(
-                    "The frame rate and dynamic range follow Match Content in the Apple TV's Settings, "
-                        + "under Video and Audio.",
-                )
+                Text("""
+                The frame rate and dynamic range follow Match Content in the Apple TV's Settings, \
+                under Video and Audio.
+                """)
             }
         }
         .navigationTitle("Streaming and Display")
@@ -62,14 +62,14 @@ struct StreamingSettingsPage: View {
 
     private var matchContentText: String {
         switch DisplayCriteriaMatching.isMatchingEnabled {
-        case true?: "On"
-        case false?: "Off"
-        case nil: "Unknown"
+        case true?: String(localized: "On")
+        case false?: String(localized: "Off")
+        case nil: String(localized: "Unknown")
         }
     }
 
     private static func skipBackText(_ seconds: Int) -> String {
-        seconds == 0 ? "Off" : "\(seconds) s"
+        seconds == 0 ? String(localized: "Off") : String(localized: "\(seconds) s")
     }
 }
 
@@ -110,9 +110,9 @@ extension Int {
     /// A bitrate as Wholphin shows one: "750 kbps", "8 Mbps", "8.5 Mbps".
     var bitrateText: String {
         if self < 1_000_000 {
-            return "\(self / 1000) kbps"
+            return String(localized: "\(self / 1000) kbps")
         }
         let megabits = (Double(self) / 1_000_000).formatted(.number.precision(.fractionLength(0 ... 1)))
-        return "\(megabits) Mbps"
+        return String(localized: "\(megabits) Mbps")
     }
 }

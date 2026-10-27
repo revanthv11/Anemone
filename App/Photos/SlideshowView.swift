@@ -155,7 +155,7 @@ struct SlideshowView: View {
         }
         // The photo, then where it is in the slideshow and whether that's running; Select shows
         // its details and controls.
-        .accessibilityLabel(item?.name ?? "Photo")
+        .accessibilityLabel(item?.name ?? String(localized: "Photo"))
         .accessibilityValue(photoValue(in: slideshow))
         .accessibilityHint("Shows the details and controls")
         .accessibilityIdentifier("slideshow.photo")
@@ -187,7 +187,7 @@ struct SlideshowView: View {
         do {
             try await slideshow.load(showing: start.itemID, near: isShuffled ? 0 : start.gridIndex)
             guard pager.count > 0 else {
-                problem = "There are no photos here."
+                problem = String(localized: "There are no photos here.")
                 return
             }
             self.slideshow = slideshow
@@ -196,7 +196,7 @@ struct SlideshowView: View {
             }
             prepare(slideshow.current, in: slideshow)
         } catch {
-            problem = browse.problem(with: error, doing: "load the photos from \(browse.server.name)")
+            problem = browse.problem(with: error, failure: "Couldn't load the photos from \(browse.server.name).")
         }
     }
 
@@ -231,11 +231,11 @@ struct SlideshowView: View {
             switch direction {
             case .left:
                 if !slideshow.previous() {
-                    notice = Notice(text: "At beginning")
+                    notice = Notice(text: String(localized: "At beginning"))
                 }
             case .right:
                 if !slideshow.next() {
-                    notice = Notice(text: "No more photos")
+                    notice = Notice(text: String(localized: "No more photos"))
                 }
             default:
                 showDetails(slideshow)

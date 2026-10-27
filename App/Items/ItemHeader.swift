@@ -56,7 +56,7 @@ struct NameList: View {
     var body: some View {
         let shown = names.prefix(4).joined(separator: ", ")
         let more = names.count - 4
-        Text(more > 0 ? "\(shown), +\(more)" : shown)
+        Text(more > 0 ? String(localized: "\(shown), +\(more)") : shown)
             .font(.callout)
             .lineLimit(1)
             // VoiceOver would read "+2" as "plus 2".

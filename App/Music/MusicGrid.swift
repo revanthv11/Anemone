@@ -73,7 +73,7 @@ struct MusicGrid: View {
             MusicSortMenu(fields: list.sortFields, sort: sortBinding)
             Spacer()
             if let count = pager?.count {
-                Text(count == 1 ? "1 item" : "\(count.formatted()) items")
+                Text("\(count) items")
                     .foregroundStyle(theme.secondaryText)
                     .accessibilityIdentifier("music.count")
             }
@@ -139,7 +139,7 @@ struct MusicGrid: View {
             problem = nil
         } catch {
             guard !Task.isCancelled, self.pager == nil else { return }
-            problem = browse.problem(with: error, doing: "load this list from \(browse.server.name)")
+            problem = browse.problem(with: error, failure: "Couldn't load this list from \(browse.server.name).")
         }
     }
 }
@@ -172,7 +172,7 @@ private struct MusicGridCard: View {
         .modifier(SongCardActions(song: item?.item.kind == .audio ? item : nil, play: play))
         // The name, then the card's line under it: an album's artist and year, a song's album
         // and artists.
-        .accessibilityLabel(item?.item.name ?? "Loading")
+        .accessibilityLabel(item?.item.name ?? String(localized: "Loading"))
         .accessibilityValue(item?.subtitle ?? "")
         .accessibilityIdentifier("music.card.\(index)")
         .task {
@@ -231,18 +231,18 @@ extension MusicSort.Field {
     /// Wholphin's names for its sort options.
     var title: String {
         switch self {
-        case .name: "Name"
-        case .premiereDate: "Date Released"
-        case .album: "Album"
-        case .albumArtist: "Album Artist"
-        case .artist: "Artist"
-        case .dateCreated: "Date Added"
-        case .datePlayed: "Date Played"
-        case .communityRating: "Community Rating"
-        case .criticRating: "Critic Rating"
-        case .playCount: "Play Count"
-        case .runtime: "Runtime"
-        case .random: "Random"
+        case .name: String(localized: "Name")
+        case .premiereDate: String(localized: "Date Released")
+        case .album: String(localized: "Album")
+        case .albumArtist: String(localized: "Album Artist")
+        case .artist: String(localized: "Artist")
+        case .dateCreated: String(localized: "Date Added")
+        case .datePlayed: String(localized: "Date Played")
+        case .communityRating: String(localized: "Community Rating")
+        case .criticRating: String(localized: "Critic Rating")
+        case .playCount: String(localized: "Play Count")
+        case .runtime: String(localized: "Runtime")
+        case .random: String(localized: "Random")
         }
     }
 }

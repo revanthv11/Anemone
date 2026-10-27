@@ -56,7 +56,7 @@ struct UserListView: View {
                             .accessibilityIdentifier("user.\(user.name)")
                         }
                         NavigationLink(value: SignInRoute(username: nil)) {
-                            ProfileTile(name: "Other user", systemImage: "person.badge.plus")
+                            ProfileTile(name: String(localized: "Other user"), systemImage: "person.badge.plus")
                         }
                         .accessibilityIdentifier("user.other")
                     }
@@ -74,7 +74,7 @@ struct UserListView: View {
                 SignInView(server: server, username: route.username)
             }
             .sheet(item: $userEnteringPIN) { user in
-                PINEntryView(title: "Enter the PIN for \(user.name)") { pin in
+                PINEntryView(title: String(localized: "Enter the PIN for \(user.name)")) { pin in
                     switch await model.unlock(user, on: server, pin: pin) {
                     case .none:
                         return false

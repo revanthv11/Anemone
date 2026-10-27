@@ -21,14 +21,14 @@ struct ProfileLockView: View {
             Text("Controls what it takes to switch to \(user.name) on this Apple TV.")
                 .foregroundStyle(theme.secondaryText)
             VStack(alignment: .leading, spacing: 20) {
-                option("No lock", isSelected: user.lock == .unlocked) {
+                option(String(localized: "No lock"), isSelected: user.lock == .unlocked) {
                     model.setLock(.unlocked)
                     dismiss()
                 }
-                option("PIN", isSelected: isPINLocked) {
+                option(String(localized: "PIN"), isSelected: isPINLocked) {
                     isSettingPIN = true
                 }
-                option("Require sign-in", isSelected: user.lock == .requireSignIn) {
+                option(String(localized: "Require sign-in"), isSelected: user.lock == .requireSignIn) {
                     model.setLock(.requireSignIn)
                     dismiss()
                 }
@@ -89,7 +89,7 @@ struct PINEntryView: View {
                 .onSubmit(check)
                 .accessibilityIdentifier("pin.field")
             if isWrong {
-                NoticeText("Wrong PIN.")
+                NoticeText(String(localized: "Wrong PIN."))
             }
             Button("Cancel") {
                 dismiss()
@@ -144,7 +144,7 @@ private struct NewPINView: View {
         defer { pin = "" }
         guard let first else {
             guard PINHash.isValid(pin) else {
-                problem = "Use exactly \(PINHash.length) digits."
+                problem = String(localized: "Use exactly \(PINHash.length) digits.")
                 return
             }
             first = pin
@@ -153,7 +153,7 @@ private struct NewPINView: View {
         }
         guard pin == first else {
             self.first = nil
-            problem = "The PINs didn't match. Start again."
+            problem = String(localized: "The PINs didn't match. Start again.")
             return
         }
         save(PINHash(pin: pin))

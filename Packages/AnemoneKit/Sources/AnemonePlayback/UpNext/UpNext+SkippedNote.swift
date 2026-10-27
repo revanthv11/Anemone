@@ -14,7 +14,7 @@ extension UpNext {
             title: title,
             message: message,
             actions: [
-                PlayerAction(id: "skipped.ok", title: "OK") {
+                PlayerAction(id: "skipped.ok", title: String(localized: "OK", bundle: .module)) {
                     accessories.dismissCard(Self.skippedCard)
                 },
             ],
@@ -35,13 +35,16 @@ extension UpNext {
         let skipped = queue.skippedCount
         let overLimit = queue.overLimitCount
         let title = if overLimit > 0 {
-            "Playing \(playing) of \(playing + skipped + overLimit) items"
+            String(localized: "Playing \(playing) of \(playing + skipped + overLimit) items", bundle: .module)
         } else {
-            skipped == 1 ? "Skipping 1 item" : "Skipping \(skipped) items"
+            // One key with plural forms in the String Catalog.
+            String(localized: "Skipping \(skipped) items", bundle: .module)
         }
         let reasons = [
-            overLimit > 0 ? "A queue holds up to \(JellyfinSession.queueLimit) items." : nil,
-            skipped > 0 ? "Only videos play here for now." : nil,
+            overLimit > 0
+                ? String(localized: "A queue holds up to \(JellyfinSession.queueLimit) items.", bundle: .module)
+                : nil,
+            skipped > 0 ? String(localized: "Only videos play here for now.", bundle: .module) : nil,
         ]
         return (title, reasons.compactMap(\.self).joined(separator: "\n"))
     }

@@ -214,12 +214,13 @@ public final class DrawnSubtitles: PlaybackFeature {
         let steps = later.reversed().map { .zero - $0 } + [.zero] + later
         controller.accessories.show(PlayerMenu(
             id: Self.delayMenuID,
-            title: "Subtitle delay: \(MPVSubtitleMenus.delayText(delay))",
+            title: String(localized: "Subtitle delay: \(MPVSubtitleMenus.delayText(delay))", bundle: .module),
             systemImage: "timer",
             options: steps.map { step in
                 PlayerMenu.Option(
                     id: step == .zero ? "reset" : MPVSubtitleMenus.delayText(step),
-                    title: step == .zero ? "No delay" : MPVSubtitleMenus.delayText(step),
+                    title: step == .zero ? String(localized: "No delay", bundle: .module) : MPVSubtitleMenus
+                        .delayText(step),
                     isSelected: step == .zero && delay == .zero,
                 ) { [weak self] in
                     self?.changeDelay(by: step)

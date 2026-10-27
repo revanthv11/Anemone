@@ -50,16 +50,16 @@ public enum SubtitleColor: String, CaseIterable, Codable, Sendable {
 
     public var name: String {
         switch self {
-        case .white: "White"
-        case .black: "Black"
-        case .lightGray: "Light gray"
-        case .darkGray: "Dark gray"
-        case .red: "Red"
-        case .yellow: "Yellow"
-        case .green: "Green"
-        case .cyan: "Cyan"
-        case .blue: "Blue"
-        case .magenta: "Magenta"
+        case .white: String(localized: "White", bundle: .module)
+        case .black: String(localized: "Black", bundle: .module)
+        case .lightGray: String(localized: "Light gray", bundle: .module)
+        case .darkGray: String(localized: "Dark gray", bundle: .module)
+        case .red: String(localized: "Red", bundle: .module)
+        case .yellow: String(localized: "Yellow", bundle: .module)
+        case .green: String(localized: "Green", bundle: .module)
+        case .cyan: String(localized: "Cyan", bundle: .module)
+        case .blue: String(localized: "Blue", bundle: .module)
+        case .magenta: String(localized: "Magenta", bundle: .module)
         }
     }
 }

@@ -81,10 +81,10 @@ struct SignInView: View {
                     // Read a character at a time, as it's typed.
                     .accessibilityLabel(Text(verbatim: quickConnectCode).speechSpellsOutCharacters())
                     .accessibilityIdentifier("quickConnect.code")
-                Text(
-                    "On a phone or computer that's signed in to \(server.name), " +
-                        "open Quick Connect and enter this code.",
-                )
+                Text("""
+                On a phone or computer that's signed in to \(server.name), \
+                open Quick Connect and enter this code.
+                """)
                 .foregroundStyle(theme.secondaryText)
             } else {
                 Text("Sign in by approving a code from a phone or computer that's already signed in.")
@@ -103,9 +103,9 @@ struct SignInView: View {
             do {
                 try await model.signIn(to: server, username: username, password: password)
             } catch AuthenticationError.invalidCredentials {
-                errorMessage = "Wrong username or password."
+                errorMessage = String(localized: "Wrong username or password.")
             } catch {
-                errorMessage = "Couldn't sign in: \(error.localizedDescription)"
+                errorMessage = String(localized: "Couldn't sign in: \(error.localizedDescription)")
             }
         }
     }
@@ -127,7 +127,7 @@ struct SignInView: View {
                 // Left the screen.
             } catch {
                 quickConnectCode = nil
-                errorMessage = "Quick Connect stopped. Try again."
+                errorMessage = String(localized: "Quick Connect stopped. Try again.")
             }
         }
     }

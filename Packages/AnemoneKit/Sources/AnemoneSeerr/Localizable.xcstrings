@@ -1,0 +1,21 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Movies" : {
+
+    },
+    "TV Shows" : {
+
+    },
+    "Trending" : {
+
+    },
+    "Upcoming Movies" : {
+
+    },
+    "Upcoming TV Shows" : {
+
+    }
+  },
+  "version" : "1.0"
+}

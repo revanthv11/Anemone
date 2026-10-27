@@ -44,13 +44,15 @@ struct HomeView: View {
             HomeRows(content: home, isCovered: !stack.path.isEmpty)
         case let .loaded(home) where home.failedRows.isEmpty:
             HomeMessage(
-                title: "Nothing to show yet",
-                message: "Add media to your libraries in Jellyfin, or ask the server's admin for access to them.",
+                title: String(localized: "Nothing to show yet"),
+                message: String(
+                    localized: "Add media to your libraries in Jellyfin, or ask the server's admin for access to them.",
+                ),
             )
         case .loaded, .failed:
             HomeMessage(
-                title: "Couldn't load your home page",
-                message: "Check that \(browse.server.name) is running, then try again.",
+                title: String(localized: "Couldn't load your home page"),
+                message: String(localized: "Check that \(browse.server.name) is running, then try again."),
             ) {
                 Button("Try again") {
                     Task { await browse.load() }
@@ -58,8 +60,8 @@ struct HomeView: View {
             }
         case .signedOut:
             HomeMessage(
-                title: "Signed out",
-                message: "\(browse.server.name) signed you out. Sign in again to continue.",
+                title: String(localized: "Signed out"),
+                message: String(localized: "\(browse.server.name) signed you out. Sign in again to continue."),
             ) {
                 Button("Sign in again") {
                     model.signOut()
@@ -114,7 +116,7 @@ private struct HomeRows: View {
                             .defaultFocus($focusedCard, rememberedCard(in: row), priority: .userInitiated)
                     }
                     if !content.failedRows.isEmpty {
-                        NoticeText("Some rows couldn't be loaded.")
+                        NoticeText(String(localized: "Some rows couldn't be loaded."))
                     }
                 }
                 .padding(.horizontal, HomeLayout.horizontalInset)
@@ -279,7 +281,8 @@ private struct HomeRowView: View {
             Text(row.title)
                 .font(.headline)
                 .foregroundStyle(theme.onBackground)
-                .accessibilityAddTraits(.isHeader)
+                // The row's label reads the title as focus moves in, so it's said once.
+                .accessibilityHidden(true)
             ScrollViewReader { scroller in
                 ScrollView(.horizontal) {
                     LazyHStack(spacing: CGFloat(row.config.viewOptions.spacing) * HomeCardStyle.spacingPointsPerDp) {

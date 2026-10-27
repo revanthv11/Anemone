@@ -1,0 +1,218 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Active Recordings" : {
+
+    },
+    "Albums" : {
+
+    },
+    "Arranger" : {
+
+    },
+    "Artist" : {
+
+    },
+    "Artists" : {
+
+    },
+    "Behind the Scenes" : {
+
+    },
+    "Behind the scenes" : {
+
+    },
+    "Channels" : {
+
+    },
+    "Clip" : {
+
+    },
+    "Clips" : {
+
+    },
+    "Collection" : {
+
+    },
+    "Collections" : {
+
+    },
+    "Composer" : {
+
+    },
+    "Conductor" : {
+
+    },
+    "Continue Watching" : {
+
+    },
+    "Creator" : {
+
+    },
+    "Deleted Scenes" : {
+
+    },
+    "Deleted scene" : {
+
+    },
+    "Director" : {
+
+    },
+    "Engineer" : {
+
+    },
+    "Episodes" : {
+
+    },
+    "External" : {
+
+    },
+    "Favorite %@" : {
+
+    },
+    "Featurette" : {
+
+    },
+    "Featurettes" : {
+
+    },
+    "Genres" : {
+
+    },
+    "Genres in %@" : {
+
+    },
+    "Interview" : {
+
+    },
+    "Interviews" : {
+
+    },
+    "Local" : {
+
+    },
+    "Lyricist" : {
+
+    },
+    "Mixer" : {
+
+    },
+    "Movies" : {
+
+    },
+    "Music Videos" : {
+
+    },
+    "Next Up" : {
+
+    },
+    "No data" : {
+
+    },
+    "Other" : {
+
+    },
+    "People" : {
+
+    },
+    "Photo Albums" : {
+
+    },
+    "Photos" : {
+
+    },
+    "Playlists" : {
+
+    },
+    "Producer" : {
+
+    },
+    "Recently Added" : {
+
+    },
+    "Recently Added in %@" : {
+
+    },
+    "Recently Released" : {
+
+    },
+    "Recently Released in %@" : {
+
+    },
+    "Recordings" : {
+
+    },
+    "Sample" : {
+
+    },
+    "Samples" : {
+
+    },
+    "Scene" : {
+
+    },
+    "Scenes" : {
+
+    },
+    "Short" : {
+
+    },
+    "Shorts" : {
+
+    },
+    "Songs" : {
+
+    },
+    "Studios" : {
+
+    },
+    "Studios in %@" : {
+
+    },
+    "Subtitles %lld" : {
+
+    },
+    "Suggestions" : {
+
+    },
+    "Suggestions for %@" : {
+
+    },
+    "TV Shows" : {
+
+    },
+    "Theme Songs" : {
+
+    },
+    "Theme Videos" : {
+
+    },
+    "Theme song" : {
+
+    },
+    "Theme video" : {
+
+    },
+    "Top Rated" : {
+      "localizations" : {
+
+      }
+    },
+    "Trailer" : {
+
+    },
+    "Trailers" : {
+
+    },
+    "Videos" : {
+
+    },
+    "Watch Live" : {
+
+    },
+    "Writer" : {
+
+    }
+  },
+  "version" : "1.0"
+}

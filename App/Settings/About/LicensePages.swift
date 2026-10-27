@@ -14,7 +14,7 @@ struct CreditPage: View {
             }
             if BundledLicenses.licenseText(for: section.title) != nil {
                 NavigationLink("\(section.title)'s license") {
-                    LicenseTextPage(title: "\(section.title)'s license", licenseName: section.title)
+                    LicenseTextPage(title: String(localized: "\(section.title)'s license"), licenseName: section.title)
                 }
                 .padding(.top, 24)
                 .accessibilityIdentifier("credit.license")

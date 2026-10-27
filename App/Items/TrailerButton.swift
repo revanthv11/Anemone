@@ -21,7 +21,10 @@ struct TrailerButton: View {
 
     var body: some View {
         if !trailers.isEmpty {
-            ActionButton(title: trailers.count == 1 ? "Play trailer" : "Trailers", systemImage: "film") {
+            ActionButton(
+                title: trailers.count == 1 ? String(localized: "Play trailer") : String(localized: "Trailers"),
+                systemImage: "film",
+            ) {
                 if let trailer = trailers.first, trailers.count == 1 {
                     play(trailer)
                 } else {
@@ -54,12 +57,12 @@ struct TrailerButton: View {
             playback = browse.playback(of: details, from: nil)
         case .remote:
             guard let url = trailer.youTubeAppURL else {
-                show("This trailer is on a website, and Apple TV can only open YouTube trailers.")
+                show(String(localized: "This trailer is on a website, and Apple TV can only open YouTube trailers."))
                 return
             }
             openURL(url) { accepted in
                 if !accepted {
-                    show("This trailer is on YouTube. Install the YouTube app to watch it.")
+                    show(String(localized: "This trailer is on YouTube. Install the YouTube app to watch it."))
                 }
             }
         }
@@ -70,7 +73,7 @@ struct TrailerButton: View {
         let name = trailers[index].name
         let namesakes = trailers.indices.filter { trailers[$0].name == name }
         guard namesakes.count > 1, let number = namesakes.firstIndex(of: index) else { return name }
-        return "\(name) \(number + 1)"
+        return String(localized: "\(name) \(number + 1)")
     }
 
     private func show(_ problem: String) {

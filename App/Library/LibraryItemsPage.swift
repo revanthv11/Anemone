@@ -42,13 +42,13 @@ struct LibraryItemsPage: View {
             case let .loaded(pager):
                 page(pager)
             case .failed:
-                message("Couldn't load \(heading) from \(browse.server.name).") {
+                message(String(localized: "Couldn't load \(heading) from \(browse.server.name).")) {
                     Button("Try again") {
                         Task { await load() }
                     }
                 }
             case .signedOut:
-                message("\(browse.server.name) signed you out. Go to Home to sign in again.") {}
+                message(String(localized: "\(browse.server.name) signed you out. Go to Home to sign in again.")) {}
             }
         }
         .background {
@@ -140,7 +140,7 @@ struct LibraryItemsPage: View {
         .overlay(alignment: .bottom) {
             if pager.error != nil {
                 // Cleared when a page loads; cards retry their page as they come back on screen.
-                NoticeText("Some items couldn't be loaded from \(browse.server.name).")
+                NoticeText(String(localized: "Some items couldn't be loaded from \(browse.server.name)."))
                     .padding(.bottom, 60)
             }
         }
@@ -182,7 +182,7 @@ struct LibraryItemsPage: View {
                     .lineLimit(1)
                     .accessibilityAddTraits(.isHeader)
                 if let count {
-                    Text(count == 1 ? "1 item" : "\(count.formatted()) items")
+                    Text("\(count) items")
                         .font(.callout)
                         .foregroundStyle(theme.secondaryText)
                 }
@@ -252,11 +252,11 @@ private extension LibraryItemsPage {
 
     private var emptyMessage: String {
         if settings?.filter.isEmpty == false {
-            return "Nothing here matches the filters."
+            return String(localized: "Nothing here matches the filters.")
         }
         return switch scope {
-        case .collections: "No collections hold titles from \(library.name)."
-        default: "There's nothing in \(heading) yet."
+        case .collections: String(localized: "No collections hold titles from \(library.name).")
+        default: String(localized: "There's nothing in \(heading) yet.")
         }
     }
 
@@ -270,7 +270,7 @@ private extension LibraryItemsPage {
 
     private var filterTitle: String {
         let active = settings?.filter.activeCount ?? 0
-        return active > 0 ? "Filter (\(active))" : "Filter"
+        return active > 0 ? String(localized: "Filter (\(active))") : String(localized: "Filter")
     }
 
     /// Loads the first page for the current sort and filter. The old grid stays up meanwhile, so
@@ -369,19 +369,19 @@ extension LibrarySort.Field {
     /// Wholphin's names for its sort options.
     var title: String {
         switch self {
-        case .default: "Default"
-        case .name: "Name"
-        case .premiereDate: "Date Released"
-        case .dateCreated: "Date Added"
-        case .dateLastContentAdded: "Date Episode Added"
-        case .datePlayed, .seriesDatePlayed: "Date Played"
-        case .communityRating: "Community Rating"
-        case .criticRating: "Critic Rating"
-        case .officialRating: "Parental Rating"
-        case .runtime: "Runtime"
-        case .playCount: "Play Count"
-        case .albumArtist: "Album Artist"
-        case .random: "Random"
+        case .default: String(localized: "Default")
+        case .name: String(localized: "Name")
+        case .premiereDate: String(localized: "Date Released")
+        case .dateCreated: String(localized: "Date Added")
+        case .dateLastContentAdded: String(localized: "Date Episode Added")
+        case .datePlayed, .seriesDatePlayed: String(localized: "Date Played")
+        case .communityRating: String(localized: "Community Rating")
+        case .criticRating: String(localized: "Critic Rating")
+        case .officialRating: String(localized: "Parental Rating")
+        case .runtime: String(localized: "Runtime")
+        case .playCount: String(localized: "Play Count")
+        case .albumArtist: String(localized: "Album Artist")
+        case .random: String(localized: "Random")
         }
     }
 }

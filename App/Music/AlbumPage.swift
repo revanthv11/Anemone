@@ -32,7 +32,12 @@ struct AlbumPage: View {
                     .id(ItemLayout.headerID)
                     songList
                     if !similar.isEmpty {
-                        MusicRow(id: "similar", title: "More Like This", items: similar, focus: $focus)
+                        MusicRow(
+                            id: "similar",
+                            title: String(localized: "More Like This"),
+                            items: similar,
+                            focus: $focus,
+                        )
                     }
                 }
                 .padding(.horizontal, ItemLayout.horizontalInset)
@@ -97,7 +102,7 @@ struct AlbumPage: View {
     private var songList: some View {
         if let songs {
             VStack(alignment: .leading, spacing: 4) {
-                Text(songs.count == 1 ? "1 song" : "\(songs.count) songs")
+                Text("\(songs.count) songs")
                     .font(.headline)
                     .foregroundStyle(theme.onBackground)
                     .padding(.bottom, 8)
@@ -148,7 +153,7 @@ struct AlbumPage: View {
             songs = list
         case let .failure(error):
             // A failed refresh keeps the songs showing.
-            if songs == nil, let message = browse.problem(with: error, doing: "load \(details.item.name)") {
+            if songs == nil, let message = browse.problem(with: error, failure: "Couldn't load \(details.item.name).") {
                 songs = []
                 alert = .failed(message)
             }
@@ -231,17 +236,17 @@ struct MusicActionButtons: View {
     @Environment(MusicPlayer.self) private var player
 
     var body: some View {
-        ActionButton(title: "Play", systemImage: "play.fill") {
+        ActionButton(title: String(localized: "Play"), systemImage: "play.fill") {
             play(false)
         }
         .focused(focus, equals: .action(.play))
         .accessibilityIdentifier("action.play")
-        ActionButton(title: "Shuffle", systemImage: "shuffle") {
+        ActionButton(title: String(localized: "Shuffle"), systemImage: "shuffle") {
             play(true)
         }
         .focused(focus, equals: .action(.shuffle))
         .accessibilityIdentifier("action.shuffle")
-        ActionButton(title: "Instant Mix", systemImage: "wand.and.stars", action: instantMix)
+        ActionButton(title: String(localized: "Instant Mix"), systemImage: "wand.and.stars", action: instantMix)
             .focused(focus, equals: .action(.instantMix))
             .accessibilityIdentifier("action.instantMix")
         FavoriteButton(isFavorite: details.userState.isFavorite, action: favorite)
@@ -255,7 +260,7 @@ struct MusicActionButtons: View {
             .accessibilityIdentifier("action.artist")
         }
         if player.hasQueue {
-            ActionButton(title: "Now Playing", systemImage: "waveform", action: nowPlaying)
+            ActionButton(title: String(localized: "Now Playing"), systemImage: "waveform", action: nowPlaying)
                 .focused(focus, equals: .action(.nowPlaying))
                 .accessibilityIdentifier("action.nowPlaying")
         }

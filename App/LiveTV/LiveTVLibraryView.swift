@@ -17,9 +17,9 @@ struct LiveTVLibraryView: View {
 
         var title: String {
             switch self {
-            case .guide: "Guide"
-            case .channels: "Channels"
-            case .schedule: "Schedule"
+            case .guide: String(localized: "Guide")
+            case .channels: String(localized: "Channels")
+            case .schedule: String(localized: "Schedule")
             case let .recordings(folder): folder.name
             }
         }
@@ -189,7 +189,7 @@ struct LiveTVLibraryView: View {
                 )
             }
         case .noChannels:
-            PageMessage(message: "Live TV is on, but \(browse.server.name) has no channels.")
+            PageMessage(message: String(localized: "Live TV is on, but \(browse.server.name) has no channels."))
         case let .failed(problem):
             VStack(spacing: 30) {
                 PageMessage(message: problem)
@@ -221,7 +221,7 @@ struct LiveTVLibraryView: View {
         if program.isAiring(at: .now) {
             playback = browse.playback(onChannelOf: program, channel: guide?.channel(program.channelID))
         } else {
-            notice = "Nothing is listed for this time."
+            notice = String(localized: "Nothing is listed for this time.")
         }
     }
 
@@ -248,7 +248,7 @@ struct LiveTVLibraryView: View {
                 version += 1
                 await guide?.load()
             } catch {
-                notice = browse.problem(with: error, doing: "update \(channel.name)")
+                notice = browse.problem(with: error, failure: "Couldn't update \(channel.name).")
             }
         }
     }
@@ -269,7 +269,7 @@ struct LiveTVLibraryView: View {
                 try await browse.session.cancelRecording(timerID: timerID, series: series)
                 recordingsChanged()
             } catch {
-                notice = browse.problem(with: error, doing: "cancel \(name)")
+                notice = browse.problem(with: error, failure: "Couldn't cancel \(name).")
             }
         }
     }

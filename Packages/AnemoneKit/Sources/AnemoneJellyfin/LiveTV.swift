@@ -114,7 +114,11 @@ public extension JellyfinSession {
     /// as one, even the server's "Recorded Movies" and "Recorded Shows".
     func liveTVRecordingFolders() async throws -> [Library] {
         try await (send(Paths.getRecordingFolders(userID: userID)).items ?? []).compactMap { dto in
-            dto.id.map { Library(id: $0, name: dto.name ?? "Recordings", kind: .folders) }
+            dto.id.map { Library(
+                id: $0,
+                name: dto.name ?? String(localized: "Recordings", bundle: .module),
+                kind: .folders,
+            ) }
         }
     }
 

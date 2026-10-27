@@ -19,8 +19,8 @@ public struct TopShelfRow: Hashable, Sendable {
 
     public var title: String {
         switch kind {
-        case .continueWatching: "Continue Watching"
-        case .nextUp: "Next Up"
+        case .continueWatching: String(localized: "Continue Watching", bundle: .module)
+        case .nextUp: String(localized: "Next Up", bundle: .module)
         }
     }
 }

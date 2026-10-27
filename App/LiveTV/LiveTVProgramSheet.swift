@@ -104,7 +104,10 @@ struct LiveTVProgramSheet: View {
                 changed(loaded ?? program)
                 dismiss()
             } catch {
-                problem = browse.problem(with: error, doing: "change the recording on \(browse.server.name)")
+                problem = browse.problem(
+                    with: error,
+                    failure: "Couldn't change the recording on \(browse.server.name).",
+                )
             }
             isWorking = false
         }

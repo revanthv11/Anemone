@@ -33,10 +33,12 @@ struct FilterSheet: View {
     }
 
     private func summary(of kind: LibraryFilter.Kind) -> String {
-        switch kind {
-        case .played: filter.played.map { $0 ? "Played" : "Unplayed" } ?? "Any"
-        case .favorite: filter.favorite.map { $0 ? "Favorites" : "Not favorites" } ?? "Any"
-        case .communityRating: filter.minCommunityRating.map { "\($0) or higher" } ?? "Any"
+        let any = String(localized: "Any")
+        return switch kind {
+        case .played: filter.played.map { $0 ? String(localized: "Played") : String(localized: "Unplayed") } ?? any
+        case .favorite:
+            filter.favorite.map { $0 ? String(localized: "Favorites") : String(localized: "Not favorites") } ?? any
+        case .communityRating: filter.minCommunityRating.map { String(localized: "\($0) or higher") } ?? any
         case .genres: count(filter.genres)
         case .studios: count(filter.studios)
         case .officialRating: list(filter.officialRatings.sorted())
@@ -47,11 +49,11 @@ struct FilterSheet: View {
     }
 
     private func count(_ values: Set<String>) -> String {
-        values.isEmpty ? "Any" : "\(values.count) selected"
+        values.isEmpty ? String(localized: "Any") : String(localized: "\(values.count) selected")
     }
 
     private func list(_ values: [String]) -> String {
-        values.isEmpty ? "Any" : values.joined(separator: ", ")
+        values.isEmpty ? String(localized: "Any") : values.joined(separator: ", ")
     }
 }
 
@@ -124,11 +126,17 @@ private struct FilterChoices: View {
         let session = browse.session
         return switch kind {
         case .played:
-            [FilterOption(id: "true", name: "Played"), FilterOption(id: "false", name: "Unplayed")]
+            [
+                FilterOption(id: "true", name: String(localized: "Played")),
+                FilterOption(id: "false", name: String(localized: "Unplayed")),
+            ]
         case .favorite:
-            [FilterOption(id: "true", name: "Favorites"), FilterOption(id: "false", name: "Not favorites")]
+            [
+                FilterOption(id: "true", name: String(localized: "Favorites")),
+                FilterOption(id: "false", name: String(localized: "Not favorites")),
+            ]
         case .communityRating:
-            (1 ... 10).map { FilterOption(id: "\($0)", name: "\($0) or higher") }
+            (1 ... 10).map { FilterOption(id: "\($0)", name: String(localized: "\($0) or higher")) }
         case .videoType:
             LibraryFilter.VideoType.allCases.map { FilterOption(id: $0.rawValue, name: $0.title) }
         case .genres:
@@ -256,15 +264,15 @@ extension LibraryFilter.Kind {
     /// Wholphin's names for its filters.
     var title: String {
         switch self {
-        case .played: "Played"
-        case .favorite: "Favorites"
-        case .genres: "Genres"
-        case .studios: "Studios"
-        case .communityRating: "Community Rating"
-        case .officialRating: "Parental Rating"
-        case .videoType: "Video"
-        case .year: "Year"
-        case .decade: "Decade"
+        case .played: String(localized: "Played")
+        case .favorite: String(localized: "Favorites")
+        case .genres: String(localized: "Genres")
+        case .studios: String(localized: "Studios")
+        case .communityRating: String(localized: "Community Rating")
+        case .officialRating: String(localized: "Parental Rating")
+        case .videoType: String(localized: "Video")
+        case .year: String(localized: "Year")
+        case .decade: String(localized: "Decade")
         }
     }
 }
@@ -273,11 +281,11 @@ extension LibraryFilter.VideoType {
     var title: String {
         switch self {
         case .fourK: "4K"
-        case .highDefinition: "HD"
-        case .standardDefinition: "SD"
+        case .highDefinition: String(localized: "HD")
+        case .standardDefinition: String(localized: "SD")
         case .threeD: "3D"
-        case .bluRay: "Blu-ray"
-        case .dvd: "DVD"
+        case .bluRay: String(localized: "Blu-ray")
+        case .dvd: String(localized: "DVD")
         }
     }
 }
@@ -286,9 +294,9 @@ extension GridViewOptions.Layout {
     /// Wholphin's names for its layouts.
     var title: String {
         switch self {
-        case .grid: "Grid"
-        case .list: "List"
-        case .denseList: "Dense list"
+        case .grid: String(localized: "Grid")
+        case .list: String(localized: "List")
+        case .denseList: String(localized: "Dense list")
         }
     }
 }
@@ -296,9 +304,9 @@ extension GridViewOptions.Layout {
 extension CardShape {
     var title: String {
         switch self {
-        case .poster: "Poster"
-        case .thumb: "Landscape"
-        case .square: "Square"
+        case .poster: String(localized: "Poster")
+        case .thumb: String(localized: "Landscape")
+        case .square: String(localized: "Square")
         }
     }
 }

@@ -32,7 +32,7 @@ extension ItemDetails {
     /// "Season 1, episode 3", for `episodeLabel`'s "S1:E3".
     var spokenEpisodeLabel: String? {
         guard let season = item.episode?.seasonNumber, let number = item.episode?.episodeNumber else { return nil }
-        return "Season \(season), episode \(number)"
+        return String(localized: "Season \(season), episode \(number)")
     }
 }
 
