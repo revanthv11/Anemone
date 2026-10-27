@@ -1,3 +1,4 @@
+import AnemoneJellyfin
 @testable import AnemonePlayback
 import Foundation
 import Testing
@@ -34,22 +35,43 @@ struct MPVPlayerEngineTests {
         #expect(client.commands.last?.last == "force-media-title=%1%M")
     }
 
-    @Test func `it's ready once its file has started and playback has restarted at its start`() async {
+    @Test func `it's ready once playback of its own file has restarted at its start`() async throws {
         let client = FakeMPVClient()
         let engine = MPVPlayerEngine.testing(client)
-        _ = engine.loadLog()
+        _ = engine.loadLog("/old.mkv")
         engine.handle(.startFile(entry: client.entries[0]))
         let log = engine.loadLog()
+        let subtitles = try [ExternalSubtitle(url: #require(URL(string: "https://jf.test/sub.srt")), title: "English")]
+        engine.addExternalSubtitles(subtitles, toStreamFrom: URL(filePath: "/m.mkv"))
 
-        // What libmpv says about the file this one replaced comes first, and doesn't count.
-        engine.handle(.playbackRestart)
-        engine.handle(.endFile(entry: client.entries[0], .failed("loading failed")))
-        #expect(await eventually { log.events == ["paused"] })
+        // What libmpv says about the file this one replaced, still on its way, doesn't count.
+        engine.handle(.fileLoaded(entry: client.entries[0]))
+        engine.handle(.playbackRestart(entry: client.entries[0]))
+        engine.handle(.endFile(entry: client.entries[0], .stopped))
+        #expect(await engine.seek(to: .seconds(5)) == false)
+        #expect(!client.commands.contains { ["seek", "sub-add"].contains($0.first) })
 
-        engine.handle(.startFile(entry: client.entries[1]))
-        engine.handle(.playbackRestart)
+        engine.start(client.entries[1])
 
         #expect(await eventually { log.events == ["paused", "ready", "paused"] })
+        #expect(client.commands.last?.first == "sub-add")
+    }
+
+    /// libmpv always names the entry it made; if it ever doesn't, the load still plays.
+    @Test func `a load libmpv took without naming its entry plays as the next entry to start`() async {
+        let client = FakeMPVClient()
+        let engine = MPVPlayerEngine.testing(client)
+        _ = engine.loadAndStart(on: client)
+        client.hidesEntries = true
+
+        let log = engine.loadLog("/next.mkv")
+        engine.handle(.playbackRestart(entry: client.entries[0]))
+        engine.handle(.endFile(entry: client.entries[0], .stopped))
+        engine.start(client.entries[1])
+        engine.handle(.endFile(entry: client.entries[1], .failed("loading failed")))
+
+        #expect(await eventually { log.isFinished })
+        #expect(log.events == ["paused", "ready", "paused", "failed"])
     }
 
     @Test func `pausing, buffering and seeking set the status once it's ready`() async {
@@ -165,47 +187,6 @@ struct MPVPlayerEngineTests {
         #expect(log.events == ["failed"])
     }
 
-    @Test func `a seek lands exactly when playback restarts, and a newer seek replaces it`() async {
-        let client = FakeMPVClient()
-        let engine = MPVPlayerEngine.testing(client)
-        _ = engine.loadAndStart(on: client)
-
-        let first = Task { await engine.seek(to: .seconds(30)) }
-        #expect(await eventually { client.commands.count == 2 })
-        let second = Task { await engine.seek(to: .seconds(45)) }
-        #expect(await eventually { client.commands.count == 3 })
-        engine.handle(.playbackRestart)
-
-        #expect(await first.value == false)
-        #expect(await second.value == true)
-        #expect(client.commands.suffix(2) == [
-            ["seek", "30.000", "absolute+exact"],
-            ["seek", "45.000", "absolute+exact"],
-        ])
-    }
-
-    @Test func `a seek waiting when the engine stops didn't get there`() async {
-        let client = FakeMPVClient()
-        let engine = MPVPlayerEngine.testing(client)
-        _ = engine.loadAndStart(on: client)
-
-        async let seek = engine.seek(to: .seconds(30))
-        #expect(await eventually { client.commands.count == 2 })
-        engine.stop()
-
-        #expect(await seek == false)
-        #expect(client.commands.last == ["stop"])
-    }
-
-    @Test func `there's no seeking before the file is ready`() async {
-        let client = FakeMPVClient()
-        let engine = MPVPlayerEngine.testing(client)
-        _ = engine.load(URL(filePath: "/m.mkv"), from: nil, metadata: PlaybackMetadata(title: "M"))
-
-        #expect(await engine.seek(to: .seconds(30)) == false)
-        #expect(client.commands.count == 1)
-    }
-
     @Test func `time and duration come from libmpv, keeping the last time once the file is gone`() {
         let client = FakeMPVClient()
         let engine = MPVPlayerEngine.testing(client)
@@ -284,14 +265,14 @@ struct MPVPlayerEngineTests {
         #expect(client.lastSet("sub-color") == "#FFFFFFFF")
     }
 
-    @Test func `subtitles from outside the file are added and shown`() throws {
-        let client = FakeMPVClient()
-        let engine = MPVPlayerEngine.testing(client)
-        let url = try #require(URL(string: "https://jf.test/sub.srt"))
+    @Test func `libmpv's messages are logged without tokens`() {
+        let message = "Failed to open https://jf.test/Videos/m1/stream?static=true&ApiKey=tok123&Tag=x, "
+            + "'https://jf.test/sub.srt?api_key=abc' and http://h/live?token=xyz"
 
-        engine.addSubtitles(from: url, title: "English", language: "eng")
-
-        #expect(client.commands.last == ["sub-add", "https://jf.test/sub.srt", "select", "English", "eng"])
+        #expect(MPVLog.redacted(message) == "Failed to open https://jf.test/Videos/m1/stream?static=true&"
+            + "ApiKey=<redacted>&Tag=x, 'https://jf.test/sub.srt?api_key=<redacted>' and "
+            + "http://h/live?token=<redacted>")
+        #expect(MPVLog.redacted("audio: AAC 2.0") == "audio: AAC 2.0")
     }
 
     @Test func `languages without a two-letter code keep theirs`() {

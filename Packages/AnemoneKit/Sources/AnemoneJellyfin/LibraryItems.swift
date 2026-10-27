@@ -63,9 +63,8 @@ public extension JellyfinSession {
         parameters.startIndex = startIndex
         parameters.limit = limit
         parameters.enableTotalRecordCount = includeTotalCount
-        // Wholphin's `SlimItemFields`: the overview is for the details header and list layout.
-        parameters.fields = [.sortName, .overview]
-        parameters.enableImageTypes = [.primary, .thumb, .backdrop, .logo]
+        parameters.fields = LibraryEntry.fields
+        parameters.enableImageTypes = LibraryEntry.imageTypes
         parameters.imageTypeLimit = 1
         let result = try await send(Paths.getItems(parameters: parameters))
         let items = (result.items ?? []).compactMap(LibraryEntry.init)
@@ -258,6 +257,10 @@ extension LibraryFilter {
 }
 
 extension LibraryEntry {
+    /// Wholphin's `SlimItemFields`: the overview is for the details header and list layout.
+    static let fields: [ItemFields] = [.sortName, .overview]
+    static let imageTypes: [ImageType] = [.primary, .thumb, .backdrop, .logo]
+
     init?(_ dto: BaseItemDto) {
         guard let details = ItemDetails(dto) else { return nil }
         self.init(item: details.item, sortName: dto.sortName, details: details)

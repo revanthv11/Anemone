@@ -21,6 +21,7 @@ public extension PlaybackController {
             DisplayCriteriaMatching(),
             PlaybackSpeedMenu(),
             MPVSubtitleMenus(session: session),
+            MPVExternalSubtitles(session: session),
         ]
     }
 }

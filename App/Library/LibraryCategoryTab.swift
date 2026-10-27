@@ -137,13 +137,14 @@ struct LibraryCategoryTab: View {
         content = .loaded(pager, sortNames: entries.map { $0.sortName ?? $0.item.name })
         if kind == .genres {
             do {
-                let art = try await GenreArtCache.images(for: entries.map(\.id), in: library, session: session)
+                let art = try await GenreArtCache.shared.images(for: entries.map(\.id), in: library, session: session)
                 guard !Task.isCancelled else { return }
                 genreArt = art
-            } catch {
-                // Only a revoked token gets here; other failures leave their cards plain.
+            } catch SessionError.signedOut {
                 browse.noteSignedOut()
                 content = .signedOut
+            } catch {
+                // The cache throws nothing else; anything that did would leave the cards plain.
             }
         }
     }
@@ -155,33 +156,6 @@ struct LibraryCategoryPage: Hashable {
     let scope: LibraryQuery.Scope
     /// Like Wholphin's: the genre or studio, then the library, as in "Drama Movies".
     let title: String
-}
-
-/// Genre cards' artwork, kept for two hours per library as Wholphin keeps it, so going back to
-/// the tab doesn't ask for it all again or change every picture.
-@MainActor
-private enum GenreArtCache {
-    private static var entries: [String: (fetched: Date, images: [String: ItemImage])] = [:]
-
-    /// - Throws: `SessionError.signedOut`, from any genre's request.
-    static func images(
-        for genreIDs: [String],
-        in library: Library,
-        session: JellyfinSession,
-    ) async throws -> [String: ItemImage] {
-        let key = "\(session.serverURL.absoluteString)|\(session.userID)|\(library.id)"
-        if let cached = entries[key], cached.fetched.timeIntervalSinceNow > -2 * 60 * 60 {
-            return cached.images
-        }
-        let backdrops = try await session.genreBackdrops(for: genreIDs, in: library)
-        // Only a full set is kept. Wholphin caches only when every request succeeds; one cut
-        // short by leaving the tab, or missing a genre whose request failed, would otherwise
-        // leave those cards plain for two hours.
-        if backdrops.isComplete {
-            entries[key] = (.now, backdrops.images)
-        }
-        return backdrops.images
-    }
 }
 
 /// A 16:9 card with a name over a picture, like Wholphin's `GenreCard` and `StudioCard`.

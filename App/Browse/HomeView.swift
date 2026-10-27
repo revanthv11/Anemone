@@ -94,6 +94,11 @@ private struct HomeRows: View {
     /// The stand-in for a card a refresh removed while focus was outside the rows, which focus
     /// goes to if nothing has it once a menu closes.
     @State private var orphanedFocus: CardID?
+    /// `cardLeft`, kept for the scene: Home is built afresh when its tab is chosen again, as when
+    /// a link opens a page on it from another tab, and Back from that page should still return
+    /// to the card focused before.
+    @SceneStorage("home.cardLeft.row") private var savedRow = ""
+    @SceneStorage("home.cardLeft.item") private var savedItem = ""
     @State private var headerItem: MediaItem?
     @State private var backdropItem: MediaItem?
 
@@ -129,7 +134,8 @@ private struct HomeRows: View {
         }
         .onChange(of: isCovered) { _, isCovered in
             if isCovered {
-                returningCard = focusedCard ?? lastFocusedCard
+                let saved = savedItem.isEmpty ? nil : CardID(rowID: savedRow, itemID: savedItem)
+                returningCard = focusedCard ?? lastFocusedCard ?? saved
             }
         }
         .onChange(of: content) { old, new in
@@ -138,6 +144,9 @@ private struct HomeRows: View {
         .onChange(of: focusedCard) { old, card in
             guard let card else {
                 cardLeft = old
+                if let old {
+                    (savedRow, savedItem) = (old.rowID, old.itemID)
+                }
                 return
             }
             cardLeft = nil

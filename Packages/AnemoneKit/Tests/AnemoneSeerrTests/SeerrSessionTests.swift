@@ -40,6 +40,10 @@
             ])
             let resent = try #require(SeerrMockServer.requests(to: seerr.host).last)
             #expect(resent.header("Cookie") == "connect.sid=s2")
+            // Signing in again went through the connection's own session.
+            withExtendedLifetime(connection) {
+                #expect(SeerrTransport.openSessions(to: seerr.host) == 1)
+            }
         }
 
         @Test func `requests turned down together sign in again once`() async throws {

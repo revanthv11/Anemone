@@ -63,6 +63,77 @@ struct PlayerChoiceTests {
         #expect(container.sublayers?.count == 1)
     }
 
+    /// The server is asked for the entry's video first; the player can close meanwhile.
+    @Test func `with Prefer MPV a choice that comes back after the player stopped starts no engine`() async {
+        var made = 0
+        var answer: CheckedContinuation<EngineKind, Never>?
+        let engine = SwitchingEngine(
+            choose: { _ in await withCheckedContinuation { answer = $0 } },
+            makeMPV: {
+                made += 1
+                return MPVPlayerEngine.testing(FakeMPVClient())
+            },
+        )
+        guard case let .layer(container) = engine.videoOutput else {
+            Issue.record("Prefer MPV always draws into its own layer")
+            return
+        }
+
+        let preparing = Task { await engine.prepare(for: .item("sdr")) }
+        #expect(await eventually { answer != nil })
+        engine.stop()
+        answer?.resume(returning: .mpv)
+        await preparing.value
+
+        #expect(made == 0)
+        #expect(container.sublayers?.isEmpty ?? true)
+        #expect(engine.mpv == nil)
+    }
+
+    @Test func `with Prefer MPV an entry's choice that a newer entry's overtook is dropped`() async {
+        var answers: [String: CheckedContinuation<EngineKind, Never>] = [:]
+        let engine = SwitchingEngine(
+            choose: { entry in await withCheckedContinuation { answers[entry.itemID] = $0 } },
+            makeMPV: { MPVPlayerEngine.testing(FakeMPVClient()) },
+        )
+
+        let first = Task { await engine.prepare(for: .item("hdr")) }
+        #expect(await eventually { answers["hdr"] != nil })
+        let second = Task { await engine.prepare(for: .item("sdr")) }
+        #expect(await eventually { answers["sdr"] != nil })
+        answers["sdr"]?.resume(returning: .mpv)
+        await second.value
+        answers["hdr"]?.resume(returning: .avPlayer)
+        await first.value
+
+        #expect(engine.kind == .mpv)
+        #expect(engine.mpv != nil)
+    }
+
+    @Test func `with Prefer MPV only preparing an entry starts an engine`() async {
+        var made = 0
+        let engine = SwitchingEngine(
+            choose: { _ in .mpv },
+            makeMPV: {
+                made += 1
+                return MPVPlayerEngine.testing(FakeMPVClient())
+            },
+        )
+
+        engine.rate = 1.5
+        engine.pause()
+        engine.stop()
+
+        #expect(engine.currentTime == .zero)
+        #expect(engine.duration == nil)
+        #expect(await engine.seek(to: .seconds(5)) == false)
+        #expect(await engine.tracks(.audio).isEmpty)
+        #expect(made == 0)
+        await engine.prepare(for: .item("sdr"))
+        #expect(made == 1)
+        #expect(engine.mpv?.rate == 1.5)
+    }
+
     @Test func `the controller has a per-entry engine prepare for each new entry, but not for a retry`() async throws {
         let engine = PreparingEngine()
         let streams = FakeStreams()

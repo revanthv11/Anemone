@@ -71,10 +71,10 @@
             Set(seasons.filter(\.isRequestable).map(\.number))
         }
 
-        /// Starts from the seasons already asked for and still pending, as Wholphin does, so
-        /// sending again keeps them in the user's request.
+        /// Starts from the seasons of the user's own pending request, as Wholphin does, so sending
+        /// again keeps them in it, even those another request also asks for.
         private func chooseRequested() {
-            chosen = Set(seasons.filter { $0.isRequestable && $0.requestStatus == .pending }.map(\.number))
+            chosen = Set(seasons.filter(\.isInOwnRequest).map(\.number))
         }
 
         private var allSeasons: Binding<Bool> {

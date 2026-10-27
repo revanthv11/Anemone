@@ -316,6 +316,26 @@ struct ThemeMusicTests {
     }
 }
 
+extension ThemeMusicTests {
+    @Test func `a player dropped without closing lets the page showing play its theme again`() async throws {
+        let music = music()
+        music.show("m1", for: page, find: finder.find)
+        #expect(await eventually { output.played.count == 1 })
+        weak var dropped: PlaybackController?
+        do {
+            let playback = try player(["m1"], engine: FakeEngine(), music: music, log: EventLog())
+            dropped = playback
+            #expect(output.stops == 1)
+            #expect(music.playing == nil)
+        }
+
+        // Nothing calls stop(), and the page doesn't show again.
+        #expect(dropped == nil)
+        #expect(await eventually { output.played.count == 2 })
+        #expect(music.playing == "m1")
+    }
+}
+
 /// Records the songs it's asked to play.
 @MainActor
 final class FakeThemeOutput: ThemeMusicOutput {

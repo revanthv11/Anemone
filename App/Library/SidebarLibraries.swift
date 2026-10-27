@@ -73,7 +73,7 @@ struct MoreLibrariesView: View {
             .navigationDestination(for: Library.self) { library in
                 LibraryRoot(library: library, path: $stack.path)
                     // tvOS doesn't pass the stack's environment on to the pages pushed on it.
-                    .environment(\.pageStack, stack)
+                    .libraryRootStack(stack, for: library)
             }
             .itemPages(in: stack)
         }

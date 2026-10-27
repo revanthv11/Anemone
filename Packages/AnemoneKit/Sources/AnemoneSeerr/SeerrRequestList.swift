@@ -23,12 +23,21 @@
     /// only the first page, so a user with more requests never sees the older ones.
     ///
     /// It's given the connection on each call rather than keeping one, so a page always reads
-    /// with the latest sign-in.
+    /// with the latest sign-in. Reloading and reading on take turns: each waits for the one
+    /// before to finish, so neither reads from a place the other is about to move.
     @MainActor
     @Observable
     public final class SeerrRequestList {
         /// How near the end focus gets before the next page is read: two rows of the grid.
         public static let lookahead = 12
+
+        /// Reads the page of `take` requests from the `skip`th, without looking up the titles in
+        /// `known`: `SeerrConnection.requests(skip:take:known:)`, or a stand-in in tests.
+        typealias Reader = @Sendable (
+            _ skip: Int,
+            _ take: Int,
+            _ known: [DiscoverItem.ID: DiscoverItem],
+        ) async throws -> SeerrRequestsPage
 
         /// The requests read so far whose titles were found, newest first; `nil` until the first
         /// page is read.
@@ -36,45 +45,93 @@
         /// How many requests have been read, found or not.
         @ObservationIgnored private var end = 0
         @ObservationIgnored private var hasMore = false
-        @ObservationIgnored private var isReadingMore = false
         @ObservationIgnored private let pageSize: Int
+        /// The titles found so far, by `DiscoverItem.id`, so reading a request again doesn't look
+        /// its title up again.
+        @ObservationIgnored private var titles: [DiscoverItem.ID: DiscoverItem] = [:]
+        /// The latest reload or read, which the next waits for.
+        @ObservationIgnored private var latest: Task<Void, any Error>?
 
         public init(pageSize: Int = SeerrConnection.requestsPageSize) {
             self.pageSize = pageSize
         }
 
-        /// Reads the list again from the start, as far as it had been read, so coming back to the
-        /// page keeps the user's place.
+        /// Reads the list again from the start, a page at a time, as far as it had been read, so
+        /// coming back to the page keeps the user's place. Only titles not found before are
+        /// looked up.
         public func reload(from connection: SeerrConnection) async throws {
-            let page = try await connection.requests(take: max(end, pageSize))
-            items = page.items
-            end = page.end
-            hasMore = page.hasMore
-            if page.items.isEmpty {
-                try await readNext(from: connection)
-            }
+            try await reload(reading: Self.reader(connection))
         }
 
         /// Reads the next page once the request `id` is among the last `lookahead` shown, so it's
         /// there before focus reaches the end.
         public func readMore(near id: SeerrRequestedItem.ID, from connection: SeerrConnection) async throws {
-            guard let items, hasMore, !isReadingMore,
-                  let index = items.firstIndex(where: { $0.id == id }),
-                  items.count - index <= Self.lookahead
-            else { return }
-            isReadingMore = true
-            defer { isReadingMore = false }
-            try await readNext(from: connection)
+            try await readMore(near: id, reading: Self.reader(connection))
+        }
+
+        func reload(reading read: @escaping Reader) async throws {
+            try await inTurn { try await self.refresh(read) }
+        }
+
+        func readMore(near id: SeerrRequestedItem.ID, reading read: @escaping Reader) async throws {
+            try await inTurn {
+                // Checked in turn, against the list as the reads before left it.
+                guard let items = self.items, self.hasMore,
+                      let index = items.firstIndex(where: { $0.id == id }),
+                      items.count - index <= Self.lookahead
+                else { return }
+                try await self.readNext(read)
+            }
+        }
+
+        /// Runs `work` once the reload or read before it has finished. Cancelling the caller
+        /// cancels `work`.
+        private func inTurn(_ work: @escaping @MainActor @Sendable () async throws -> Void) async throws {
+            let previous = latest
+            let task = Task { @MainActor in
+                _ = await previous?.result
+                try Task.checkCancellation()
+                try await work()
+            }
+            latest = task
+            try await withTaskCancellationHandler {
+                try await task.value
+            } onCancel: {
+                task.cancel()
+            }
+        }
+
+        /// Reads the pages read so far again. Each page replaces the requests it covers as it
+        /// comes in, and those after it stay until their own page comes in, so the grid doesn't
+        /// shrink or lose focus while the rest load.
+        private func refresh(_ read: Reader) async throws {
+            let reach = max(end, pageSize)
+            let before = items ?? []
+            var fresh: [SeerrRequestedItem] = []
+            var position = 0
+            var more = true
+            repeat {
+                let page = try await readPage(at: position, read)
+                // A request made meanwhile moves the rest down, so a page can repeat the last one.
+                let shown = Set(fresh.map(\.id))
+                fresh += page.items.filter { !shown.contains($0.id) }
+                position = page.end
+                more = page.hasMore
+                items = fresh + Self.rest(of: before, after: fresh)
+            } while more && position < reach
+            items = fresh
+            end = position
+            hasMore = more
+            if fresh.isEmpty {
+                try await readNext(read)
+            }
         }
 
         /// Reads the next page, and on past any whose titles were all left out, so focus has
         /// something new to reach.
-        private func readNext(from connection: SeerrConnection) async throws {
-            while hasMore {
-                let start = end
-                let page = try await connection.requests(skip: start, take: pageSize)
-                // Reloaded meanwhile to somewhere else: this page doesn't follow on.
-                guard end == start, let items else { return }
+        private func readNext(_ read: Reader) async throws {
+            while hasMore, let items {
+                let page = try await readPage(at: end, read)
                 // A request made meanwhile moves the rest down, so a page can repeat the last one.
                 let shown = Set(items.map(\.id))
                 self.items = items + page.items.filter { !shown.contains($0.id) }
@@ -83,6 +140,34 @@
                 if !page.items.isEmpty {
                     return
                 }
+            }
+        }
+
+        /// Reads the page from the `skip`th request, and keeps its titles for next time.
+        private func readPage(at skip: Int, _ read: Reader) async throws -> SeerrRequestsPage {
+            let page = try await read(skip, pageSize, titles)
+            // Cancelled while looking titles up, a page leaves out the titles it didn't get to.
+            try Task.checkCancellation()
+            for item in page.items {
+                titles[item.item.id] = item.item
+            }
+            return page
+        }
+
+        /// The requests of `before` that a refresh hasn't reached yet: those after the last one
+        /// it has read again.
+        private static func rest(
+            of before: [SeerrRequestedItem],
+            after fresh: [SeerrRequestedItem],
+        ) -> [SeerrRequestedItem] {
+            let read = Set(fresh.map(\.id))
+            let start = before.lastIndex { read.contains($0.id) }.map { $0 + 1 } ?? 0
+            return before[start...].filter { !read.contains($0.id) }
+        }
+
+        private static func reader(_ connection: SeerrConnection) -> Reader {
+            { skip, take, known in
+                try await connection.requests(skip: skip, take: take, known: known)
             }
         }
     }

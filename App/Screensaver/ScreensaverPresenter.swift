@@ -30,6 +30,7 @@ private struct ScreensaverPresenter: ViewModifier {
                     guard let window else { return }
                     stage.window = window
                     screensaver.keepsScreenOn = { [weak window] in Self.keepsScreenOn(in: window) }
+                    screensaver.isOnScreen = { [weak stage] in stage?.isOnScreen ?? false }
                 }
             }
             .task(id: session.map { "\($0.serverURL)/\($0.userID)" }) {
@@ -70,8 +71,21 @@ private struct ScreensaverPresenter: ViewModifier {
         let controller = ScreensaverController(content: ScreensaverView(session: session)) { [screensaver] in
             screensaver.stop()
         }
+        controller.removed = { [weak controller, stage, screensaver] in
+            // Taken away without a press, along with what it was shown over, as when a sheet
+            // under it is dismissed: it can show again after the delay.
+            guard let controller, stage.shown === controller else { return }
+            stage.shown = nil
+            screensaver.stop()
+        }
         stage.shown = controller
         top.present(controller, animated: true)
+        // UIKit refuses to present over a controller that's on its way out, or already
+        // presenting, and only logs it.
+        if controller.presentingViewController == nil {
+            stage.shown = nil
+            screensaver.stop()
+        }
     }
 
     private func dismiss() {
@@ -105,6 +119,11 @@ private struct ScreensaverPresenter: ViewModifier {
 private final class ScreensaverStage {
     weak var window: UIWindow?
     var shown: UIViewController?
+
+    /// Whether the screensaver shown is still presented, even if something covers it.
+    var isOnScreen: Bool {
+        shown?.presentingViewController != nil
+    }
 }
 
 private extension UIViewController {
@@ -122,6 +141,8 @@ private extension UIView {
 /// Shows the screensaver full screen. It holds focus while it shows, so the first press or
 /// touch closes it and goes no further.
 private final class ScreensaverController: UIViewController {
+    /// Called once it's no longer presented, however it went.
+    var removed: () -> Void = {}
     private let content: UIHostingController<ScreensaverView>
     private let close: () -> Void
 
@@ -157,6 +178,21 @@ private final class ScreensaverController: UIViewController {
 
     override var preferredFocusEnvironments: [any UIFocusEnvironment] {
         [view]
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        // Gone, rather than covered by something shown over it. UIKit may finish taking it out
+        // of the presentation only after this, so it's checked again once this turn is over.
+        if isBeingDismissed || presentingViewController == nil {
+            removed()
+        } else {
+            Task { [weak self] in
+                if let self, presentingViewController == nil {
+                    removed()
+                }
+            }
+        }
     }
 
     override func pressesBegan(_: Set<UIPress>, with _: UIPressesEvent?) {

@@ -2,59 +2,55 @@ import AnemoneCore
 import Foundation
 import Observation
 
-/// The in-app screensaver's timer, ported from Wholphin's `ScreensaverService`: it shows once
-/// the remote has been left alone for the delay chosen in Settings › Screensaver, while it's
-/// turned on and nothing keeps the screen on (`keepsScreenOn`, such as a video playing). Any
-/// press or touch closes it. tvOS has no screensaver API for apps, so this is all in the app,
-/// and the system's own screensaver still takes over later.
+/// The in-app screensaver: its timer (`ScreensaverTimer`, ported from Wholphin's
+/// `ScreensaverService`) with the settings from Settings › Screensaver. It shows once the remote
+/// has been left alone for the chosen delay, while it's turned on and nothing keeps the screen
+/// on, such as a video playing. Any press or touch closes it.
 @Observable
 final class Screensaver {
-    private(set) var isShowing = false
+    @ObservationIgnored private let timer = ScreensaverTimer {
+        ScreensaverTimer.Settings(
+            isEnabled: Screensaver.debugStartDelay != nil || Preferences.screensaverEnabled.value(),
+            startDelay: Screensaver.debugStartDelay ?? .seconds(Preferences.screensaverStartDelay.value()),
+        )
+    }
+
+    /// Whether it should be on screen. The presenter shows it, and closes it when this goes.
+    var isShowing: Bool {
+        timer.isShowing
+    }
+
     /// Whether something on screen keeps the screen on, which pauses the timer like Wholphin's
     /// `keepScreenOn`. The presenter sets it.
-    @ObservationIgnored var keepsScreenOn: () -> Bool = { false }
-    @ObservationIgnored private var schedule = ScreensaverSchedule(startDelay: .seconds(900), now: .now)
+    var keepsScreenOn: () -> Bool {
+        get { timer.keepsScreenOn }
+        set { timer.keepsScreenOn = newValue }
+    }
 
-    /// Turned on in Settings, or by the DEBUG launch argument.
-    var isEnabled: Bool {
-        Self.debugStartDelay != nil || Preferences.screensaverEnabled.value()
+    /// Whether the screensaver is really on screen. The presenter sets it.
+    var isOnScreen: () -> Bool {
+        get { timer.isOnScreen }
+        set { timer.isOnScreen = newValue }
     }
 
     /// A press or touch on the remote: the wait starts again.
     func noteActivity() {
-        schedule.noteActivity(at: .now)
+        timer.noteActivity()
     }
 
     /// Shows it now, even when it's turned off, like Wholphin's "Start screensaver".
     func start() {
-        isShowing = true
+        timer.start()
     }
 
+    /// Closes it, or notes that it went: the wait starts again.
     func stop() {
-        isShowing = false
-        noteActivity()
+        timer.stop()
     }
 
     /// Runs the timer until the calling task is cancelled.
     func run() async {
-        noteActivity()
-        while !Task.isCancelled {
-            schedule.startDelay = Self.debugStartDelay ?? .seconds(Preferences.screensaverStartDelay.value())
-            let decision: ScreensaverSchedule.Decision
-            if isShowing || !isEnabled {
-                // Checked again later, in case it's turned on meanwhile.
-                schedule.noteActivity(at: .now)
-                decision = .wait(until: .now + ScreensaverSchedule.pollInterval)
-            } else {
-                decision = schedule.check(at: .now, keepsScreenOn: keepsScreenOn())
-            }
-            switch decision {
-            case .start:
-                isShowing = true
-            case let .wait(until):
-                try? await Task.sleep(until: until, clock: .continuous)
-            }
-        }
+        await timer.run()
     }
 
     /// Launched with `-screensaverIdleSeconds <n>`, DEBUG builds turn the screensaver on with an

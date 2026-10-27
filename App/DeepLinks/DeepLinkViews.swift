@@ -2,6 +2,7 @@ import AnemoneCore
 import AnemoneJellyfin
 import AnemonePlayback
 import SwiftUI
+import UIKit
 
 extension View {
     /// Opens the tab for a link that's ready (`DeepLinkRouter`). For the signed-in app's tabs.
@@ -29,10 +30,74 @@ private struct DeepLinkTabs: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onChange(of: router?.ready, initial: true) {
-                if let tab = router?.take() {
-                    selection = tab
+                guard router?.ready != nil else { return }
+                Task {
+                    // Wholphin clears its back stack for a link, so a player closes, as does
+                    // anything else shown over the app, rather than the link opening unseen
+                    // under it, or failing to show its own player.
+                    await PresentedScreens.close()
+                    if let tab = router?.take() {
+                        selection = tab
+                    }
                 }
             }
+    }
+}
+
+/// What's shown over the app: players, Now Playing, sheets.
+private enum PresentedScreens {
+    /// Closes everything shown over the app, and returns once it has gone and SwiftUI has heard,
+    /// so a player has started ending its play session.
+    static func close() async {
+        // Each pass closes what's shown, or waits for what's coming or going.
+        for _ in 0 ..< 30 {
+            guard let root = keyWindow?.rootViewController, let shown = root.presentedViewController else { return }
+            if shown.isBeingPresented || shown.isBeingDismissed {
+                try? await Task.sleep(for: .milliseconds(100))
+            } else {
+                await dismiss(from: root)
+            }
+        }
+    }
+
+    private static var keyWindow: UIWindow? {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)
+    }
+
+    /// Dismisses everything `root` presents. UIKit calls back once it's gone; that's waited
+    /// for at most 2 s, in case it never does.
+    private static func dismiss(from root: UIViewController) async {
+        await withCheckedContinuation { continuation in
+            let resume = Once { continuation.resume() }
+            root.dismiss(animated: true) {
+                resume()
+            }
+            Task {
+                try? await Task.sleep(for: .seconds(2))
+                resume()
+            }
+        }
+        // Lets SwiftUI run the cover's `onDismiss`, which ends a player's session, before the
+        // link replaces the pages under it.
+        try? await Task.sleep(for: .milliseconds(100))
+    }
+
+    /// Runs its action the first time it's called.
+    private final class Once {
+        private var action: (() -> Void)?
+
+        init(_ action: @escaping () -> Void) {
+            self.action = action
+        }
+
+        func callAsFunction() {
+            let action = action
+            self.action = nil
+            action?()
+        }
     }
 }
 
@@ -45,6 +110,9 @@ private struct DeepLinkPages: ViewModifier {
         content
             .navigationDestination(for: DeepLinkTarget.self) { target in
                 DeepLinkPage(target: target)
+                    // A link that replaces another's page gets a page of its own, rather than
+                    // SwiftUI keeping the one in the same place on the stack, with its item.
+                    .id(target)
                     .environment(\.pageStack, stack)
             }
             .onChange(of: router?.page, initial: true) {

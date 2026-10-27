@@ -5,19 +5,27 @@ import SwiftUI
 
 /// The Search tab, with its own navigation.
 struct SearchTab: View {
-    @State private var stack = PageStack()
-    @State private var preferences: SearchPreferences
+    let server: SavedServer
+    let user: SavedUser
 
-    init(server: SavedServer, user: SavedUser) {
-        _preferences = State(initialValue: SearchPreferences(serverID: server.id, userID: user.id))
-    }
+    @State private var stack = PageStack()
+    /// Read from UserDefaults once, when the tab first shows. `SignedInView` makes this view
+    /// again on every update, and State would throw away a copy made in `init` each time.
+    @State private var preferences: SearchPreferences?
 
     var body: some View {
         NavigationStack(path: $stack.path) {
-            SearchPage(preferences: preferences)
-                // The search page is the stack's root, which `itemPages(in:)` doesn't reach.
-                .environment(\.pageStack, stack)
-                .itemPages(in: stack)
+            if let preferences {
+                SearchPage(preferences: preferences)
+                    // The search page is the stack's root, which `itemPages(in:)` doesn't reach.
+                    .environment(\.pageStack, stack)
+                    .itemPages(in: stack)
+            }
+        }
+        .onAppear {
+            if preferences == nil {
+                preferences = SearchPreferences(serverID: server.id, userID: user.id)
+            }
         }
     }
 }
@@ -35,17 +43,15 @@ struct SearchPage: View {
     @Environment(\.pageStack) private var stack
     @AppStorage(Preferences.combinedSearchResults) private var isCombined: Bool
     @State private var query = ""
-    @State private var results = SearchResults()
-    /// Counts the searches picked from recent searches or submitted, each of which runs at once,
-    /// like Wholphin's `triggerImmediateSearch`, even when the query didn't change.
-    @State private var submissions = 0
-    /// Set when a search is picked or submitted, so focus moves to its results, as in Wholphin.
-    /// That search clears it when it ends, however it ends, so a later search, typed, doesn't
-    /// take focus from the keyboard.
-    @State private var focusesResults = false
-    /// The run started last, which tells the page showing again from a new search.
-    @State private var lastRun: SearchRun?
+    /// What's showing, and what each run of the search does next (`SearchState`).
+    @State private var search = SearchState()
     @State private var showsOptions = false
+    /// The search a link picked, whose results hold on to focus for a moment; see `holdFocus`.
+    @State private var linkSubmission: Int?
+    /// A link's result that focus moved to, and until when it's moved back there if tvOS takes
+    /// focus away: the link has just opened the tab, and tvOS may still be settling focus on the
+    /// keyboard.
+    @State private var heldFocus: (card: ItemFocus, until: ContinuousClock.Instant)?
     @FocusState private var focus: ItemFocus?
 
     var body: some View {
@@ -59,9 +65,9 @@ struct SearchPage: View {
                 } else if request.kinds.isEmpty {
                     NoSearchKinds()
                 } else if isCombined {
-                    CombinedResults(results: results, focus: $focus)
+                    CombinedResults(results: search.results, focus: $focus)
                 } else {
-                    SearchRows(results: results, kinds: request.kinds, focus: $focus)
+                    SearchRows(results: search.results, kinds: request.kinds, focus: $focus)
                 }
             }
             .padding(.horizontal, ItemLayout.horizontalInset)
@@ -72,21 +78,24 @@ struct SearchPage: View {
         .onSubmit(of: .search) {
             submit()
         }
-        .deepLinkSearch(pick)
+        .deepLinkSearch { term in
+            pick(term)
+            linkSubmission = search.submissions
+        }
         .pageTask(id: run) {
-            await search(run)
+            await perform(run)
         }
         .onChange(of: focus) { old, new in
+            holdFocus(from: old, to: new)
             // Noted as focus leaves a row rather than on every move along it, which would redraw
             // every row and card. Entering a row again is when the memory is read.
-            if let row = old?.cardRow, row != new?.cardRow {
-                results.memory.note(old)
+            if case let .card(row, item) = old, row != new?.cardRow {
+                search.results.noteFocus(leaving: SearchCard(row: row, item: item))
             }
         }
         .onChange(of: stack?.path.isEmpty ?? true) { _, isEmpty in
-            // Opening a result is what makes a search worth keeping.
             if !isEmpty {
-                remember(results.term)
+                openedResult()
             }
         }
         .sheet(isPresented: $showsOptions) {
@@ -120,118 +129,87 @@ struct SearchPage: View {
     }
 
     private var run: SearchRun {
-        SearchRun(request: request, submission: submissions)
+        SearchRun(request: request, submission: search.submissions)
     }
 
+    /// A recent search, or a link's: searched at once, with focus moving to its results.
     private func pick(_ term: String) {
-        submissions += 1
-        focusesResults = true
+        search.submit()
         query = term
     }
 
     /// Wholphin's search button (`onSearchClick`): searches the term at once, without waiting
     /// for typing to pause, then moves focus to its results. Rows that failed are tried again.
     private func submit() {
-        submissions += 1
-        focusesResults = true
+        search.submit()
     }
 
-    private func remember(_ term: String) {
-        guard !term.isEmpty else { return }
-        preferences.updateRecent { $0.add(term) }
-    }
-
-    /// Runs the request once typing pauses for 750 ms, as Wholphin does, or at once when it was
-    /// picked or submitted. When only the kinds or the layout changed, it runs at once, and asks
-    /// only for what isn't showing yet: a kind switched back on gets its row, and one switched
-    /// off just hides its row, as in Wholphin.
-    ///
-    /// When the page shows again (after Back from a result, or when the app returns to the
-    /// foreground), everything is searched again, so cards show their new watched, favourite
-    /// and progress state, like Home's and item pages' refresh. Opening a result or leaving the
-    /// app cuts a search short.
-    private func search(_ run: SearchRun) async {
-        let request = run.request
-        let term = request.term
-        let isShowingAgain = run == lastRun
-        let isSubmitted = run.submission != lastRun?.submission
-        lastRun = run
-        defer {
-            // Done with focus, whether it moved there, found nothing or was cut short, unless
-            // another pick or submission has taken over.
-            if run.submission == submissions {
-                focusesResults = false
-            }
+    /// Opening a result is what makes a search worth keeping. When a newer term was still
+    /// waiting for typing to pause, the result's own term goes back in the field, so Back
+    /// returns to those results with focus on the result.
+    private func openedResult() {
+        let opened = search.openResult(typed: request)
+        if opened.restoresTerm {
+            query = opened.term
         }
-        // With every kind left out there's nothing to ask for: `/Items` without types would
-        // return every type.
-        guard !term.isEmpty, !request.kinds.isEmpty else {
-            results = SearchResults(term: term)
+        if !opened.term.isEmpty {
+            preferences.updateRecent { $0.add(opened.term) }
+        }
+    }
+
+    /// Runs the request once typing pauses, or at once when it was picked or submitted, when
+    /// only the kinds or the layout changed, or when the page shows again; `SearchState` decides
+    /// which, and what to ask for. Opening a result or leaving the app cuts a search short.
+    private func perform(_ run: SearchRun) async {
+        // Replaced before it got going, as when a link picks a search as the page appears.
+        guard !Task.isCancelled else { return }
+        let start = search.start(run)
+        switch start {
+        case .nothing:
             return
+        case .waitsForTyping:
+            try? await Task.sleep(for: SearchState.typingPause)
+            guard !Task.isCancelled else { return }
+        case .searchesNow:
+            break
         }
-        if results.term != term {
-            if !isSubmitted, !isShowingAgain {
-                try? await Task.sleep(for: .milliseconds(750))
-                guard !Task.isCancelled else { return }
-            }
-            results = SearchResults(term: term)
-        }
-        if request.isCombined {
-            await searchCombined(term, kinds: request.kinds, refreshes: isShowingAgain, run: run)
-        } else {
-            // Rows that haven't found anything yet: never searched, cut short, or failed.
-            let kinds = isShowingAgain ? request.kinds : request.kinds.filter { results.rows[$0]?.isFound != true }
-            await searchRows(term, kinds: kinds, run: run)
+        switch search.work(for: run) {
+        case let .rows(kinds):
+            await searchRows(run.request.term, kinds: kinds, run: run)
+        case let .combined(kinds):
+            await searchCombined(run.request.term, kinds: kinds, run: run)
+        case .none:
+            break
         }
         // When everything was already showing, as when the term showing is submitted.
         moveFocusToResults(for: run)
     }
 
     private func searchRows(_ term: String, kinds: [SearchKind], run: SearchRun) async {
-        guard !kinds.isEmpty else { return }
         let session = browse.session
-        // Rows already showing results keep them until their new ones arrive.
-        for kind in kinds where results.rows[kind]?.isFound != true {
-            results.rows[kind] = .searching
-        }
         // Each row shows as soon as its own search ends.
         await withTaskGroup(of: (SearchKind, Result<[ItemDetails], any Error>).self) { group in
             for kind in kinds {
                 group.addTask { await (kind, attempt { try await session.search(term, for: kind) }) }
             }
             for await (kind, result) in group {
-                guard let state = state(for: result) else { continue }
-                // A row that fails to refresh keeps what it found.
-                if case .failed = state, results.rows[kind]?.isFound == true {
-                    continue
-                }
-                results.rows[kind] = state
+                guard let state = outcome(of: result) else { continue }
+                search.results.record(state, for: kind)
                 moveFocusToResults(for: run)
             }
         }
     }
 
-    private func searchCombined(_ term: String, kinds: [SearchKind], refreshes: Bool, run: SearchRun) async {
-        // The grid is searched again when its kinds change, and when it hasn't found anything
-        // yet: never searched, cut short, or failed.
-        let isShowing = results.combined?.kinds == kinds && results.combined?.state.isFound == true
-        guard refreshes || !isShowing else { return }
+    private func searchCombined(_ term: String, kinds: [SearchKind], run: SearchRun) async {
         let session = browse.session
-        if !isShowing {
-            results.combined = CombinedSearch(kinds: kinds, state: .searching)
-        }
         let result = await attempt { try await session.search(term, forAll: kinds) }
-        guard let state = state(for: result) else { return }
-        // A grid that fails to refresh keeps what it found.
-        if case .failed = state, isShowing {
-            return
-        }
-        results.combined = CombinedSearch(kinds: kinds, state: state)
+        guard let state = outcome(of: result) else { return }
+        search.results.recordCombined(state, kinds: kinds)
         moveFocusToResults(for: run)
     }
 
     /// `nil` when the search was cut short, by more typing or by leaving the page.
-    private func state(for result: Result<[ItemDetails], any Error>) -> SearchResults.State? {
+    private func outcome(of result: Result<[ItemDetails], any Error>) -> SearchResults.State? {
         guard !Task.isCancelled else { return nil }
         switch result {
         case let .success(items):
@@ -244,80 +222,36 @@ struct SearchPage: View {
         }
     }
 
-    /// After a picked or submitted search, focus moves to the first row with results once every
-    /// row above it has finished, like Wholphin's, so it doesn't jump when a row above fills in.
-    /// Only that search's own results take it, never rows left from an earlier term, and never
-    /// once it's cut short, as when a result covers the page.
+    /// After a picked or submitted search, moves focus to its results once they're ready
+    /// (`SearchState.focusMove(for:)`), never once it's cut short, as when a result covers the
+    /// page.
     private func moveFocusToResults(for run: SearchRun) {
-        guard focusesResults, run.submission == submissions, results.term == run.request.term,
-              !Task.isCancelled else { return }
-        if run.request.isCombined {
-            guard let state = results.combined?.state, state != .searching else { return }
-            focusesResults = false
-            if case let .found(items) = state, let first = items.first {
-                focus = .card(row: SearchKind.combinedRowID, item: first.id)
-            }
-            return
-        }
-        for kind in run.request.kinds {
-            switch results.rows[kind] {
-            case nil, .searching?:
-                return
-            case let .found(items)? where !items.isEmpty:
-                focusesResults = false
-                focus = results.memory.entry(row: kind.rowID, first: items.first?.id)
-                return
-            default:
-                continue
-            }
-        }
-        // Nothing was found.
-        focusesResults = false
-    }
-}
-
-/// What a search asks for.
-struct SearchRequest: Equatable {
-    let term: String
-    let kinds: [SearchKind]
-    let isCombined: Bool
-}
-
-/// One run of the page's search: the request, and the pick or submission it belongs to, so
-/// picking or submitting runs it again even when the request is the same.
-struct SearchRun: Equatable {
-    let request: SearchRequest
-    let submission: Int
-}
-
-/// What a search found so far: a state for each row, or for the combined grid.
-struct SearchResults {
-    enum State: Equatable {
-        case searching
-        case found([ItemDetails])
-        case failed(String)
-
-        var isFound: Bool {
-            if case .found = self {
-                true
-            } else {
-                false
-            }
+        guard !Task.isCancelled, let card = search.focusMove(for: run) else { return }
+        focus = .card(row: card.row, item: card.item)
+        if run.submission == linkSubmission {
+            linkSubmission = nil
+            heldFocus = (.card(row: card.row, item: card.item), .now + .seconds(2))
         }
     }
 
-    var term = ""
-    var rows: [SearchKind: State] = [:]
-    var combined: CombinedSearch?
-    /// Each row's last-focused card. It's part of the results, so a new search enters its rows
-    /// at their first cards, not at cards remembered from an earlier search that it may not have.
-    var memory = RowMemory()
+    /// Moves focus back to a link's result if tvOS takes it to the keyboard just after it got
+    /// there, once.
+    private func holdFocus(from old: ItemFocus?, to new: ItemFocus?) {
+        guard let held = heldFocus, old == held.card else { return }
+        heldFocus = nil
+        if new == nil, ContinuousClock.now < held.until {
+            focus = held.card
+        }
+    }
 }
 
-struct CombinedSearch {
-    /// The kinds searched for; the grid is searched again when they change.
-    let kinds: [SearchKind]
-    let state: SearchResults.State
+extension SearchResults {
+    /// Each row's last-focused card, for its `CardRow`.
+    var memory: RowMemory {
+        lastFocused.reduce(into: RowMemory()) { memory, entry in
+            memory.note(.card(row: entry.key, item: entry.value))
+        }
+    }
 }
 
 private extension ItemFocus {
