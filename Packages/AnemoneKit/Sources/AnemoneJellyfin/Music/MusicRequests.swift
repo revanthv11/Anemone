@@ -135,9 +135,7 @@ public extension JellyfinSession {
             parameters.isRecursive = true
             parameters.sortBy = trackOrder
         case let .playlist(id):
-            parameters.parentID = id
-            parameters.isRecursive = true
-            parameters.sortBy = [.default]
+            return try await songs(inPlaylist: id, startIndex: startIndex, limit: limit)
         case let .library(id):
             parameters.parentID = id
             parameters.isRecursive = true
@@ -159,6 +157,24 @@ public extension JellyfinSession {
         }
         let result = try await send(Paths.getItems(parameters: parameters))
         let items = result.items.musicItems
+        return MusicPage(items: items, totalCount: startIndex == 0 ? result.totalRecordCount ?? items.count : nil)
+    }
+
+    /// A playlist's songs in the playlist's own order, from `/Playlists/{id}/Items`, as its page
+    /// lists them. Wholphin's `getPagerForPlaylist` asks `/Items` for the playlist's children in
+    /// the `Default` order, which a Jellyfin 12.3 server answers in another order (the demo server's
+    /// "Binaerpilot" came back Bend, Thunderdays, Cornered! for Thunderdays, Cornered!, Bend).
+    private func songs(inPlaylist id: MediaItem.ID, startIndex: Int, limit: Int?) async throws -> MusicPage {
+        let parameters = Paths.GetPlaylistItemsParameters(
+            userID: userID,
+            startIndex: startIndex,
+            limit: limit,
+            fields: Self.songFields,
+            enableUserData: true,
+            imageTypeLimit: 1,
+        )
+        let result = try await send(Paths.getPlaylistItems(playlistID: id, parameters: parameters))
+        let items = result.items.musicItems.filter { $0.item.kind == .audio }
         return MusicPage(items: items, totalCount: startIndex == 0 ? result.totalRecordCount ?? items.count : nil)
     }
 
