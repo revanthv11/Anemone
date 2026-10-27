@@ -119,9 +119,14 @@ public enum AVPlayerProfile {
         ]
     }
 
-    /// Text subtitles come as WebVTT in the HLS playlist; picture subtitles are burned in.
-    private static let subtitleProfiles: [SubtitleProfile] = [
-        SubtitleProfile(format: "vtt", method: .hls),
+    /// Text subtitles come as files of their own, which Anemone draws over the video
+    /// (`DrawnSubtitles`), rather than as WebVTT in the HLS playlist, which AVPlayer showed 10 s
+    /// late in a remuxed stream. The server converts other text formats, such as ASS, to the
+    /// first of these, and burns in the ASS asked for (`TrackRequest`). MP4's own text tracks
+    /// play in the file; picture subtitles are burned in.
+    private static let subtitleProfiles: [SubtitleProfile] = ["srt", "subrip", "vtt", "webvtt"].map {
+        SubtitleProfile(format: $0, method: .external)
+    } + [
         SubtitleProfile(format: "mov_text", method: .embed),
         SubtitleProfile(format: "ttml", method: .embed),
         SubtitleProfile(format: "cc_dec", method: .embed),

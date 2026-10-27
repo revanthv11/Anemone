@@ -25,6 +25,8 @@ struct PlaybackSettingsPage: View {
             .accessibilityIdentifier("settings.playback.streamingAndDisplay")
             NavigationLink("Player", destination: PlayerEngineSettingsPage.init)
                 .accessibilityIdentifier("settings.playback.player")
+            NavigationLink("Subtitle Style", destination: SubtitleStyleSettingsPage.init)
+                .accessibilityIdentifier("settings.playback.subtitleStyle")
             NavigationLink("Cinema Mode", destination: CinemaModeSettingsPage.init)
                 .accessibilityIdentifier("settings.playback.cinemaMode")
         }

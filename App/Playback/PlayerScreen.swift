@@ -69,6 +69,7 @@ struct PlayerScreen: View {
                 accessories: accessories,
                 shown: SystemPlayer.Shown(actions: accessories.actions, menus: accessories.menus),
             )
+            .overlay { DrawnSubtitlesView(playback: playback) }
         default:
             // Engines that draw their own layer, such as MPV, always need Anemone's overlay.
             AnemonePlayer(playback: playback)

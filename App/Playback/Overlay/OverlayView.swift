@@ -71,6 +71,7 @@ struct OverlayView: View {
                 .ignoresSafeArea()
                 .transition(.opacity)
             }
+            DrawnSubtitlesView(playback: playback, overlay: overlay)
             PauseIndicator(isPaused: overlay.isPaused && !overlay.controlsVisible && !overlay.showsSeekBar)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             if overlay.showsSeekBar, !overlay.controlsVisible {

@@ -8,8 +8,9 @@ import Foundation
 /// track parts of its `PlaybackViewModel` and `ItemPlaybackRepository`.
 ///
 /// A switch the stream can make on its own happens at once: audio in a file that plays
-/// directly, and text subtitles. Anything else asks the server for another stream and goes on
-/// from the same position, as Wholphin's `changeStreams` does.
+/// directly, and text subtitles, which the server sends as files of their own for Anemone to
+/// draw (`DrawnSubtitles`). Anything else asks the server for another stream and goes on from
+/// the same position, as Wholphin's `changeStreams` does.
 ///
 /// Live TV is left to the server, as Wholphin and Swiftfin leave it: the request names no
 /// version or tracks, and the menus offer what the live stream can switch to by itself.
@@ -197,8 +198,9 @@ public final class TrackSelection: PlaybackFeature {
         self.entry = entry
         showMenus(in: controller)
         applying?.cancel()
-        applying = Task { [weak self, engine = controller.engine] in
-            await self?.select(in: engine, for: stream)
+        applying = Task { [weak self, weak controller] in
+            guard let controller else { return }
+            await self?.select(in: controller, for: stream)
         }
     }
 
@@ -216,10 +218,14 @@ public final class TrackSelection: PlaybackFeature {
         )
     }
 
-    /// Selects the chosen tracks in the engine, where the stream carries them as tracks of
-    /// its own, and turns off subtitles the player would otherwise pick by itself.
-    func select(in engine: any PlayerEngine, for stream: PlaybackStream) async {
+    /// Has text subtitles that come as a file of their own drawn, and selects the chosen tracks
+    /// in the engine where the stream carries them as tracks of its own, turning off subtitles
+    /// the player would otherwise pick by itself.
+    func select(in controller: PlaybackController, for stream: PlaybackStream) async {
         guard let entry, entry.stream == stream else { return }
+        let drawn = entry.subtitle.flatMap { TrackSwitching.isDrawn($0, in: stream) ? $0 : nil }
+        controller.feature(DrawnSubtitles.self)?.show(drawn, in: stream)
+        let engine = controller.engine
         if stream.method == .directPlay, let audio = entry.audio {
             let options = await engine.tracks(.audio)
             guard !Task.isCancelled, self.entry?.stream == stream else { return }
@@ -229,7 +235,9 @@ public final class TrackSelection: PlaybackFeature {
         }
         let options = await engine.tracks(.subtitle)
         guard !Task.isCancelled, self.entry?.stream == stream else { return }
-        let wanted = entry.subtitle.flatMap { TrackSwitching.playerTrack(for: $0, in: stream, options: options) }
+        let wanted = drawn == nil
+            ? entry.subtitle.flatMap { TrackSwitching.playerTrack(for: $0, in: stream, options: options) }
+            : nil
         if wanted?.id != options.first(where: \.isSelected)?.id {
             await engine.select(wanted, .subtitle)
         }
@@ -238,7 +246,9 @@ public final class TrackSelection: PlaybackFeature {
     /// AVPlayer showed no HLS subtitles that were selected before playback got under way, the
     /// server's default included, until they were selected again; so they are, once it has.
     private func reselectSubtitles(in engine: any PlayerEngine) async {
-        guard let entry, let stream = entry.stream, let subtitle = entry.subtitle else { return }
+        guard let entry, let stream = entry.stream, let subtitle = entry.subtitle,
+              !TrackSwitching.isDrawn(subtitle, in: stream)
+        else { return }
         let options = await engine.tracks(.subtitle)
         guard self.entry?.stream == stream,
               let wanted = TrackSwitching.playerTrack(for: subtitle, in: stream, options: options)

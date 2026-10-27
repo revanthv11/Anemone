@@ -41,12 +41,14 @@ struct TrackRequest: Hashable, Sendable {
 }
 
 /// How to show another audio or subtitle track: in the stream that's playing, which the engine
-/// switches to at once, or by asking the server for another stream. Adapted from Swiftfin's
-/// track index map and rebuild rules (MPL-2.0).
+/// switches to at once, by drawing text subtitles over it, or by asking the server for another
+/// stream. Adapted from Swiftfin's track index map and rebuild rules (MPL-2.0).
 enum TrackSwitching {
     enum Switch: Equatable {
         /// The engine selects this track, or turns subtitles off.
         case inPlace(PlayerTrack?)
+        /// Anemone draws these text subtitles itself (`DrawnSubtitles`), from a file of their own.
+        case drawn(MediaTrack)
         /// The server has to send another stream.
         case reload
     }
@@ -74,10 +76,19 @@ enum TrackSwitching {
             return .reload
         }
         guard let new else { return .inPlace(nil) }
-        guard !needsBurnIn(new, in: stream, burnsInStyled: burnsInStyled),
-              let option = playerTrack(for: new, in: stream, options: options)
-        else { return .reload }
+        guard !needsBurnIn(new, in: stream, burnsInStyled: burnsInStyled) else { return .reload }
+        if isDrawn(new, in: stream) {
+            return .drawn(new)
+        }
+        guard let option = playerTrack(for: new, in: stream, options: options) else { return .reload }
         return .inPlace(option)
+    }
+
+    /// Whether Anemone draws `track` itself: text subtitles that the stream doesn't carry, which
+    /// the server sends as a file of their own instead (External delivery), as it does all text
+    /// subtitles for AVPlayer.
+    static func isDrawn(_ track: MediaTrack, in stream: PlaybackStream) -> Bool {
+        track.kind == .subtitle && track.isText && delivery(of: track, in: stream) == .external
     }
 
     /// Whether the server has to draw `track` into the video: picture subtitles, ASS and SSA
@@ -88,7 +99,8 @@ enum TrackSwitching {
 
     /// Whether the engine can switch to `track` in `stream` without another stream, going by
     /// what the stream carries: audio in a file that plays directly, and subtitles it lists that
-    /// needn't be burned in. All a live stream offers, since its tracks can't be asked for.
+    /// needn't be burned in. All a live stream offers, since its tracks can't be asked for, and
+    /// the server can't read a subtitle file out of a stream that hasn't ended.
     static func switchesInPlace(to track: MediaTrack, in stream: PlaybackStream, burnsInStyled: Bool) -> Bool {
         let carries = switch track.kind {
         case .audio: stream.method == .directPlay
@@ -117,8 +129,9 @@ enum TrackSwitching {
 
     /// The tracks of a kind that the engine lists for `stream`, in order: the file's own when
     /// it plays directly; in Jellyfin's HLS, the one audio track asked for and every text
-    /// subtitle, unless the one asked for is burned in. The playlist lists text subtitles the
-    /// server would only burn in, such as ASS, as well.
+    /// subtitle, unless the one asked for is burned in or sent as a file of its own (then the
+    /// playlist has none). The playlist lists text subtitles the server would only burn in, such
+    /// as ASS, as well, but not those it sends as files.
     static func listed(_ kind: MediaTrack.Kind, in stream: PlaybackStream) -> [MediaTrack] {
         let tracks = stream.tracks.of(kind)
         switch (kind, stream.method) {
@@ -130,9 +143,9 @@ enum TrackSwitching {
             return tracks.filter { $0.delivery == .embedded || ($0.delivery == nil && !$0.isExternal) }
         case (.subtitle, _):
             let leftOut = tracks.contains { track in
-                track.index == stream.subtitleStreamIndex && [.burnedIn, .dropped].contains(track.delivery)
+                track.index == stream.subtitleStreamIndex && [.burnedIn, .dropped, .external].contains(track.delivery)
             }
-            return leftOut ? [] : tracks.filter(\.isText)
+            return leftOut ? [] : tracks.filter { $0.isText && $0.delivery != .external }
         }
     }
 

@@ -8,6 +8,8 @@ public extension PlaybackController {
             ProgressReporting(session: session),
             SegmentSkipping(session: session),
             UpNext(),
+            // Before track selection, which says what it draws once it knows the stream.
+            DrawnSubtitles(session: session),
             TrackSelection(session: session),
             PlaybackDetails(session: session),
             LiveStreamClosing(session: session),
