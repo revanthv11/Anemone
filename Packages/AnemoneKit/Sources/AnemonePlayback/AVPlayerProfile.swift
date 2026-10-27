@@ -35,7 +35,7 @@ public enum AVPlayerProfile {
     /// Wholphin's default limit, 100 Mbit/s.
     public static let defaultMaxBitrate = 100_000_000
 
-    /// The limit the user set (Settings › Playback › Player), which PlaybackInfo asks for.
+    /// The limit the user set (Settings › Playback › Streaming and Display), which PlaybackInfo asks for.
     public static var maxBitrate: Int {
         Preferences.maxBitrate.value()
     }

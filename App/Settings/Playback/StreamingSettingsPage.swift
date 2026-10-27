@@ -3,11 +3,11 @@ import AnemonePlayback
 import AnemoneUI
 import SwiftUI
 
-/// Settings › Playback › Player: the streaming limit, skipping back on resume, and how the
-/// display follows the video. Wholphin's `MaxBitrate` and `SkipBackOnResume` settings, with its
-/// names, choices and defaults; its refresh-rate and resolution switches become tvOS's own Match
-/// Content setting.
-struct PlayerSettingsPage: View {
+/// Settings › Playback › Streaming and Display: the streaming limit, skipping back on resume, and
+/// how the display follows the video. Wholphin's `MaxBitrate` and `SkipBackOnResume` settings,
+/// with its names, choices and defaults; its refresh-rate and resolution switches become tvOS's
+/// own Match Content setting. Named apart from Player Controls, which is about the controls.
+struct StreamingSettingsPage: View {
     @AppStorage(Preferences.maxBitrate) private var maxBitrate: Int
     @AppStorage(Preferences.skipBackOnResume) private var skipBack: Int
 
@@ -57,7 +57,7 @@ struct PlayerSettingsPage: View {
                 )
             }
         }
-        .navigationTitle("Player")
+        .navigationTitle("Streaming and Display")
     }
 
     private var matchContentText: String {
