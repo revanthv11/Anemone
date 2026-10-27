@@ -56,8 +56,12 @@ struct LibraryRecommendedTab: View {
         }
         // The rows don't load again after Back, so a title deleted from its page is dropped here.
         .onItemsDeleted { deleted in
-            if case let .loaded(recommended) = content {
-                content = .loaded(recommended.removing(deleted))
+            guard case let .loaded(recommended) = content else { return }
+            let remaining = recommended.removing(deleted)
+            content = .loaded(remaining)
+            // The header goes back to the first title, as when the tab loaded.
+            if focus.details?.item.wasDeleted(in: deleted) == true {
+                focus.details = remaining.rows.first?.items.first.map { ItemDetails(item: $0) }
             }
         }
     }
