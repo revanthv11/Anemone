@@ -102,6 +102,11 @@ public actor HomePreferencesWriter {
         try await update { $0[HomeDisplayPreferences.homeSettingsKey] = json }
     }
 
+    /// Forgets the saved rows, Wholphin's "Reset", keeping the entry's other keys.
+    public func forgetHomePageSettings() async throws {
+        try await update { $0[HomeDisplayPreferences.homeSettingsKey] = nil }
+    }
+
     /// Changes the entry's `customPrefs`, after any change already under way.
     public func update(_ change: @escaping @Sendable (inout [String: String]) throws -> Void) async throws {
         let previous = last

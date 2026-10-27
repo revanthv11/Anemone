@@ -109,6 +109,21 @@ struct HomeSettingsTests {
         #expect(try HomePageSettings(json: #require(prefs["home_settings"])) == settings)
     }
 
+    @Test func `reset forgets the saved rows and keeps the entry's other keys`() async throws {
+        let server = HomeServer("settings-reset.test") { path, request in
+            guard path == "/DisplayPreferences/default" else { return nil }
+            if request.method == "POST" {
+                return MockServer.Reply(status: 204, body: "")
+            }
+            return .displayPreferences(["removeNextUp": #"{"value":{}}"#, "home_settings": Self.savedJSON])
+        }
+
+        try await HomePreferencesWriter(session: server.session()).forgetHomePageSettings()
+
+        let sent = try #require(server.requests(to: "/DisplayPreferences/default").last { $0.method == "POST" })
+        #expect(sent.json["CustomPrefs"] as? [String: String] == ["removeNextUp": #"{"value":{}}"#])
+    }
+
     @Test func `an entry with nulls in it is read, and saved with its other fields`() async throws {
         // What Jellyfin 12.3 sends for a client that never saved anything, plus a saved key.
         let escaped = Self.savedJSON.replacingOccurrences(of: "\"", with: "\\\"")
