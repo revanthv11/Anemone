@@ -40,7 +40,7 @@ struct HomeSettingsTests {
 
         #expect(plugin.source == .plugin)
         #expect(plugin.settings?.rows.count == 2)
-        #expect(fallback == HomeSettingsResolution(settings: nil, source: .default))
+        #expect(fallback == HomeSettingsResolution(settings: nil, source: .default, removedFromNextUp: .init()))
         #expect(!withoutPlugin.paths.contains("/wholphin/homesettings"))
     }
 
@@ -107,6 +107,21 @@ struct HomeSettingsTests {
         let prefs = try #require(sent.json["CustomPrefs"] as? [String: String])
         #expect(prefs["removeNextUp"] == #"{"value":{}}"#)
         #expect(try HomePageSettings(json: #require(prefs["home_settings"])) == settings)
+    }
+
+    @Test func `reset forgets the saved rows and keeps the entry's other keys`() async throws {
+        let server = HomeServer("settings-reset.test") { path, request in
+            guard path == "/DisplayPreferences/default" else { return nil }
+            if request.method == "POST" {
+                return MockServer.Reply(status: 204, body: "")
+            }
+            return .displayPreferences(["removeNextUp": #"{"value":{}}"#, "home_settings": Self.savedJSON])
+        }
+
+        try await HomePreferencesWriter(session: server.session()).forgetHomePageSettings()
+
+        let sent = try #require(server.requests(to: "/DisplayPreferences/default").last { $0.method == "POST" })
+        #expect(sent.json["CustomPrefs"] as? [String: String] == ["removeNextUp": #"{"value":{}}"#])
     }
 
     @Test func `an entry with nulls in it is read, and saved with its other fields`() async throws {
@@ -231,6 +246,21 @@ struct HomeSettingsTests {
             .recentlyAdded(parentID: "movies"), .continueWatching, .nextUp, .genres(parentID: "movies"),
         ])
         #expect(split[2].viewOptions == look)
+    }
+
+    @Test func `combining beside a combined row keeps just the one`() {
+        var look = HomeRowViewOptions()
+        look.showTitles = true
+        let rows = [
+            HomeRowConfig(.continueWatchingCombined, viewOptions: look),
+            HomeRowConfig(.recentlyAdded(parentID: "movies")),
+            HomeRowConfig(.nextUp),
+        ]
+
+        let combined = rows.combiningWatchingRows()
+
+        #expect(combined.map(\.kind) == [.continueWatchingCombined, .recentlyAdded(parentID: "movies")])
+        #expect(combined[0].viewOptions == look)
     }
 
     @Test func `row IDs are stable and readable`() {

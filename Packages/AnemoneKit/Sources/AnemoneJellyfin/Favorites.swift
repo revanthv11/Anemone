@@ -50,6 +50,19 @@ public struct FavoritesContent: Hashable, Sendable {
         self.sections = sections
         self.failedKinds = failedKinds
     }
+
+    /// The page with one type's row loaded again, as after a favourite of that type changed. The
+    /// row goes when `items` is empty, and a new row comes in at its place in the page's order.
+    public func replacing(_ kind: MediaItem.Kind, with items: [ItemDetails]) -> FavoritesContent {
+        var sections = sections.filter { $0.kind != kind }
+        if !items.isEmpty {
+            let order = FavoritesSection.kinds
+            let rank = { (kind: MediaItem.Kind) in order.firstIndex(of: kind) ?? order.count }
+            let index = sections.firstIndex { rank($0.kind) > rank(kind) } ?? sections.count
+            sections.insert(FavoritesSection(kind: kind, items: items), at: index)
+        }
+        return FavoritesContent(sections: sections, failedKinds: failedKinds.filter { $0 != kind })
+    }
 }
 
 /// Ported from Wholphin's `FavoritesViewModel`.
