@@ -56,7 +56,7 @@ final class ItemContextActions {
         var details = target.details
         // A card without the user's state, or one a menu or the player has changed since, may not
         // have the current resume position.
-        if !target.knowsState || marks.marks(for: target.id, given: given) != given {
+        if !target.knowsState || marks.savedMarks(for: target.id, given: given) != nil {
             do {
                 details = try await browse.session.itemDetails(id: target.id)
             } catch {
@@ -85,10 +85,9 @@ final class ItemContextActions {
 
     private func note(_ state: ItemDetails.UserState, for id: MediaItem.ID, given: CardMarks) {
         var badges = CardBadges(isFavorite: state.isFavorite, isPlayed: state.isPlayed)
-        // Only on cards that show a count; the server's answer to a change doesn't always have one.
-        if given.badges.unplayedCount != nil {
-            badges.unplayedCount = state.unplayedCount ?? (state.isPlayed ? 0 : given.badges.unplayedCount)
-        }
+        // The server's answer to a change doesn't always have a count. Cards of the item that show
+        // one take it from here, and only those do.
+        badges.unplayedCount = state.unplayedCount ?? given.badges.unplayedCount.map { state.isPlayed ? 0 : $0 }
         marks.record(CardMarks(badges: badges, progress: state.progress), for: id, replacing: given)
         revision += 1
     }
@@ -166,13 +165,13 @@ private struct ItemContextMenu: View {
     }
 
     private func entries(for target: MenuTarget) -> [ItemMenuEntry] {
-        let shown = actions.marks.marks(for: target.id, given: given)
-        let state = if shown != given {
-            // What the menu last saved, which is newer than what the card holds.
+        let state = if let saved = actions.marks.savedMarks(for: target.id, given: given) {
+            // What a menu last saved for the item, from any of its cards, which is newer than what
+            // this card holds.
             ItemMenuState(
-                isPlayed: shown.badges.isPlayed,
-                isFavorite: shown.badges.isFavorite,
-                isResumable: (shown.progress ?? 0) > 0,
+                isPlayed: saved.badges.isPlayed,
+                isFavorite: saved.badges.isFavorite,
+                isResumable: (saved.progress ?? 0) > 0,
             )
         } else if target.knowsState {
             target.details.menuState
