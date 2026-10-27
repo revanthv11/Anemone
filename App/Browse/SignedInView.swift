@@ -62,6 +62,7 @@ struct SignedInView: View {
         .tabViewStyle(.sidebarAdaptable)
         .itemContextActions()
         .environment(browse)
+        .musicPlayback(session: browse.session)
         .task {
             await browse.load()
         }
