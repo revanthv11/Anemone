@@ -153,7 +153,20 @@ private final class PrefsAfterNextUp: URLProtocol, @unchecked Sendable {
         var timedOut = false
     }
 
-    private static let state = Mutex(State())
+    /// A lock around `State` with a plain `inout`. `Mutex.withLock`'s `inout sending` makes Xcode 26.6's
+    /// region checker reject storing `self` in the state, though this class is `@unchecked Sendable`.
+    private final class LockedState: @unchecked Sendable {
+        private let lock = NSLock()
+        private var value = State()
+
+        func withLock<Result>(_ body: (inout State) -> Result) -> Result {
+            lock.lock()
+            defer { lock.unlock() }
+            return body(&value)
+        }
+    }
+
+    private static let state = LockedState()
 
     static var timedOut: Bool {
         state.withLock(\.timedOut)
