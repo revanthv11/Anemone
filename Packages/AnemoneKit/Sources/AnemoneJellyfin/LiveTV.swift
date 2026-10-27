@@ -102,7 +102,7 @@ public extension JellyfinSession {
         async let scheduled = send(Paths.getTimers(parameters: .init(isActive: false, isScheduled: true)))
         async let series = send(Paths.getSeriesTimers())
         return try await LiveTVSchedule(
-            active: (active.items ?? []).compactMap(LiveTVRecording.init),
+            active: recordingsWithTimes(active.items ?? []),
             scheduled: (scheduled.items ?? []).compactMap(LiveTVTimer.init),
             series: (series.items ?? []).compactMap(LiveTVSeriesTimer.init),
         )

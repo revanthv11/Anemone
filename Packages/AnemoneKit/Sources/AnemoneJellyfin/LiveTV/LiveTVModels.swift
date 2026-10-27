@@ -93,7 +93,9 @@ public struct LiveTVProgram: Hashable, Identifiable, Sendable {
         self.channelID = channelID
         self.name = name
         self.start = start
-        self.end = end
+        // A listing the server says ends before it starts has no length: the guide draws no cell
+        // for it, as for any programme without one, and its times show its start twice.
+        self.end = max(start, end)
         self.episodeTitle = episodeTitle
         self.overview = overview
         self.seasonNumber = seasonNumber
@@ -112,6 +114,31 @@ public struct LiveTVProgram: Hashable, Identifiable, Sendable {
 
     public func isAiring(at date: Date) -> Bool {
         start <= date && date < end
+    }
+
+    /// "8:00 – 9:30 PM", with the weekday when it isn't today, as Wholphin's guide shows times.
+    public func timeRange(now: Date = .now, calendar: Calendar = .current) -> String {
+        // A range needs its start first, and `end` can change after the programme is made.
+        let end = max(start, end)
+        // The interval style shares the AM or PM ("8:00 – 9:30 PM") but adds dates across
+        // midnight, so those get the two times on their own.
+        let range = if calendar.isDate(start, inSameDayAs: end) {
+            (start ..< end).formatted(Date.IntervalFormatStyle(
+                date: .omitted,
+                time: .shortened,
+                calendar: calendar,
+                timeZone: calendar.timeZone,
+            ))
+        } else {
+            [start, end].map { $0.formatted(Self.time(in: calendar)) }.joined(separator: " – ")
+        }
+        guard !calendar.isDate(start, inSameDayAs: now) else { return range }
+        let weekday = Date.FormatStyle(calendar: calendar, timeZone: calendar.timeZone).weekday(.abbreviated)
+        return "\(start.formatted(weekday)) \(range)"
+    }
+
+    private static func time(in calendar: Calendar) -> Date.FormatStyle {
+        Date.FormatStyle(date: .omitted, time: .shortened, calendar: calendar, timeZone: calendar.timeZone)
     }
 
     /// "S1:E3" when both numbers are known.
@@ -300,22 +327,6 @@ extension LiveTVTimer {
         program.seriesTimerID = dto.seriesTimerID.nonBlank ?? program.seriesTimerID
         program.channelName = program.channelName ?? dto.channelName
         self.init(id: id, program: program, isInProgress: dto.status == .inProgress)
-    }
-}
-
-extension LiveTVRecording {
-    /// The server adds its timer's times, IDs and programme details to a recording under way,
-    /// which it reads as a programme would be. Only watching the channel would need the channel,
-    /// so a recording without one is still listed.
-    init?(_ dto: BaseItemDto) {
-        guard let id = dto.id else { return nil }
-        var programDto = dto
-        programDto.id = dto.programID ?? id
-        programDto.channelID = dto.channelID ?? ""
-        guard var program = LiveTVProgram(programDto) else { return nil }
-        // The artwork is the recording's.
-        program.image = ItemImage(itemID: id, kind: .primary, tag: dto.imageTags?[ImageType.primary.rawValue])
-        self.init(id: id, program: program)
     }
 }
 

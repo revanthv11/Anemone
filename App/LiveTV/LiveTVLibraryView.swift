@@ -78,8 +78,8 @@ struct LiveTVLibraryView: View {
             LiveTVProgramSheet(program: program) { program in
                 pendingPlayback = browse.playback(onChannelOf: program, channel: guide?.channel(program.channelID))
                 shownProgram = nil
-            } changed: { _ in
-                recordingsChanged()
+            } changed: { program, series in
+                recordingsChanged(onChannel: series ? nil : program.channelID)
             }
         }
         .sheet(isPresented: $showsViewOptions) {
@@ -232,12 +232,13 @@ struct LiveTVLibraryView: View {
         }
     }
 
-    /// A series recording can mark programmes on any channel, so every row loaded so far loads
-    /// its listings again.
-    private func recordingsChanged() {
+    /// The schedule and channels load again, and so do the guide's listings: for a programme's
+    /// own recording, only the rows of its channel's page; for a series (`channel` `nil`), which
+    /// can mark programmes on any channel, every row loaded so far.
+    private func recordingsChanged(onChannel channel: LiveTVChannel.ID?) {
         version += 1
         Task {
-            await guide?.reloadListings()
+            await guide?.reloadListings(channel: channel)
         }
     }
 
@@ -254,20 +255,20 @@ struct LiveTVLibraryView: View {
     }
 
     private func cancel(_ series: LiveTVSeriesTimer) {
-        cancelTimer(series.id, series: true, name: series.name)
+        cancelTimer(series.id, series: true, name: series.name, channel: nil)
     }
 
     private func cancel(_ recording: LiveTVRecording, series: Bool) {
         let program = recording.program
         guard let timerID = series ? program.seriesTimerID : program.timerID else { return }
-        cancelTimer(timerID, series: series, name: program.name)
+        cancelTimer(timerID, series: series, name: program.name, channel: series ? nil : program.channelID)
     }
 
-    private func cancelTimer(_ timerID: String, series: Bool, name: String) {
+    private func cancelTimer(_ timerID: String, series: Bool, name: String, channel: LiveTVChannel.ID?) {
         Task {
             do {
                 try await browse.session.cancelRecording(timerID: timerID, series: series)
-                recordingsChanged()
+                recordingsChanged(onChannel: channel)
             } catch {
                 notice = browse.problem(with: error, failure: "Couldn't cancel \(name).")
             }

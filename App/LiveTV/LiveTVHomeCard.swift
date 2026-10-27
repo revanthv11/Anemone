@@ -14,8 +14,9 @@ struct LiveTVHomeCard<Label: View>: View {
     /// The signed-in app's card actions, whose player outlives Home's rows refreshing.
     @Environment(ItemContextActions.self) private var actions
     @State private var shownProgram: LiveTVProgram?
-    /// Waits for the programme sheet to close before the player opens.
-    @State private var pendingPlayback: PlaybackRequest?
+    /// The player, and Home's refresh, wait for the programme sheet to close: the refresh can take
+    /// this card out of its row, sheet and all.
+    @State private var followUp = LiveTVSheetFollowUp<PlaybackRequest>()
 
     init(item: MediaItem, isChannel: Bool, @ViewBuilder label: () -> Label) {
         self.item = item
@@ -27,13 +28,13 @@ struct LiveTVHomeCard<Label: View>: View {
         Button(action: select) {
             label
         }
-        .sheet(item: $shownProgram, onDismiss: playPending) { program in
+        .sheet(item: $shownProgram, onDismiss: sheetDismissed) { program in
             LiveTVProgramSheet(program: program) { program in
-                pendingPlayback = browse.playback(onChannelOf: program)
+                followUp.play(browse.playback(onChannelOf: program))
                 shownProgram = nil
-            } changed: { _ in
+            } changed: { _, _ in
                 // Active Recordings may have changed.
-                Task { await browse.refresh() }
+                followUp.recordingChanged()
             }
         }
     }
@@ -54,10 +55,13 @@ struct LiveTVHomeCard<Label: View>: View {
         }
     }
 
-    private func playPending() {
-        if let pendingPlayback {
-            self.pendingPlayback = nil
-            actions.playback = pendingPlayback
+    private func sheetDismissed() {
+        let next = followUp.sheetClosed()
+        if let playback = next.playback {
+            actions.playback = playback
+        }
+        if next.refreshes {
+            Task { await browse.refresh() }
         }
     }
 }

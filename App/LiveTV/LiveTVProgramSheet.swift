@@ -9,8 +9,8 @@ import SwiftUI
 struct LiveTVProgramSheet: View {
     let program: LiveTVProgram
     let watch: (LiveTVProgram) -> Void
-    /// A recording was set or cancelled.
-    let changed: (LiveTVProgram) -> Void
+    /// A recording was set or cancelled: the programme's own, or (`series`) its series'.
+    let changed: (_ program: LiveTVProgram, _ series: Bool) -> Void
 
     @Environment(BrowseModel.self) private var browse
     @Environment(\.dismiss) private var dismiss
@@ -66,12 +66,12 @@ struct LiveTVProgramSheet: View {
             if program.isSeries {
                 if let seriesTimerID = program.seriesTimerID {
                     Button("Cancel Series Recording", systemImage: "xmark.circle") {
-                        perform { try await $0.cancelRecording(timerID: seriesTimerID, series: true) }
+                        perform(series: true) { try await $0.cancelRecording(timerID: seriesTimerID, series: true) }
                     }
                     .accessibilityIdentifier("program.cancelSeries")
                 } else {
                     Button("Record Series", systemImage: "record.circle") {
-                        perform { try await $0.record(programID: program.id, series: true) }
+                        perform(series: true) { try await $0.record(programID: program.id, series: true) }
                     }
                     .accessibilityIdentifier("program.recordSeries")
                 }
@@ -80,12 +80,12 @@ struct LiveTVProgramSheet: View {
             if program.end > now {
                 if let timerID = program.timerID {
                     Button("Cancel Recording", systemImage: "xmark.circle") {
-                        perform { try await $0.cancelRecording(timerID: timerID, series: false) }
+                        perform(series: false) { try await $0.cancelRecording(timerID: timerID, series: false) }
                     }
                     .accessibilityIdentifier("program.cancelRecording")
                 } else {
                     Button("Record", systemImage: "record.circle") {
-                        perform { try await $0.record(programID: program.id, series: false) }
+                        perform(series: false) { try await $0.record(programID: program.id, series: false) }
                     }
                     .accessibilityIdentifier("program.record")
                 }
@@ -95,13 +95,13 @@ struct LiveTVProgramSheet: View {
 
     /// Sends the change, then closes, so the page shows the new state; when the server refuses,
     /// says why and stays open.
-    private func perform(_ change: @escaping @Sendable (JellyfinSession) async throws -> Void) {
+    private func perform(series: Bool, _ change: @escaping @Sendable (JellyfinSession) async throws -> Void) {
         isWorking = true
         let session = browse.session
         Task {
             do {
                 try await change(session)
-                changed(loaded ?? program)
+                changed(loaded ?? program, series)
                 dismiss()
             } catch {
                 problem = browse.problem(
