@@ -19,7 +19,9 @@ Each build sets both:
     'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) ANEMONE_SEERR'
   ```
 
-  The same works for `build-for-testing` and `archive`. `xcodebuild` can't choose a local package's traits on its command line, so `Package.swift` makes the trait a default one when it sees `ANEMONE_SEERR` set (to anything but `0` or `NO`) in its environment, which `xcodebuild` passes on to it.
+  The same works for `build-for-testing` and `archive`. `xcodebuild` can't choose a local package's traits on its command line, so `Package.swift` makes the trait a default one when it sees `ANEMONE_SEERR` set (to anything but `0` or `NO`) in its environment, which `xcodebuild` passes on to it, and makes the client's packages plain dependencies, since Xcode 27.1 didn't apply a default trait to the package's target dependencies.
+
+  Xcode keeps the package graph it worked out in DerivedData: a build without Seerr after one with it, in the same DerivedData, failed with "Missing package product 'swift-openapi-runtime_OpenAPIRuntime…'" until that DerivedData's `Build/Intermediates.noindex/XCBuildData/PIFCache` was deleted. Give each build its own `-derivedDataPath`, or delete that folder when switching. CI's jobs each start fresh.
 - **Package tests (`swift test`):**
 
   ```
@@ -29,14 +31,14 @@ Each build sets both:
   `ANEMONE_SEERR=1 swift test …` does the same.
 - **In Xcode:** build from the command line, as above; the simulator can then run that build. The project's own build settings don't reach the package, and an Xcode launched without `ANEMONE_SEERR` in its environment leaves the trait off.
 
-The condition without the trait, such as `swift test -Xswiftc -DANEMONE_SEERR` or the build setting without the environment variable, stops the build with an error that points here, since the client would be compiled without its packages.
+The condition without the trait, such as `swift test -Xswiftc -DANEMONE_SEERR` or the build setting without the environment variable, stops the build with an error that points here, since the client would be compiled without its packages. (In a DerivedData that has built Seerr before, the packages' old modules are still found, and it fails to link instead.)
 
-The default build, the one CI's `build` job and App Store archives make, has Seerr off. A trait only decides what's built: both `Package.resolved` files pin the Seerr client's packages, so neither changes when Seerr is turned on or off, and Seerr-on builds use the same versions every time.
+The default build, the one CI's `build` job and App Store archives make, has Seerr off. The switch only decides what's built: both `Package.resolved` files pin the Seerr client's packages, so neither changes when Seerr is turned on or off, and Seerr-on builds use the same versions every time. After changing `Package.swift`, resolve with `ANEMONE_SEERR=1` so the files keep those pins, then check that resolving without it leaves them alone.
 
 ### Why a trait and an environment variable
 
 - **The packages.** Before the trait, `AnemoneSeerr` always depended on the client's three packages, so every build compiled and linked them even with Seerr off. The trait leaves them out of the build graph; SwiftPM and Xcode don't even fetch them then.
-- **The environment variable.** Xcode 26.4 and later can set a package's traits, but only in the project, for every build, and `xcodebuild` has no option for it. Reading the environment in `Package.swift` keeps the project file the same for both builds and lets CI turn Seerr on with a variable.
+- **The environment variable.** Xcode 26.4 and later can set a package's traits, but only in the project, for every build, and `xcodebuild` has no option for it. Turning the trait on by default from the environment wasn't enough either: Xcode 27.1 resolved the client's packages, then built `AnemoneSeerr` without them. Reading the environment in `Package.swift` and making them plain dependencies keeps the project file the same for both builds and lets CI turn Seerr on with a variable.
 - **The app's condition.** A trait only reaches the package's targets, so the app needs its own condition either way.
 
 ## The client
