@@ -123,7 +123,10 @@ public final class PlaybackController: Identifiable {
     public func start() async {
         guard !hasStarted else { return }
         hasStarted = true
-        await loadIntros()
+        // What the request's `intros` finds plays first; a failure plays the queue as it is.
+        if let intros, let found = try? await intros(queue.current), !isStopped {
+            queue.insertBeforeCurrent(found)
+        }
         loadFollowing()
         await load(allowsDirect: true, from: queue.current.startPosition, as: beginLoad())
     }
@@ -169,9 +172,10 @@ public final class PlaybackController: Identifiable {
         }
     }
 
-    /// Does nothing at the end of the queue.
+    /// Plays `queue.next`, passing over intros; does nothing at the end of the queue.
     public func playNext() {
-        play(entryAt: queue.currentIndex + 1)
+        guard let index = queue.nextIndex else { return }
+        play(entryAt: index)
     }
 
     /// Closes the player, as at the end of the queue; for features such as pass-out protection.
@@ -188,15 +192,6 @@ public final class PlaybackController: Identifiable {
     /// the segments feature where the credits start.
     public func feature<Feature: PlaybackFeature>(_: Feature.Type) -> Feature? {
         features.lazy.compactMap { $0 as? Feature }.first
-    }
-
-    /// Puts what the request's `intros` finds before the first entry. A failure plays the queue
-    /// as it is.
-    private func loadIntros() async {
-        guard let intros else { return }
-        self.intros = nil
-        guard let found = try? await intros(queue.current), !found.isEmpty, !isStopped else { return }
-        queue.insertBeforeCurrent(found)
     }
 
     /// Adds what the request's `following` finds to the end of the queue. A failure leaves the
@@ -224,6 +219,10 @@ public final class PlaybackController: Identifiable {
             await play(stream, entry, from: position)
         } catch {
             guard !isStopped, attempt == loads else { return }
+            // An intro the server won't offer is passed over (Phase 5c).
+            if let afterIntro = queue.afterIntroIndex {
+                return play(entryAt: afterIntro)
+            }
             state = .failed(error)
             await publish(.failed(error))
         }
@@ -250,7 +249,11 @@ public final class PlaybackController: Identifiable {
         // Unless a feature moved on meanwhile.
         guard !isStopped, attempt == loads else { return }
         guard stream.method != .transcode else {
-            state = .failed(error)
+            if let afterIntro = queue.afterIntroIndex {
+                play(entryAt: afterIntro)
+            } else {
+                state = .failed(error)
+            }
             return
         }
         let position = currentPosition
@@ -267,9 +270,8 @@ public final class PlaybackController: Identifiable {
         guard !isStopped else { return }
         // An intro plays straight into what follows, as in Wholphin: features don't hear it end,
         // so Up Next doesn't offer what's next.
-        if queue.current.isIntro, queue.next != nil {
-            playNext()
-            return
+        if let afterIntro = queue.afterIntroIndex {
+            return play(entryAt: afterIntro)
         }
         stopWatching()
         let attempt = loads

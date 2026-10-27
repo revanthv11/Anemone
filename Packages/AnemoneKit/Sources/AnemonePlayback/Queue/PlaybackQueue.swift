@@ -8,7 +8,8 @@ public struct PlaybackQueue: Sendable {
         /// Where to start; the beginning when `nil`.
         public var startPosition: Duration?
         public var metadata: PlaybackMetadata
-        /// A cinema-mode intro, which plays straight into the entry after it (Phase 5c).
+        /// A cinema-mode intro, which plays straight into the entry after it (Phase 5c). What
+        /// counts entries or moves between them passes over intros; see `next`.
         public var isIntro: Bool
 
         public init(
@@ -53,9 +54,49 @@ public struct PlaybackQueue: Sendable {
         entries[currentIndex]
     }
 
-    /// The entry after the current one, if there is one.
+    /// The entry after the current one, if there is one, passing over intros: what Next, Up Next
+    /// and Now Playing move on to. Intros only lead into the entry after them, which the
+    /// controller plays itself (Phase 5c).
     public var next: Entry? {
-        entries.indices.contains(currentIndex + 1) ? entries[currentIndex + 1] : nil
+        nextIndex.map { entries[$0] }
+    }
+
+    /// While an intro plays, where the entry right after it is, another intro or what was picked:
+    /// the player plays it straight after the intro, or in its place when the intro won't play,
+    /// so the user still gets what they picked rather than an error.
+    public var afterIntroIndex: Int? {
+        current.isIntro && entries.indices.contains(currentIndex + 1) ? currentIndex + 1 : nil
+    }
+
+    /// Where `next` is in `entries`.
+    public var nextIndex: Int? {
+        entries.indices.dropFirst(currentIndex + 1).first { !entries[$0].isIntro }
+    }
+
+    /// Where the closest entry before the current one is, passing over intros, as Previous goes
+    /// back to it: an intro isn't played again once what it led into has started.
+    public var previousIndex: Int? {
+        entries.indices.prefix(currentIndex).last { !entries[$0].isIntro }
+    }
+
+    /// The entries after the current one, with their places in `entries`, without intros: what
+    /// the player's queue row offers.
+    public var upcoming: [(index: Int, entry: Entry)] {
+        entries.indices.dropFirst(currentIndex + 1).compactMap { index in
+            entries[index].isIntro ? nil : (index, entries[index])
+        }
+    }
+
+    /// How many entries there are besides intros: what the player counts, as in "Playing 3 of 5"
+    /// and Now Playing's queue.
+    public var countWithoutIntros: Int {
+        entries.count(where: { !$0.isIntro })
+    }
+
+    /// The current entry's place among the entries besides intros, from 0. An intro is counted
+    /// at the place of the entry it leads into.
+    public var indexWithoutIntros: Int {
+        entries.prefix(currentIndex).count(where: { !$0.isIntro })
     }
 
     /// Adds entries at the end, such as the episodes after the one playing once they've loaded.
