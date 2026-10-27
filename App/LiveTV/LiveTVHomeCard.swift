@@ -27,15 +27,15 @@ struct LiveTVHomeCard<Label: View>: View {
         Button(action: select) {
             label
         }
-            .sheet(item: $shownProgram, onDismiss: playPending) { program in
-                LiveTVProgramSheet(program: program) { program in
-                    pendingPlayback = browse.playback(onChannelOf: program)
-                    shownProgram = nil
-                } changed: { _ in
-                    // Active Recordings may have changed.
-                    Task { await browse.refresh() }
-                }
+        .sheet(item: $shownProgram, onDismiss: playPending) { program in
+            LiveTVProgramSheet(program: program) { program in
+                pendingPlayback = browse.playback(onChannelOf: program)
+                shownProgram = nil
+            } changed: { _ in
+                // Active Recordings may have changed.
+                Task { await browse.refresh() }
             }
+        }
     }
 
     private func select() {
