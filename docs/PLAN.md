@@ -78,6 +78,19 @@ The FSF considers Apple's App Store terms incompatible with the GPL; in practice
 - Support [jellyfin-plugin-wholphin](https://github.com/damontecres/jellyfin-plugin-wholphin) (`GET /wholphin/public`, `GET /wholphin/homesettings`), so admins configure home layouts once for both apps.
 - Offer "Import from Wholphin" by reading its DisplayPreferences entry (id `default`, client `Wholphin`, key `home_settings`). Anemone writes its own entry under client `Anemone`.
 
+### Seams
+
+So the rest of the plan can be built in separate files, side by side:
+
+- **Player engine:** `PlaybackController` drives a `PlayerEngine`, never AVPlayer itself. An engine loads a URL at a start position, plays, pauses, seeks exactly, reports the time, duration and rate, sends status, end and failure events, lists and selects audio and subtitle tracks, and gives the UI its video output. `AVPlayerEngine` is the only one so far; MPV will conform the same way, as Swiftfin's AVPlayer and MPV players do.
+- **Queue:** the controller plays a `PlaybackQueue` of entries (item, start position, metadata). Pages ask for playback with a `PlaybackRequest` (a queue, and whether to shuffle) from the builders in `App/Playback/PlaybackSupport.swift`, and `.player($request)` builds the controller. Every queue holds one item for now. `play(entryAt:)` and `playNext()` play another entry with its own PlaybackInfo and play session, after ending the current session.
+- **Playback features:** each `PlaybackFeature` hears the controller's events in order (loaded, started, position once a second, paused, resumed, ended, failed, stopped), acts through the controller, and shows controls through `PlayerAccessories`: actions, transport-bar menus and a card. The system player shows them as `contextualActions`, `transportBarCustomMenuItems` and a card over the video; Anemone's overlay will show the same. Features are listed in `PlaybackController.features(for:)`; the first is `ProgressReporting`. At the end of an entry the player closes, unless a feature played another entry or set `closesAtEnd` to `false`; `finish()` closes it.
+- **Settings:** `App/Settings/SettingsView.swift` has the account (switch user, profile lock, sign out) and a page each for Sidebar, Home, Playback, Subtitles, Appearance and About. Playback links to a page per part of playback. A setting is a `Preference` (a UserDefaults key and a default, with Wholphin's name and default where it has one), declared in an extension of `Preferences` next to what uses it, read with `value()` and bound with `@AppStorage(Preferences.someSetting)`.
+- **Library kinds:** Live TV, music and photo libraries open `App/LiveTV`, `App/Music` and `App/Photos`.
+- **UI tests:** `UITests/Support` has helpers to launch, wait for Home, press sequences, move and wait for focus, open a sidebar destination and attach screenshots. `UITests/SmokeUITests.swift` plays an item from Continue Watching for about 10 s, and runs only when asked to; its doc comment has the command.
+
+Apart from Settings, now a list with a page for each part of the app, nothing visible changed. Tested live in the simulator against the Jellyfin 12.3 demo server: resuming a movie by direct play and closing with Menu still updates Resume on its page; Settings opens each page and comes back; the music library still shows its grid. With a throwaway feature, the system player showed a card over the video with focus on its first button, a contextual action, and a menu above the transport bar whose choice showed as selected. Not verified live: the Live TV and photo pages (the demo server has neither kind of library), listing and choosing tracks through the engine, and moving through a queue of more than one entry, which only the unit tests cover.
+
 ## Phases
 
 ### Phase 0: setup and spikes
@@ -142,10 +155,25 @@ Tested live in the simulator against the Jellyfin 12.3 demo server profile saved
 - Play, Resume and Restart play since Phase 3a. Play and Shuffle on series, collections and playlists are still marked as not wired up; they need queues
 - Not yet: trailers, extras, chapters, version and track choice, delete, the context menu, collection sort/filter/view options, Seerr rows, theme music
 
-#### Later in Phase 2
+#### 2d: search
 
-- Home page: the other row types (combined Continue Watching and Next Up, Recently Released, Genres, Studios, Favorites, Live TV rows, Suggestions, ByParent, GetItems, CustomEndpoint), customization, server sync, companion plugin
-- Search, favorites, context menu
+Not started. Wholphin's search page: type-ahead, results in rows by type, search type and view options, recent searches.
+
+#### 2e: home row types, customization and server sync
+
+Not started. The other row types (combined Continue Watching and Next Up, Recently Released, Genres, Studios, Favorites, Live TV rows, Suggestions, ByParent, GetItems, CustomEndpoint), customization in Settings › Home, server sync, the companion plugin, and Import from Wholphin.
+
+#### 2f: library tabs and layouts
+
+Not started. Wholphin's other library tabs (Recommended, Collections, Genres, Studios), list layouts, the details header and backdrop options, page jumps with the remote, and remembered tabs.
+
+#### 2g: item page extras: trailers, extras, chapters, delete, collection options
+
+Not started.
+
+#### 2h: Favorites page and card context menu
+
+Not started. The Favorites destination is in the sidebar, before the libraries as in Wholphin's drawer, and hidden until this lands.
 
 ### Phase 3: playback v1 (AVPlayer)
 
@@ -164,17 +192,42 @@ Resuming a transcode waits for the server to restart the transcode at the resume
 
 Not yet: skip-back on resume, keeping playback going across the app going to the background, version choice, and a bitrate setting. Series, collection and playlist Play and Shuffle wait for queues.
 
-#### Later in Phase 3
+#### 3b: queues and Up Next with pass-out protection
 
-- Audio/subtitle choice, ported from `StreamChoiceService` (per-item and per-series persistence)
-- Plex-style overlay: D-pad seek with acceleration, chapters, queue, trickplay
-- Media segments (intro, credits, recap, preview, commercial): ignore / ask / auto-skip
-- Next up with autoplay countdown and pass-out protection
-- Queues: Play and Shuffle for series, collections and playlists
-- Now Playing artwork and remote commands, frame-rate and HDR matching
-- First TestFlight builds start here
+Not started. Play and Shuffle for series, seasons, collections and playlists; Up Next with an autoplay countdown, and pass-out protection.
+
+What tvOS offers the system player for this, checked in the SDK headers (all available since tvOS 15 or earlier, none deprecated, so all in tvOS 26):
+
+- `contextualActions` (tvOS 15): buttons over the video, which S0 maps `PlayerAccessories.actions` onto. Suits "Next Episode" during the credits.
+- `transportBarCustomMenuItems` (tvOS 15): `UIMenu`s and `UIAction`s above the transport bar, one level deep; `PlayerAccessories.menus` maps onto it.
+- `customOverlayViewController` (tvOS 13): shown only when the user asks for it (swiping up, or a button in the transport bar), so it can't pop up an Up Next card on its own. `PlayerAccessories.card` shows as a SwiftUI card over the player instead; in the simulator, focus moved to its first button when it appeared, and its buttons worked.
+- `AVContentProposal` and `AVContentProposalViewController` (tvOS 10): tvOS's own Up Next. Set `AVPlayerItem.nextContentProposal` with `contentTimeForTransition` and `automaticAcceptanceInterval`; at that time the player shows the app's `contentProposalViewController` subclass and shrinks the video into its `preferredPlayerViewFrame`, with `dateOfAutomaticAcceptance` for a countdown. The delegate's `playerViewController(_:didAcceptContentProposal:)` must load the next item (`playNext()`), and rejecting dismisses the player unless the delegate handles it. It's the native look, but only for the system player; Anemone's overlay (3e) and MPV need the card, so an Up Next built on the card works in both.
+
+For pass-out protection, the system player keeps remote presses to itself. Pausing, resuming and scrubbing reach features as events; noticing any press would take a press observer in `PlayerScreen`.
+
+#### 3c: media segments: skip intro, credits, recap and more
+
+Not started. Intro, credits, recap, preview and commercial segments: ignore, ask (a skip button), or auto-skip.
+
+#### 3d: audio and subtitle choice
+
+Not started. Ported from `StreamChoiceService`, remembered per item and per series, with Audio and Subtitles menus in the player.
+
+#### 3e: Anemone player overlay, seeking, chapters, trickplay
+
+Not started. Plex-style overlay: D-pad seek with acceleration, clickpad scrubbing, chapters, queue, trickplay, and the controls features add.
+
+#### 3f: Now Playing, display matching and playback settings
+
+Not started. Now Playing artwork and remote commands, frame-rate and HDR matching, skip-back on resume, a bitrate setting, version choice, and what happens when the app goes to the background.
+
+First TestFlight builds start once Phase 3 is done.
 
 ### Phase 4: playback v2 (MPV)
+
+#### 4: MPV engine, ASS/PGS subtitles, styling, delay, speed, subtitle search
+
+Not started.
 
 - MPV engine and profile; player-choice rules (`EXO_PLAYER` → AVPlayer, `MPV`, `PREFER_MPV`)
 - ASS and PGS subtitles, subtitle styling with a separate HDR style, subtitle delay, playback speed
@@ -182,23 +235,43 @@ Not yet: skip-back on resume, keeping playback going across the app going to the
 
 ### Phase 5: breadth
 
-- Live TV guide, recordings and DVR scheduling
-- Music, Now Playing, synced lyrics
-- Photo slideshow
-- Theme music, trailers (remote trailers hand off to the YouTube app), cinema-mode intros
-- Seerr behind a build flag
-- Top Shelf, `anemone://` deep links, in-app screensaver, colour themes
+#### 5a: Live TV guide, recordings, DVR
+
+Not started. Live TV libraries open `App/LiveTV`, which shows a placeholder until then.
+
+#### 5b: music, music Now Playing, synced lyrics
+
+Not started. Music libraries open `App/Music`, which shows the library grid until then.
+
+#### 5c: photos slideshow, theme music, cinema-mode intros
+
+Not started. Photo libraries open `App/Photos`, which shows the library grid until then.
+
+#### 5d: Seerr behind a build flag
+
+Not started.
+
+#### 5e: Top Shelf, deep links, in-app screensaver
+
+Not started.
 
 ### Phase 6: App Store release
 
-- Localization import from Wholphin's translations
-- VoiceOver pass
+#### 6a: release config: privacy, ATS, export compliance, licenses screen, EULA draft
+
+Not started.
+
 - Privacy manifest and privacy labels (no data collected; logs go only to the user's own server)
 - Export compliance (standard encryption only)
 - ATS justification for user-entered plain-HTTP servers; local network usage string
 - Demo Jellyfin server and reviewer login, with legally free media
 - Custom GPL EULA, source tag per build
-- Decide whether Seerr ships in 1.0
+
+#### 6b: colour themes, VoiceOver pass, localization import
+
+Not started. Localization comes from Wholphin's translations.
+
+Still to decide: whether Seerr ships in 1.0.
 
 ### Phase 7: iOS and iPadOS
 
