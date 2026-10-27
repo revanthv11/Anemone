@@ -115,7 +115,7 @@ public struct HomeOptions: Sendable {
 public actor HomeCache {
     private var datePlayed: [String: (date: Date, expiry: Date)] = [:]
     private var suggestions: [String: (ids: [String], expiry: Date)] = [:]
-    private var genreImages: [String: [String: ItemImage]] = [:]
+    private var genreArt: [String: GenreArt] = [:]
 
     public init() {}
 
@@ -137,13 +137,20 @@ public actor HomeCache {
         suggestions[key] = (ids, now.addingTimeInterval(12 * 3600))
     }
 
-    func genreImages(for parentID: String) -> [String: ItemImage]? {
-        genreImages[parentID]
+    func genreArt(for parentID: String) -> GenreArt? {
+        genreArt[parentID]
     }
 
-    func setGenreImages(_ images: [String: ItemImage], for parentID: String) {
-        genreImages[parentID] = images
+    func setGenreArt(_ art: GenreArt, for parentID: String) {
+        genreArt[parentID] = art
     }
+}
+
+/// The art picked for a library's genres, and which genres were looked up, since some have no
+/// item with a backdrop.
+struct GenreArt: Sendable {
+    var images: [String: ItemImage] = [:]
+    var lookedUp: Set<String> = []
 }
 
 public extension JellyfinSession {

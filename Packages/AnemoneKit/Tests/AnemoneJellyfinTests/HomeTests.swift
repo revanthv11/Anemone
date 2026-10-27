@@ -1,6 +1,7 @@
 import AnemoneCore
 @testable import AnemoneJellyfin
 import Foundation
+import Synchronization
 import Testing
 
 /// Loading the home page's rows.
@@ -164,6 +165,34 @@ struct HomeRowKindTests {
         let art = try #require(server.requests(to: "/Items").first)
         #expect(art.query["sortBy"] == "Random")
         #expect(art.query["imageTypes"] == "Backdrop")
+    }
+
+    @Test func `a refresh keeps the genres' art and looks up only genres new since`() async throws {
+        let calls = Counter()
+        let server = HomeServer("home-genres-refresh.test") { path, request in
+            switch (path, request.query["genreIds"]) {
+            case ("/UserViews", _):
+                return .json(HomeFixtures.views)
+            case ("/Genres", _):
+                let comedy = #"{"Id":"g1","Name":"Comedy","Type":"Genre"}"#
+                let drama = #"{"Id":"g2","Name":"Drama","Type":"Genre"}"#
+                return calls.next() == 1 ? .homeItems(comedy) : .homeItems(comedy, drama)
+            case let ("/Items", genre?):
+                return .homeItems(#"{"Id":"\#(genre)-film","Name":"Film","Type":"Movie","BackdropImageTags":["bd"]}"#)
+            default:
+                return nil
+            }
+        }
+        let session = try server.session()
+        let cache = HomeCache()
+        let rows = [HomeRowConfig(.genres(parentID: "movies"))]
+
+        _ = try await session.home(rows: rows, options: HomeOptions(cache: cache))
+        let refreshed = try await session.home(rows: rows, options: HomeOptions(cache: cache, isRefresh: true))
+
+        let cards = try #require(refreshed.rows.first?.cards)
+        #expect(cards.map(\.image?.itemID) == ["g1-film", "g2-film"])
+        #expect(server.requests(to: "/Items").compactMap { $0.query["genreIds"] } == ["g1", "g2"])
     }
 
     @Test func `studio cards ask for the studios of series`() async throws {
@@ -414,5 +443,17 @@ private struct FakeLiveTV: HomeLiveTVSource {
 
     func channels(limit _: Int) async throws -> [MediaItem] {
         [MediaItem(id: "c1", name: "channel", kind: .other)]
+    }
+}
+
+/// Counts the requests a mock server answers.
+private final class Counter: Sendable {
+    private let value = Mutex(0)
+
+    func next() -> Int {
+        value.withLock { count in
+            count += 1
+            return count
+        }
     }
 }
