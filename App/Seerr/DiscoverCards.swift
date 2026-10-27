@@ -50,6 +50,7 @@
                     DiscoverCard(item: item)
                 }
                 .buttonStyle(.borderless)
+                .accessibilityLabel(item.cardLabel())
             }
         }
     }
@@ -83,6 +84,7 @@
                         DiscoverCard(item: entry.item, subtitle: entry.subtitle)
                     }
                     .buttonStyle(.borderless)
+                    .accessibilityLabel(entry.item.cardLabel(subtitle: entry.subtitle))
                     .focused(focus, equals: .card(row: "grid", item: entry.id))
                     .accessibilityIdentifier("card.grid.\(entry.id)")
                 }
@@ -111,6 +113,13 @@
 
         var cardSubtitle: String {
             [year.map(String.init), availability.label].compactMap(\.self).joined(separator: " · ")
+        }
+
+        /// What VoiceOver reads for its card: the title, then the year and availability, or the
+        /// card's own subtitle, with pauses where the card has dots.
+        func cardLabel(subtitle: String? = nil) -> String {
+            let details = subtitle.map { [$0] } ?? [year.map(String.init), availability.label].compactMap(\.self)
+            return ([title] + details).joined(separator: ", ")
         }
     }
 

@@ -3,7 +3,8 @@ import AnemoneUI
 import SwiftUI
 
 /// Wholphin's chapter row (`ChapterRow`): a card per chapter with its image, name and start,
-/// which plays the item from there. Hidden when the item has no chapters.
+/// which plays the item from there. Hidden when the item has no chapters. VoiceOver reads a
+/// card's name and start, "Intro, starts at 10 seconds".
 struct ChaptersRow: View {
     let chapters: [Chapter]
     let focus: FocusState<ItemFocus?>.Binding
@@ -17,11 +18,12 @@ struct ChaptersRow: View {
     var body: some View {
         if !chapters.isEmpty {
             CardRow(id: rowID, title: "Chapters", elements: chapters, focus: focus, memory: memory) { chapter in
+                let name = chapter.name ?? "Chapter \(chapter.index + 1)"
                 Button {
                     play(chapter.start)
                 } label: {
                     MediaCard(
-                        title: chapter.name ?? "Chapter \(chapter.index + 1)",
+                        title: name,
                         subtitle: chapter.start.clockText,
                         imageURL: browse.session.imageURL(for: chapter, maxWidth: Int(Self.cardWidth * displayScale)),
                         shape: .thumb,
@@ -29,6 +31,8 @@ struct ChaptersRow: View {
                     )
                 }
                 .buttonStyle(.borderless)
+                .accessibilityLabel(Text("\(name), starts at \(chapter.start.spokenPosition)"))
+                .accessibilityHint("Plays from this chapter")
             }
         }
     }

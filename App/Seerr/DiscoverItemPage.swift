@@ -108,28 +108,12 @@
         }
 
         private func header(_ details: DiscoverDetails) -> some View {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(details.item.title)
-                    .font(.title.bold())
-                    .lineLimit(2)
-                    .accessibilityIdentifier("detail.title")
-                Text(details.quickDetails)
-                    .font(.callout)
-                    .lineLimit(1)
-                if !details.genres.isEmpty {
-                    NameList(names: details.genres)
-                }
-                if let tagline = details.tagline {
-                    Text(tagline)
-                        .font(.callout)
-                        .italic()
-                }
+            DiscoverItemHeader(details: details) {
                 if let overview = details.item.overview, !overview.isEmpty {
                     OverviewButton(title: details.item.title, overview: overview)
                         .focused($focus, equals: .overview)
                 }
             }
-            .frame(maxWidth: ItemLayout.textWidth, alignment: .leading)
         }
 
         /// The first button follows Wholphin's `ExpandableDiscoverButtons`: Request, Requested,
@@ -296,6 +280,40 @@
         }
     }
 
+    /// The title, its details, genres and tagline, then `overview`, the page's focusable overview.
+    private struct DiscoverItemHeader<Overview: View>: View {
+        let details: DiscoverDetails
+        @ViewBuilder let overview: () -> Overview
+
+        @Environment(\.theme) private var theme
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(details.item.title)
+                    .font(.title.bold())
+                    .lineLimit(2)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityIdentifier("detail.title")
+                Text(details.quickDetails().joined(separator: " · "))
+                    .font(.callout)
+                    .lineLimit(1)
+                    .accessibilityLabel(details.quickDetails(spoken: true).joined(separator: ", "))
+                    .accessibilityIdentifier("detail.quickDetails")
+                if !details.genres.isEmpty {
+                    NameList(names: details.genres)
+                }
+                if let tagline = details.tagline {
+                    Text(tagline)
+                        .font(.callout)
+                        .italic()
+                }
+                overview()
+            }
+            .foregroundStyle(theme.onBackground)
+            .frame(maxWidth: ItemLayout.textWidth, alignment: .leading)
+        }
+    }
+
     private extension DiscoverDetails {
         /// A series the server has some of, which can be asked for more of with a second Request
         /// button after Go To.
@@ -303,22 +321,29 @@
             item.availability == .partiallyAvailable && item.kind == .series
         }
 
-        /// The year, runtime, rating and availability, in one line under the title.
-        var quickDetails: String {
+        /// The year, runtime, rating and availability, for one line under the title.
+        ///
+        /// - Parameter spoken: the parts as VoiceOver reads them, with the runtime in words and
+        ///   the rating named, without the star.
+        func quickDetails(spoken: Bool = false) -> [String] {
             var parts: [String] = []
             if let year = item.year {
                 parts.append(String(year))
             }
             if let runtime, runtime > 0 {
-                parts.append(runtime >= 60 ? "\(runtime / 60)h \(runtime % 60)m" : "\(runtime)m")
+                if spoken {
+                    parts.append(Duration.seconds(runtime * 60).spokenLength)
+                } else {
+                    parts.append(runtime >= 60 ? "\(runtime / 60)h \(runtime % 60)m" : "\(runtime)m")
+                }
             }
             if let rating, rating > 0 {
-                parts.append(String(format: "★ %.1f", rating))
+                parts.append(String(format: spoken ? "Rated %.1f out of 10" : "★ %.1f", rating))
             }
             if let label = item.availability.label {
                 parts.append(label)
             }
-            return parts.joined(separator: " · ")
+            return parts
         }
     }
 

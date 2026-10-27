@@ -94,9 +94,11 @@ struct CollectionOptionsButtons: View {
         HStack(spacing: 24) {
             if let display = Binding($display) {
                 sortMenu(display)
+                let active = display.wrappedValue.filter.activeCount
                 ActionButton(
-                    title: filterTitle(display.wrappedValue),
+                    title: active > 0 ? "Filter (\(active))" : "Filter",
                     systemImage: "line.3.horizontal.decrease.circle",
+                    spokenTitle: active > 0 ? Text("Filter, \(active) active") : nil,
                 ) {
                     showsFilters = true
                 }
@@ -157,11 +159,6 @@ struct CollectionOptionsButtons: View {
         .focused(focus, equals: .action(.viewOptions))
         .accessibilityIdentifier("collection.viewOptions")
     }
-
-    private func filterTitle(_ display: CollectionDisplay) -> String {
-        let active = display.filter.activeCount
-        return active > 0 ? "Filter (\(active))" : "Filter"
-    }
 }
 
 /// Every item in one grid, Wholphin's `CollectionMixedGrid`, drawn with the grid options.
@@ -202,6 +199,8 @@ struct CollectionGrid: View {
                     )
                 }
                 .buttonStyle(.borderless)
+                // Read whether or not the grid options show the titles.
+                .accessibilityLabel(details.cardLabel(marks: details.cardMarks))
                 .focused(focus, equals: .card(row: Self.rowID, item: details.id))
                 .accessibilityIdentifier("card.\(Self.rowID).\(details.id)")
             }

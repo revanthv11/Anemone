@@ -10,6 +10,7 @@ struct PlaylistPage: View {
 
     @Environment(BrowseModel.self) private var browse
     @Environment(MusicPlayer.self) private var music
+    @Environment(\.theme) private var theme
     @FocusState private var focus: ItemFocus?
     @State private var memory = RowMemory()
     @State private var entries: [ItemDetails]?
@@ -99,9 +100,11 @@ struct PlaylistPage: View {
                 Text(playlist.item.name)
                     .font(.title.bold())
                     .lineLimit(1)
+                    .accessibilityAddTraits(.isHeader)
                     .accessibilityIdentifier("detail.title")
                 QuickDetails(details: playlist)
             }
+            .foregroundStyle(theme.onBackground)
             HStack(spacing: 24) {
                 ActionButton(title: "Play", systemImage: "play.fill") {
                     play(shuffled: false)
@@ -204,6 +207,7 @@ struct PlaylistPage: View {
                                 EntryRow(index: index, entry: entry)
                             }
                             .buttonStyle(HighlightButtonStyle())
+                            .accessibilityLabel(entry.entryLabel(index: index))
                             .focused($focus, equals: entryFocus(index))
                             .accessibilityIdentifier("entry.\(index)")
                             if canEdit, !hasRepeats {
@@ -221,7 +225,7 @@ struct PlaylistPage: View {
             .overlay {
                 if entries.isEmpty {
                     Text("This playlist is empty.")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.secondaryText)
                 }
             }
         } else if let problem {
@@ -239,15 +243,17 @@ private struct EntryRow: View {
     let index: Int
     let entry: ItemDetails
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         HStack(spacing: 24) {
             Text("\(index + 1).")
                 .monospacedDigit()
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.secondaryText)
                 .frame(minWidth: 70, alignment: .trailing)
             if entry.userState.isFavorite {
                 Image(systemName: "heart.fill")
-                    .foregroundStyle(.red)
+                    .foregroundStyle(theme.favorite)
                     .accessibilityLabel("Favorite")
             }
             VStack(alignment: .leading, spacing: 4) {
@@ -255,7 +261,7 @@ private struct EntryRow: View {
                     .lineLimit(1)
                 Text(entry.cardSubtitle ?? " ")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryText)
                     .lineLimit(1)
             }
             Spacer(minLength: 24)
@@ -266,6 +272,7 @@ private struct EntryRow: View {
             }
         }
         .font(.callout)
+        .foregroundStyle(theme.onBackground)
         .padding(.vertical, 8)
     }
 
@@ -280,9 +287,26 @@ private struct EntryRow: View {
                     runtime.endsAtText(from: context.date)
                 }
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.secondaryText)
             }
         }
+    }
+}
+
+private extension ItemDetails {
+    /// What VoiceOver reads for an entry: its place, title and subtitle, and how long it is, in
+    /// words, then whether it's watched or a favourite.
+    func entryLabel(index: Int) -> Text {
+        var parts = [Text("\(index + 1)"), Text(cardTitle)]
+        if let cardSubtitle {
+            parts.append(Text(cardSubtitle))
+        }
+        if let runtime = item.runtime, runtime > .zero {
+            parts.append(Text(item.kind == .audio ? runtime.spokenPosition : runtime.roundedToMinutes.spokenLength))
+        }
+        parts += CardMarks(badges: CardBadges(isFavorite: userState.isFavorite, isPlayed: userState.isPlayed))
+            .spokenParts
+        return parts.spokenList ?? Text(cardTitle)
     }
 }
 
@@ -292,6 +316,7 @@ private struct EntryPanel: View {
 
     @Environment(BrowseModel.self) private var browse
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.theme) private var theme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -304,11 +329,14 @@ private struct EntryPanel: View {
                     .font(.title3.bold())
                     .lineLimit(2)
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(entry?.cardTitle ?? "")
             ShapedArtwork(
                 url: browse.imageURL(entry?.item.posterImage, width: Self.posterWidth * displayScale),
                 shape: .poster,
                 width: Self.posterWidth,
             )
+            .accessibilityHidden(true)
             if let entry {
                 QuickDetails(details: entry)
             }
@@ -316,6 +344,7 @@ private struct EntryPanel: View {
                 .font(.caption)
                 .lineLimit(5)
         }
+        .foregroundStyle(theme.onBackground)
         .frame(width: Self.width, alignment: .leading)
         .animation(nil, value: entry)
     }

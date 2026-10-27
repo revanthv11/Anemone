@@ -140,18 +140,21 @@ extension ItemDetails {
 
     /// The parts of Wholphin's quick-details line (`BaseItem.ui.quickDetails` and
     /// `QuickDetails`).
-    func quickDetails(now: Date) -> [Text] {
-        var parts = basicDetails.compactMap(\.self).map { Text($0) }
+    ///
+    /// - Parameter spoken: the parts as VoiceOver reads them, with lengths in words, the episode
+    ///   and the ratings named, and no star.
+    func quickDetails(now: Date, spoken: Bool = false) -> [Text] {
+        var parts = basicDetails(spoken: spoken).compactMap(\.self).map { Text($0) }
         if let runtime = item.runtime?.roundedToMinutes, runtime > .zero {
-            parts.append(Text(runtime.lengthText))
+            parts.append(Text(spoken ? runtime.spokenLength : runtime.lengthText))
         }
         if let left = timeRemaining?.roundedToMinutes {
-            parts.append(Text("\(left.lengthText) left"))
+            parts.append(Text("\(spoken ? left.spokenLength : left.lengthText) left"))
         }
         if let rating = item.officialRating {
-            parts.append(Text(rating))
+            parts.append(spoken ? Text("Rated \(rating)") : Text(rating))
         }
-        parts += scores
+        parts += scores(spoken: spoken)
         if let endsAt = endsAt(now: now) {
             parts.append(endsAt)
         }
@@ -159,10 +162,10 @@ extension ItemDetails {
     }
 
     /// The start of the line, which depends on the type.
-    private var basicDetails: [String?] {
+    private func basicDetails(spoken: Bool) -> [String?] {
         switch item.kind {
         case .episode:
-            [item.episodeLabel, premiereDate?.dayText]
+            [spoken ? spokenEpisodeLabel : item.episodeLabel, premiereDate?.dayText]
         case .season:
             [childCount.map { $0 == 1 ? "1 episode" : "\($0) episodes" }, item.year.map(String.init)]
         case .series:
@@ -175,17 +178,26 @@ extension ItemDetails {
     }
 
     /// The community rating out of 10 with a star, and the critics' percentage.
-    private var scores: [Text] {
+    private func scores(spoken: Bool) -> [Text] {
         var scores: [Text] = []
         if let communityRating {
-            let star = Text(Image(systemName: "star.fill")).foregroundStyle(.yellow)
-            scores.append(Text("\(communityRating, format: .number.precision(.fractionLength(1))) \(star)"))
+            let format = FloatingPointFormatStyle<Double>.number.precision(.fractionLength(1))
+            if spoken {
+                scores.append(Text("Community rating \(communityRating, format: format) out of 10"))
+            } else {
+                let star = Text(Image(systemName: "star.fill")).foregroundStyle(Self.starColor)
+                scores.append(Text("\(communityRating, format: format) \(star)"))
+            }
         }
         if let criticRating {
-            scores.append(Text("\(Int(criticRating.rounded()))%"))
+            let percent = Int(criticRating.rounded())
+            scores.append(spoken ? Text("Critic rating \(percent)%") : Text("\(percent)%"))
         }
         return scores
     }
+
+    /// Wholphin's `FilledStarColor`, the same in every theme, as its favourite red is.
+    private static let starColor = ThemeColor(0xFFFF_C700)
 
     /// When the item would end if started now. Wholphin shows this for things watched in one
     /// sitting.

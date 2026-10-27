@@ -3,10 +3,12 @@ import AnemoneUI
 import SwiftUI
 
 /// A row of cards that scrolls sideways, like a home row: its own focus section, entered at the
-/// card last focused in it.
+/// card last focused in it. VoiceOver reads its title as focus moves into it.
 struct CardRow<Element: Identifiable, Card: View>: View where Element.ID == String {
     let id: String
     let title: String?
+    /// What VoiceOver calls a row that shows no title, such as a season's episodes.
+    var spokenTitle: String?
     let elements: [Element]
     let focus: FocusState<ItemFocus?>.Binding
     let memory: RowMemory
@@ -15,11 +17,15 @@ struct CardRow<Element: Identifiable, Card: View>: View where Element.ID == Stri
     var scrollPosition: Binding<String?>?
     @ViewBuilder let card: (Element) -> Card
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let title {
                 Text(title)
                     .font(.headline)
+                    .foregroundStyle(theme.onBackground)
+                    .accessibilityAddTraits(.isHeader)
             }
             ScrollView(.horizontal) {
                 LazyHStack(alignment: .top, spacing: ItemLayout.cardSpacing) {
@@ -36,6 +42,7 @@ struct CardRow<Element: Identifiable, Card: View>: View where Element.ID == Stri
             .scrollPosition(scrollPosition)
             .scrollClipDisabled()
         }
+        .accessibilityRow(title ?? spokenTitle ?? "")
         .focusSection()
         .defaultFocus(focus, memory.entry(row: id, first: elements.first?.id), priority: .userInitiated)
     }
@@ -72,7 +79,8 @@ struct ItemRow: View {
     }
 }
 
-/// A card for an item on an item page, with Wholphin's watched and favourite marks.
+/// A card for an item on an item page, with Wholphin's watched and favourite marks. VoiceOver
+/// reads its title and subtitle, an episode's in words, then its marks.
 struct ItemCard: View {
     let details: ItemDetails
     let shape: CardShape
@@ -93,6 +101,14 @@ struct ItemCard: View {
             badges: details.badges,
             menuItem: CardMenuItem(details),
         )
+        // One element, so the card's button reads this once. With any marks a card menu has
+        // changed since, as the card shows them.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(details.cardLabel(
+            title: title,
+            subtitle: subtitle,
+            marks: browse.cardMarks.marks(for: details.id, given: details.cardMarks),
+        ))
     }
 }
 

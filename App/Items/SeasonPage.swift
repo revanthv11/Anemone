@@ -13,6 +13,7 @@ struct SeasonPage: View {
     let episodeID: MediaItem.ID?
 
     @Environment(BrowseModel.self) private var browse
+    @Environment(\.theme) private var theme
     @FocusState private var focus: ItemFocus?
     @State private var memory = RowMemory()
     @State private var alert: ItemAlert?
@@ -133,6 +134,7 @@ struct SeasonPage: View {
             .padding(.vertical, 20)
         }
         .scrollClipDisabled()
+        .accessibilityRow("Seasons")
         .focusSection()
         // Entering the tabs lands on the season being shown.
         .defaultFocus($focus, .tab(currentSeasonID), priority: .userInitiated)
@@ -144,17 +146,20 @@ struct SeasonPage: View {
             Text(selectedEpisode?.item.name ?? " ")
                 .font(.title3.bold())
                 .lineLimit(1)
+                .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("episode.title")
             if let selectedEpisode {
                 QuickDetails(details: selectedEpisode)
             } else {
                 Text(" ")
                     .font(.callout)
+                    .accessibilityHidden(true)
             }
             OverviewButton(title: selectedEpisode?.item.name ?? "", overview: selectedEpisode?.item.overview ?? "")
                 .focused($focus, equals: .overview)
                 .disabled(selectedEpisode?.item.overview == nil)
         }
+        .foregroundStyle(theme.onBackground)
         .frame(maxWidth: ItemLayout.textWidth, alignment: .leading)
         .animation(nil, value: selectedEpisodeID)
     }
@@ -165,6 +170,7 @@ struct SeasonPage: View {
             CardRow(
                 id: Self.episodeRow,
                 title: nil,
+                spokenTitle: "Episodes",
                 elements: episodes,
                 focus: $focus,
                 memory: memory,
@@ -177,6 +183,11 @@ struct SeasonPage: View {
                     ItemCard(details: episode, shape: .thumb, title: episode.item.name, subtitle: episode.numberText)
                 }
                 .buttonStyle(.borderless)
+                // The card's own marks, with any a card menu has changed since.
+                .accessibilityLabel(episode.episodeCardLabel(
+                    marks: browse.cardMarks.marks(for: episode.id, given: episode.cardMarks),
+                ))
+                .accessibilityHint("Plays the episode")
                 // While focus is elsewhere on the page, the selected episode stands out.
                 .opacity(focus != nil && !isEpisodeRowFocused && episode.id != selectedEpisodeID ? 0.4 : 1)
                 .animation(.easeOut(duration: 0.2), value: isEpisodeRowFocused)
@@ -184,7 +195,7 @@ struct SeasonPage: View {
             .overlay {
                 if episodes.isEmpty {
                     Text("This season has no episodes.")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.secondaryText)
                 }
             }
         } else if let episodesProblem {
@@ -347,35 +358,6 @@ private extension SeasonPage {
             episodes?[index].apply(state)
         }
         return true
-    }
-}
-
-/// A season tab: highlighted when focused, and marked while its season is shown.
-private struct SeasonTabStyle: ButtonStyle {
-    let isSelected: Bool
-
-    func makeBody(configuration: Configuration) -> some View {
-        TabBody(configuration: configuration, isSelected: isSelected)
-    }
-
-    private struct TabBody: View {
-        let configuration: ButtonStyleConfiguration
-        let isSelected: Bool
-        @Environment(\.isFocused) private var isFocused
-
-        var body: some View {
-            configuration.label
-                .font(.callout.weight(isSelected ? .bold : .regular))
-                .foregroundStyle(isFocused ? Color.black : isSelected ? .white : .white.opacity(0.6))
-                .padding(.horizontal, 28)
-                .padding(.vertical, 12)
-                .background(
-                    isFocused ? Color.white : isSelected ? .white.opacity(0.2) : .clear,
-                    in: .capsule,
-                )
-                .scaleEffect(isFocused ? 1.08 : configuration.isPressed ? 0.98 : 1)
-                .animation(.easeOut(duration: 0.15), value: isFocused)
-        }
     }
 }
 
