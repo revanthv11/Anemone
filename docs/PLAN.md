@@ -196,9 +196,9 @@ Not yet: skip-back on resume, keeping playback going across the app going to the
 
 Not started. Play and Shuffle for series, seasons, collections and playlists; Up Next with an autoplay countdown, and pass-out protection.
 
-What tvOS offers the system player for this, checked in the SDK headers (all available since tvOS 15 or earlier, none deprecated, so all in tvOS 26):
+What tvOS offers the system player for this, checked in the tvOS 27 SDK's headers (each available since tvOS 15 or earlier and none deprecated, so all are in tvOS 26):
 
-- `contextualActions` (tvOS 15): buttons over the video, which S0 maps `PlayerAccessories.actions` onto. Suits "Next Episode" during the credits.
+- `contextualActions` (tvOS 15): buttons over the video; `PlayerAccessories.actions` maps onto it. Suits "Next Episode" during the credits.
 - `transportBarCustomMenuItems` (tvOS 15): `UIMenu`s and `UIAction`s above the transport bar, one level deep; `PlayerAccessories.menus` maps onto it.
 - `customOverlayViewController` (tvOS 13): shown only when the user asks for it (swiping up, or a button in the transport bar), so it can't pop up an Up Next card on its own. `PlayerAccessories.card` shows as a SwiftUI card over the player instead; in the simulator, focus moved to its first button when it appeared, and its buttons worked.
 - `AVContentProposal` and `AVContentProposalViewController` (tvOS 10): tvOS's own Up Next. Set `AVPlayerItem.nextContentProposal` with `contentTimeForTransition` and `automaticAcceptanceInterval`; at that time the player shows the app's `contentProposalViewController` subclass and shrinks the video into its `preferredPlayerViewFrame`, with `dateOfAutomaticAcceptance` for a countdown. The delegate's `playerViewController(_:didAcceptContentProposal:)` must load the next item (`playNext()`), and rejecting dismisses the player unless the delegate handles it. It's the native look, but only for the system player; Anemone's overlay (3e) and MPV need the card, so an Up Next built on the card works in both.
