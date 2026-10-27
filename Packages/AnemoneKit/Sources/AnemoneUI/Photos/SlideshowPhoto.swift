@@ -4,7 +4,8 @@ import SwiftUI
 
 /// A photo filling the screen without cropping, as Wholphin's slideshow shows it. A new photo
 /// stays hidden behind the one showing until it has loaded, then cross-fades in over 750 ms,
-/// Wholphin's `CrossFadeFactory(750.milliseconds)`.
+/// Wholphin's `CrossFadeFactory(750.milliseconds)`. `Slideshow` moves a running slideshow on
+/// from a photo that fails or never loads.
 public struct SlideshowPhoto: View {
     private let url: URL?
     private let loaded: @MainActor (Bool) -> Void
@@ -43,6 +44,13 @@ public struct SlideshowPhoto: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .animation(.easeInOut(duration: 0.75), value: shown)
+        .onChange(of: url) {
+            // Back on a photo that failed just before: it isn't loaded again, so it fails now,
+            // and a running slideshow moves on rather than waiting for it.
+            if url != nil, url == failed {
+                loaded(false)
+            }
+        }
     }
 
     /// The photo showing, and the one loading behind it.

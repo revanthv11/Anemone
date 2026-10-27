@@ -17,6 +17,10 @@ public extension Preferences {
 /// shown for the set time, counted from when it finished loading, and goes back to the first
 /// after the last; a clip plays to its end before the time starts. Showing the details pauses
 /// it.
+///
+/// A running slideshow never gets stuck: a photo or clip that fails shows its message for the
+/// set time, as in Wholphin, and is passed over after that; one that takes longer than
+/// `loadTimeout` to load, or a clip that runs that long past its length, is moved on from.
 @MainActor
 @Observable
 public final class Slideshow {
@@ -31,11 +35,19 @@ public final class Slideshow {
     /// Held while the details show.
     public private(set) var isPaused = false
     @ObservationIgnored private let delay: Duration
+    @ObservationIgnored private let loadTimeout: Duration
     @ObservationIgnored private var timer: Task<Void, Never>?
+    /// Photos and clips that couldn't be shown, which a running slideshow passes over.
+    @ObservationIgnored private var failed: Set<MediaItem.ID> = []
+    /// How long the clip showing is, once it's playing.
+    @ObservationIgnored private var clipLength: Duration?
 
-    public init(pager: SlideshowPager, delay: Duration) {
+    /// - Parameter loadTimeout: how long a running slideshow waits for a photo or clip to load
+    ///   before moving on anyway.
+    public init(pager: SlideshowPager, delay: Duration, loadTimeout: Duration = .seconds(15)) {
         self.pager = pager
         self.delay = delay
+        self.loadTimeout = loadTimeout
     }
 
     /// How long each photo shows, from the user's setting within Wholphin's limits.
@@ -83,7 +95,9 @@ public final class Slideshow {
         isRunning = true
         isPaused = false
         // A clip's time starts when it ends.
-        if current?.kind != .video {
+        if current?.kind == .video {
+            wait((clipLength ?? .zero) + loadTimeout)
+        } else {
             restartTime()
         }
     }
@@ -107,14 +121,30 @@ public final class Slideshow {
         restartTime()
     }
 
-    /// The photo showing has loaded, or failed to: its time starts now.
+    /// The photo showing has loaded: its time starts now.
     public func photoShown() {
         restartTime()
     }
 
-    /// A clip started playing: the slideshow waits for its end.
+    /// The photo or clip with this ID couldn't be loaded or played. Showing, its message stays
+    /// for its time, as Wholphin's does; after that a running slideshow passes over it.
+    public func itemFailed(_ itemID: MediaItem.ID) {
+        failed.insert(itemID)
+        if current?.id == itemID {
+            restartTime()
+        }
+    }
+
+    /// A clip is about to play: the slideshow waits for it to start.
     public func clipStarted() {
-        timer?.cancel()
+        wait(loadTimeout)
+    }
+
+    /// The clip showing started playing, and is this long when known: the slideshow waits for
+    /// its end, but not for good if it stalls on the way.
+    public func clipPlaying(length: Duration?) {
+        clipLength = length
+        wait((length ?? .zero) + loadTimeout)
     }
 
     /// The clip showing played to its end.
@@ -124,35 +154,55 @@ public final class Slideshow {
 
     /// Counts the time again from now, as Wholphin does after each press it handles.
     public func restartTime() {
+        wait(delay)
+    }
+
+    /// Moves on after `length`, while running.
+    private func wait(_ length: Duration) {
         timer?.cancel()
         guard isActive else { return }
-        let delay = delay
         timer = Task { [weak self] in
-            try? await Task.sleep(for: delay)
+            try? await Task.sleep(for: length)
             guard !Task.isCancelled else { return }
             self?.moveOn()
         }
     }
 
-    /// The next photo, or the first after the last. Its time starts once it has loaded.
+    /// The next photo that hasn't failed, or the first after the last; when they all have, the
+    /// next anyway. Its time starts once it has loaded, unless it doesn't in time.
     private func moveOn() {
-        guard isActive else { return }
-        if !next() {
-            go(to: 0)
+        let count = pager.count
+        guard isActive, count > 0 else { return }
+        let following = (1 ... count).map { (position + $0) % count }
+        let index = following.first { candidate in
+            pager.item(at: candidate).map { !failed.contains($0.id) } ?? true
+        } ?? following[0]
+        go(to: index)
+        if current.map({ !failed.contains($0.id) }) ?? true {
+            wait(loadTimeout)
         }
     }
 
     private func go(to index: Int) {
+        if index != position {
+            clipLength = nil
+        }
         position = index
-        guard current == nil else { return }
-        let pager = pager
-        Task { [weak self] in
-            do {
-                _ = try await pager.load(at: index)
-            } catch {
-                // Nothing to wait for: on to the next one in time.
-                self?.restartTime()
+        guard let current else {
+            let pager = pager
+            Task { [weak self] in
+                do {
+                    _ = try await pager.load(at: index)
+                } catch {
+                    // Nothing to wait for: on to the next one in time.
+                    self?.restartTime()
+                }
             }
+            return
+        }
+        // It won't load this time either: its message shows for its time.
+        if failed.contains(current.id) {
+            restartTime()
         }
     }
 }

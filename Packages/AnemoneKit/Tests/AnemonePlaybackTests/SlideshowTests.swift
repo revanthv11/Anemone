@@ -13,11 +13,12 @@ struct SlideshowTests {
         count: Int = 25,
         clips: Set<Int> = [],
         delay: Duration = .milliseconds(30),
+        loadTimeout: Duration = .seconds(15),
         library: FakeLibrary? = nil,
     ) -> (Slideshow, FakeLibrary) {
         let library = library ?? FakeLibrary(count: count, clips: clips)
         let pager = SlideshowPager(pageSize: 10, loader: library.load)
-        return (Slideshow(pager: pager, delay: delay), library)
+        return (Slideshow(pager: pager, delay: delay, loadTimeout: loadTimeout), library)
     }
 
     @Test func `the viewer opens on the photo picked, found near where it was in the grid`() async throws {
@@ -139,6 +140,77 @@ struct SlideshowTests {
 
         slideshow.clipEnded()
 
+        #expect(await eventually { slideshow.position == 1 })
+    }
+
+    // MARK: Never stuck
+
+    @Test func `a photo that fails shows for its time, then the slideshow passes over it`() async throws {
+        let (slideshow, _) = slideshow(count: 3)
+        try await slideshow.load(showing: nil)
+        slideshow.startSlideshow()
+        var seen = [slideshow.position]
+
+        // Each photo loads, except the second.
+        for _ in 0 ..< 5 {
+            let from = slideshow.position
+            #expect(await eventually { slideshow.position != from })
+            seen.append(slideshow.position)
+            if let current = slideshow.current, current.id == "p1" {
+                slideshow.itemFailed(current.id)
+            } else {
+                slideshow.photoShown()
+            }
+        }
+
+        // Each time round after that, it goes from the first photo straight to the third.
+        #expect(seen == [0, 1, 2, 0, 2, 0])
+    }
+
+    @Test func `a photo that never loads is moved on from after the load timeout`() async throws {
+        let (slideshow, _) = slideshow(loadTimeout: .milliseconds(150))
+        try await slideshow.load(showing: nil)
+        slideshow.startSlideshow()
+        #expect(await eventually { slideshow.position == 1 })
+
+        // No photoShown for it.
+        try await Task.sleep(for: .milliseconds(60))
+        #expect(slideshow.position == 1)
+
+        #expect(await eventually { slideshow.position == 2 })
+    }
+
+    @Test func `a clip that never starts, fails, or stalls doesn't hold the slideshow`() async throws {
+        let (slideshow, _) = slideshow(clips: [0, 1, 2], loadTimeout: .milliseconds(100))
+        try await slideshow.load(showing: nil)
+
+        // Never starts playing.
+        slideshow.startSlideshow()
+        slideshow.clipStarted()
+        #expect(await eventually { slideshow.position == 1 })
+
+        // Fails: its message shows for its time.
+        slideshow.clipStarted()
+        slideshow.itemFailed("p1")
+        #expect(await eventually { slideshow.position == 2 })
+
+        // Plays, then stalls before its end.
+        slideshow.clipStarted()
+        slideshow.clipPlaying(length: .milliseconds(50))
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(slideshow.position == 2)
+        #expect(await eventually { slideshow.position == 3 })
+    }
+
+    @Test func `when nothing loads, the slideshow still goes round`() async throws {
+        let (slideshow, _) = slideshow(count: 2)
+        try await slideshow.load(showing: nil)
+        slideshow.startSlideshow()
+        slideshow.itemFailed("p0")
+        #expect(await eventually { slideshow.position == 1 })
+        slideshow.itemFailed("p1")
+
+        #expect(await eventually { slideshow.position == 0 })
         #expect(await eventually { slideshow.position == 1 })
     }
 

@@ -115,9 +115,17 @@ struct SlideshowView: View {
             ZStack {
                 if let item, item.kind == .video, let clip {
                     ClipView(player: clip.player)
+                    if clip.hasFailed {
+                        Text("Couldn't play this clip.")
+                            .foregroundStyle(.secondary)
+                    }
                 } else {
-                    SlideshowPhoto(url: photoURL(item)) { _ in
-                        slideshow.photoShown()
+                    SlideshowPhoto(url: photoURL(item)) { loaded in
+                        if loaded {
+                            slideshow.photoShown()
+                        } else if let item {
+                            slideshow.itemFailed(item.id)
+                        }
                     }
                 }
             }
@@ -157,19 +165,13 @@ struct SlideshowView: View {
     }
 
     private func load() async {
-        let session = browse.session
         let query = start.query
-        let pager = SlideshowPager { startIndex, limit, includeTotalCount in
-            try await session.slideshowItems(
-                query,
-                startIndex: startIndex,
-                limit: limit,
-                includeTotalCount: includeTotalCount,
-            )
-        }
+        // A random order is shuffled once for the whole slideshow, with the photo picked first.
+        let isShuffled = query.sort.field == .random
+        let pager = SlideshowPager(loader: browse.session.slideshowLoader(for: query, first: start.itemID))
         let slideshow = Slideshow(pager: pager, delay: Slideshow.delay())
         do {
-            try await slideshow.load(showing: start.itemID, near: start.gridIndex)
+            try await slideshow.load(showing: start.itemID, near: isShuffled ? 0 : start.gridIndex)
             guard pager.count > 0 else {
                 problem = "There are no photos here."
                 return
@@ -189,8 +191,12 @@ struct SlideshowView: View {
         clip?.stop()
         clip = nil
         if let item, item.kind == .video, let url = browse.session.slideshowClipURL(for: item.id) {
-            let clip = ClipPlayer(url: url) { [weak slideshow] in
-                slideshow?.clipEnded()
+            let clip = ClipPlayer(url: url) { [weak slideshow] event in
+                switch event {
+                case let .playing(length): slideshow?.clipPlaying(length: length)
+                case .ended: slideshow?.clipEnded()
+                case .failed: slideshow?.itemFailed(item.id)
+                }
             }
             clip.loops = !slideshow.isRunning
             self.clip = clip

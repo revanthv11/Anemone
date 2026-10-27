@@ -158,6 +158,69 @@ struct PhotosAndThemesTests {
         #expect(request.query["enableTotalRecordCount"] == "false")
     }
 
+    @Test @MainActor
+    func `a shuffled slideshow of more than a page shows each photo once, from the one picked`() async throws {
+        let count = 250
+        let sent = SentRequests()
+        MockServer.register(host: "shuffled.test") { request in
+            guard request.url?.path() == "/jf/Items" else { return nil }
+            let query = SentRequest(request).query
+            sent.all.withLock { $0.append(query) }
+            guard let ids = query["ids"] else {
+                // Every ID, and an album the server sent anyway.
+                let items = (0 ..< count).map { #"{"Id":"p\#($0)","Type":"Photo"}"# }
+                    + [#"{"Id":"a1","Type":"PhotoAlbum"}"#]
+                return .json(#"{"Items":[\#(items.joined(separator: ","))]}"#)
+            }
+            // The page's photos, in the server's order rather than the one asked for.
+            let items = ids.split(separator: ",").sorted().map { #"{"Id":"\#($0)","Name":"\#($0)","Type":"Photo"}"# }
+            return .json(#"{"Items":[\#(items.joined(separator: ","))]}"#)
+        }
+        let query = SlideshowQuery(folderID: "lib1", sort: LibrarySort(.random), isRecursive: true)
+        let loader = try session(host: "shuffled.test").slideshowLoader(for: query, first: "p137")
+        let pager = SlideshowPager(loader: loader)
+
+        try await pager.start()
+        let picked = try await pager.index(of: "p137", near: 0)
+        var shown: [MediaItem.ID] = []
+        for index in 0 ..< pager.count {
+            try shown.append(#require(await pager.load(at: index)).id)
+        }
+
+        #expect(pager.count == count)
+        #expect(picked == 0)
+        #expect(shown.count == count)
+        #expect(Set(shown) == Set((0 ..< count).map { "p\($0)" }))
+        #expect(shown != (0 ..< count).map { "p\($0)" })
+        let requests = sent.all.withLock(\.self)
+        // The IDs once, without a sort, then three pages by ID, in the shuffled order.
+        #expect(requests.count == 4)
+        let first = try #require(requests.first)
+        #expect(first["ids"] == nil)
+        #expect(first["sortBy"] == nil)
+        #expect(first["parentId"] == "lib1")
+        #expect(first["recursive"] == "true")
+        #expect(first["includeItemTypes"] == "Photo")
+        #expect(first["enableImages"] == "false")
+        let pages = requests.dropFirst()
+        #expect(pages.map { $0["ids"]?.split(separator: ",").count } == [100, 100, 50])
+        #expect(pages.flatMap { $0["ids"]?.split(separator: ",").map(String.init) ?? [] } == shown)
+        #expect(pages.allSatisfy { $0["fields"] == "Overview,Width,Height,DateCreated" })
+    }
+
+    @Test func `a slideshow sorted otherwise is fetched a page at a time in that order`() async throws {
+        let sent = register(host: "paged.test", path: "/jf/Items", reply: .json(#"{"Items":[]}"#))
+        let query = SlideshowQuery(folderID: "album1", sort: LibrarySort(.name))
+
+        let loader = try session(host: "paged.test").slideshowLoader(for: query, first: "p1")
+        _ = try await loader(100, 100, false)
+
+        let request = try #require(sent.request)
+        #expect(request.query["sortBy"] == "SortName")
+        #expect(request.query["startIndex"] == "100")
+        #expect(request.query["ids"] == nil)
+    }
+
     @Test func `a slideshow clip plays its file, with the token in the URL`() throws {
         let url = try #require(try session(host: "clip.test").slideshowClipURL(for: "c1"))
 
@@ -165,4 +228,9 @@ struct PhotosAndThemesTests {
         #expect(url.queryValues["static"] == "true")
         #expect(url.queryValues["ApiKey"] == "tok")
     }
+}
+
+/// The queries a test's fake server saw, in order.
+private final class SentRequests: Sendable {
+    let all = Mutex<[[String: String]]>([])
 }

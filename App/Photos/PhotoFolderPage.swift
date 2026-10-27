@@ -173,7 +173,8 @@ struct PhotoFolderPage: View {
     }
 
     /// Play and Shuffle: every photo inside, albums included, as a slideshow from the first.
-    /// Wholphin's Shuffle shows them in order; here it shuffles.
+    /// Wholphin's Shuffle shows them in order; here it shuffles, once for the whole slideshow
+    /// (`ShuffledSlideshow`), as for a photo picked in a grid sorted at random.
     private func startSlideshow(shuffled: Bool) {
         let query = SlideshowQuery(
             folderID: folder.id,

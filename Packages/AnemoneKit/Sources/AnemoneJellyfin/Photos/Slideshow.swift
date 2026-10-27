@@ -105,6 +105,61 @@ public extension JellyfinSession {
         return SlideshowPage(items: items, totalCount: includeTotalCount ? result.totalRecordCount ?? items.count : nil)
     }
 
+    /// The IDs of every photo a slideshow shows, and its clips when asked for, in no particular
+    /// order, for `ShuffledSlideshow` to shuffle once. One request, with as little as the
+    /// server sends for an item, so a large library stays quick.
+    func slideshowItemIDs(_ query: SlideshowQuery) async throws -> [MediaItem.ID] {
+        var parameters = Paths.GetItemsParameters(userID: userID)
+        parameters.parentID = query.folderID
+        parameters.includeItemTypes = query.includesVideos ? [.photo, .video] : [.photo]
+        parameters.isRecursive = query.isRecursive
+        parameters.enableTotalRecordCount = false
+        parameters.enableImages = false
+        parameters.enableUserData = false
+        let result = try await send(Paths.getItems(parameters: parameters))
+        return (result.items ?? []).compactMap(SlideshowItem.init).map(\.id)
+    }
+
+    /// The slideshow's photos and clips with these IDs, as `slideshowItems` describes them, in
+    /// the order given. Any the server no longer has are left out.
+    func slideshowItems(ids: [MediaItem.ID]) async throws -> [SlideshowItem] {
+        guard !ids.isEmpty else { return [] }
+        var parameters = Paths.GetItemsParameters(userID: userID)
+        parameters.ids = ids
+        parameters.fields = [.overview, .width, .height, .dateCreated]
+        parameters.enableImageTypes = [.primary]
+        parameters.imageTypeLimit = 1
+        parameters.enableUserData = false
+        let result = try await send(Paths.getItems(parameters: parameters))
+        let found = (result.items ?? []).compactMap(SlideshowItem.init)
+        let byID = Dictionary(found.map { ($0.id, $0) }) { first, _ in first }
+        return ids.compactMap { byID[$0] }
+    }
+
+    /// Fetches a slideshow's pages for `SlideshowPager`: in the order `query` sorts by, or, for
+    /// a random sort, one shuffle held for the whole slideshow (see `ShuffledSlideshow`), with
+    /// `first` at the start when it's in the slideshow.
+    func slideshowLoader(for query: SlideshowQuery, first: MediaItem.ID? = nil) -> SlideshowPager.Loader {
+        guard query.sort.field == .random else {
+            return { [self] startIndex, limit, includeTotalCount in
+                try await slideshowItems(
+                    query,
+                    startIndex: startIndex,
+                    limit: limit,
+                    includeTotalCount: includeTotalCount,
+                )
+            }
+        }
+        let shuffled = ShuffledSlideshow(first: first) { [self] in
+            try await slideshowItemIDs(query)
+        } items: { [self] ids in
+            try await slideshowItems(ids: ids)
+        }
+        return { startIndex, limit, includeTotalCount in
+            try await shuffled.page(startIndex: startIndex, limit: limit, includeTotalCount: includeTotalCount)
+        }
+    }
+
     /// A clip's file, for AVPlayer to play as it is. Wholphin plays slideshow clips this way too,
     /// without a play session.
     func slideshowClipURL(for itemID: MediaItem.ID) -> URL? {
