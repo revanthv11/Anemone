@@ -194,6 +194,27 @@ struct QueuesTests {
         #expect(sent["/Items"]?.query["sortBy"] == "Random")
     }
 
+    @Test func `a collection plays in the sort and with the filters its page shows`() async throws {
+        let sent = register(host: "queue-collection-sort.test", replies: ["/Items": Self.items([])])
+        var filter = LibraryFilter()
+        filter.played = false
+
+        _ = try await session(host: "queue-collection-sort.test").collectionQueue(
+            id: "c1",
+            shuffled: false,
+            sort: LibrarySort(.premiereDate, .descending),
+            filter: filter,
+        )
+
+        let request = try #require(sent["/Items"])
+        #expect(request.query["sortBy"] == "PremiereDate,SortName")
+        #expect(request.query["sortOrder"] == "Descending,Ascending")
+        #expect(request.query["isPlayed"] == "false")
+        #expect(request.query["recursive"] == "true")
+        #expect(request.query["filters"] == "IsNotFolder")
+        #expect(request.query["includeItemTypes"] == nil)
+    }
+
     @Test func `a playlist plays its videos in the playlist's order and counts the rest`() async throws {
         let sent = register(host: "queue-playlist.test", replies: [
             "/Playlists/p1/Items": Self.items([

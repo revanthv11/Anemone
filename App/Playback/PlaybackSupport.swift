@@ -27,6 +27,7 @@ extension BrowseModel {
     func playQueue(
         of container: ItemDetails,
         shuffled: Bool,
+        order: (sort: LibrarySort, filter: LibraryFilter)? = nil,
         play: (PlaybackRequest) -> Void,
         failed: (ItemAlert) -> Void,
     ) async {
@@ -35,7 +36,7 @@ extension BrowseModel {
         Self.isFindingQueue = true
         defer { Self.isFindingQueue = false }
         do {
-            let found = try await queueItems(of: container, shuffled: shuffled)
+            let found = try await queueItems(of: container, shuffled: shuffled, order: order)
             let resumesFirst = container.item.kind == .series && !shuffled
             let entries = found.items.enumerated().map { index, item in
                 entry(for: item, from: index == 0 && resumesFirst ? item.userState.resumePosition : nil)
@@ -111,7 +112,11 @@ private extension BrowseModel {
         return PlaybackQueue.Entry(itemID: details.id, startPosition: position, metadata: metadata)
     }
 
-    func queueItems(of container: ItemDetails, shuffled: Bool) async throws -> PlayableItems {
+    func queueItems(
+        of container: ItemDetails,
+        shuffled: Bool,
+        order: (sort: LibrarySort, filter: LibraryFilter)?,
+    ) async throws -> PlayableItems {
         let session = session
         let id = container.id
         switch container.item.kind {
@@ -125,7 +130,12 @@ private extension BrowseModel {
                 ? session.shuffledEpisodes(ofSeries: seriesID, season: id)
                 : session.seasonQueue(seriesID: seriesID, seasonID: id))
         case .collection:
-            return try await session.collectionQueue(id: id, shuffled: shuffled)
+            return try await session.collectionQueue(
+                id: id,
+                shuffled: shuffled,
+                sort: order?.sort ?? LibrarySort(.default),
+                filter: order?.filter ?? LibraryFilter(),
+            )
         case .playlist:
             return try await session.playlistQueue(id: id)
         default:

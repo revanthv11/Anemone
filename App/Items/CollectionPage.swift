@@ -106,9 +106,13 @@ struct CollectionPage: View {
         }
     }
 
+    /// In the order and with the filters the page shows, as Wholphin's Play All takes them.
     private func play(shuffled: Bool) {
+        let order = display.map { (sort: $0.sort, filter: $0.filter) }
         Task {
-            await browse.playQueue(of: collection, shuffled: shuffled) { playback = $0 } failed: { alert = $0 }
+            await browse.playQueue(of: collection, shuffled: shuffled, order: order) { playback = $0 } failed: {
+                alert = $0
+            }
         }
     }
 

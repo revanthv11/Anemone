@@ -90,22 +90,31 @@ public extension JellyfinSession {
     }
 
     /// Play or Shuffle for a collection: everything in it that plays, with the episodes of any
-    /// series in it, like Wholphin. In the collection's own order, the one its page shows, or
-    /// at random.
-    func collectionQueue(id: MediaItem.ID, shuffled: Bool) async throws -> PlayableItems {
-        let parameters = Paths.GetItemsParameters(
-            userID: userID,
-            excludeLocationTypes: [.virtual],
-            excludeItemIDs: [id],
-            limit: Self.queueLimit,
-            isRecursive: true,
-            sortOrder: [.ascending],
-            parentID: id,
-            fields: Self.queueFields,
-            filters: [.isNotFolder],
-            sortBy: [shuffled ? .random : .default],
-            enableUserData: true,
-        )
+    /// series in it, like Wholphin. In the order and with the filters its page shows, as
+    /// Wholphin's Play takes them, or at random.
+    func collectionQueue(
+        id: MediaItem.ID,
+        shuffled: Bool,
+        sort: LibrarySort = LibrarySort(.default),
+        filter: LibraryFilter = LibraryFilter(),
+    ) async throws -> PlayableItems {
+        let collection = Library(id: id, name: "", kind: .collections)
+        var parameters = LibraryQuery(library: collection, sort: sort, filter: filter).itemsParameters(userID: userID)
+        if shuffled {
+            parameters.sortBy = [.random]
+            parameters.sortOrder = nil
+        } else if sort.field == .default {
+            // The collection's own order, as its page asks for it.
+            parameters.sortBy = [.default]
+            parameters.sortOrder = [sort.direction == .ascending ? .ascending : .descending]
+        }
+        parameters.includeItemTypes = nil
+        parameters.isRecursive = true
+        parameters.filters = [.isNotFolder]
+        parameters.excludeLocationTypes = [.virtual]
+        parameters.limit = Self.queueLimit
+        parameters.fields = Self.queueFields
+        parameters.enableUserData = true
         return try await PlayableItems(send(Paths.getItems(parameters: parameters)).items)
     }
 
