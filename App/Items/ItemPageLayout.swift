@@ -47,6 +47,8 @@ enum ItemAction: Hashable {
     case sort
     case filter
     case viewOptions
+    /// Seerr's Request, when it isn't a title page's first button.
+    case request
 }
 
 /// Each row's last-focused card, so coming back to a row lands where the user left it, as on

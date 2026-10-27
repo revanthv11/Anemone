@@ -150,6 +150,7 @@ struct SeriesPage: View {
                 memory: memory,
             )
         }
+        SeerrItemRow(item: series, focus: $focus, memory: memory)
     }
 
     private func play(shuffled: Bool) {
