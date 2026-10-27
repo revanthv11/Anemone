@@ -137,6 +137,31 @@ struct PlaybackControllerTests {
         #expect(log.events.filter { $0.hasPrefix("stopped") } == ["stopped 100.0 seconds", "stopped 70.0 seconds"])
     }
 
+    @Test func `features hear nothing more from a stream another entry replaced`() async throws {
+        let playback = try controller([.item("e1"), .item("e2")])
+        // Moving on while the controller is still handing out one of the engine's events, as Up
+        // Next's Play Now can land on a busy machine. Moving on pauses the old stream, and that
+        // pause waits in the stream behind the event.
+        log.onEvent = { event, controller in
+            if case .resumed = event {
+                controller.play(entryAt: 1, markingCurrentPlayed: true)
+            }
+        }
+        await play(playback)
+        engine.currentTime = .seconds(70)
+        engine.pause()
+        #expect(await eventually { log.events.contains("paused 70.0 seconds") })
+
+        engine.play()
+
+        #expect(await eventually { engine.loads.count == 2 })
+        #expect(log.events.filter { $0 != "position" }.suffix(3) == [
+            "resumed 70.0 seconds",
+            "stopped 100.0 seconds",
+            "loaded e2 directPlay",
+        ])
+    }
+
     @Test func `what features wait for runs once the player closes`() async throws {
         let playback = try controller()
         playback.closesAtEnd = false

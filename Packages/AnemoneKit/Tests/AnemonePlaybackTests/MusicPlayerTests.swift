@@ -133,7 +133,11 @@ struct MusicPlayerTests {
         engine?.currentTime = .seconds(10)
         #expect(await eventually { player.position == .seconds(10) })
         player.previous()
-        #expect(await eventually { engine?.currentTime == .zero })
+        // Previous seeks in a task of its own, and the ticker can read the old time back into
+        // `position` before the seek lands, as this tick does. The second Previous goes by
+        // `position`, so wait for both.
+        player.tick()
+        #expect(await eventually { engine?.currentTime == .zero && player.position == .zero })
         #expect(player.current?.id == "b")
 
         player.previous()
