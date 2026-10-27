@@ -253,18 +253,3 @@ final class EngineLayer: CALayer {
         shown?.frame = bounds
     }
 }
-
-/// The engine's profile at the moment a stream is asked for, since "Prefer MPV" changes
-/// engines between entries.
-@MainActor
-final class DeviceProfileSource {
-    private let engine: any PlayerEngine
-
-    init(_ engine: any PlayerEngine) {
-        self.engine = engine
-    }
-
-    var current: DeviceProfile {
-        engine.deviceProfile
-    }
-}

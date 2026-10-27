@@ -41,7 +41,7 @@ struct AVPlayerProfileTests {
         #expect(ranges.contains(.dovi))
     }
 
-    @Test func `HEVC must be tagged hvc1 or dvh1 to play directly`() throws {
+    @Test func `only HEVC tagged hvc1 or dvh1 plays directly`() throws {
         let profile = AVPlayerProfile.deviceProfile(decoders: Self.appleTV4K)
 
         let hevc = try #require(profile.codecProfiles?.first { $0.codec == "hevc" })
