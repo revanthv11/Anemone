@@ -1,41 +1,34 @@
 import AnemoneJellyfin
-import AVFoundation
-import Combine
-import JellyfinAPI
 import Observation
-#if os(tvOS) || os(iOS)
-    // The player's title and description on `AVPlayerItem`.
-    import AVKit
-#endif
 
-/// Why AVPlayer couldn't play what the server sent.
-public enum PlayerError: Error {
-    /// The stream failed to load or stopped partway; `underlying` is AVFoundation's reason.
-    case streamFailed(underlying: (any Error)?)
-    /// Playback couldn't jump to the resume position.
-    case resumeFailed
-}
-
-/// Plays one item with AVPlayer: asks the server for a stream, starts at the requested position,
-/// switches to a transcode if the file won't play, and reports progress. Ported from the parts of
-/// Wholphin's `PlaybackViewModel` that play a single item.
+/// Plays a queue: asks the server for each entry's stream, has the engine start it at the
+/// requested position, switches to a transcode if the file won't play, and tells its features
+/// what happens, so they can report progress or offer what's next. Ported from the parts of
+/// Wholphin's `PlaybackViewModel` that play an item.
 @MainActor
 @Observable
 public final class PlaybackController: Identifiable {
     public enum State {
         case loading
         case playing
-        /// Played to the end.
+        /// Finished: the player closes.
         case ended
         case failed(any Error)
     }
 
-    /// How often progress is saved while playing, as in Wholphin.
-    static let progressInterval = Duration.seconds(5)
+    /// Asks the server how to play an item: the item, whether direct play and direct stream are
+    /// allowed (not for Wholphin's retry as a transcode), and the version, which a retry keeps.
+    typealias StreamLoader = @Sendable (MediaItem.ID, Bool, String?) async throws -> PlaybackStream
 
-    public let itemID: MediaItem.ID
-    public let player = AVPlayer()
+    public private(set) var queue: PlaybackQueue
     public private(set) var state = State.loading
+    /// What features show in the player.
+    public let accessories = PlayerAccessories()
+    /// Whether the player closes when an entry plays to the end and no feature has played
+    /// another, as Wholphin's does with nothing up next. Up Next turns it off while it counts
+    /// down, then plays the next entry or calls `finish()`.
+    public var closesAtEnd = true
+    public let engine: any PlayerEngine
 
     public var hasEnded: Bool {
         if case .ended = state {
@@ -45,43 +38,62 @@ public final class PlaybackController: Identifiable {
         }
     }
 
-    @ObservationIgnored private let session: JellyfinSession
-    @ObservationIgnored private let startPosition: Duration?
-    @ObservationIgnored private let metadata: [AVMetadataItem]
-    @ObservationIgnored private let profile: DeviceProfile
-    @ObservationIgnored private let reporter: PlaybackReporter
-    /// What's loaded in the player.
+    @ObservationIgnored private let features: [any PlaybackFeature]
+    @ObservationIgnored private let loadStream: StreamLoader
+    /// How often features hear where playback is.
+    @ObservationIgnored private let positionInterval: Duration
+    /// What's loaded in the engine.
     @ObservationIgnored private var stream: PlaybackStream?
+    /// Whether the loaded stream's play session is open, so features hear `stopped` once.
+    @ObservationIgnored private var isSessionOpen = false
+    /// The last session's `stopped`, which a later stop waits for.
+    @ObservationIgnored private var sessionEnding: Task<Void, Never>?
+    /// Counts loads, so a load that a newer one replaced is dropped.
+    @ObservationIgnored private var loads = 0
     /// Tasks following the loaded stream, cancelled when it's replaced or playback stops.
     @ObservationIgnored private var watchers: [Task<Void, Never>] = []
+    @ObservationIgnored private var status = PlayerStatus.paused
+    @ObservationIgnored private var isUnderWay = false
+    @ObservationIgnored private var wasPaused = false
     @ObservationIgnored private var hasStarted = false
     @ObservationIgnored private var isStopped = false
 
-    /// - Parameters:
-    ///   - startPosition: where to start; the beginning when `nil`.
-    ///   - metadata: the title and description the player shows.
-    public init(
-        session: JellyfinSession,
-        itemID: MediaItem.ID,
-        startPosition: Duration? = nil,
-        metadata: [AVMetadataItem] = [],
-        profile: DeviceProfile = AVPlayerProfile.current,
-    ) {
-        self.session = session
-        self.itemID = itemID
-        self.startPosition = startPosition
-        self.metadata = metadata
-        self.profile = profile
-        reporter = PlaybackReporter { report in
-            switch report {
-            case let .start(stream, progress):
-                try await session.reportPlaybackStart(stream, at: progress)
-            case let .progress(stream, progress):
-                try await session.reportPlaybackProgress(stream, at: progress)
-            case let .stop(stream, position):
-                try await session.reportPlaybackStopped(stream, at: position)
-            }
+    /// A player for `request` on `session`'s server, with the features every player gets.
+    public convenience init(session: JellyfinSession, request: PlaybackRequest) {
+        // AVPlayer for everything until the MPV engine (Phase 4) chooses per item.
+        let engine = AVPlayerEngine()
+        let profile = engine.deviceProfile
+        self.init(
+            request: request,
+            engine: engine,
+            features: Self.features(for: session),
+        ) { itemID, allowsDirect, mediaSourceID in
+            try await session.playbackStream(
+                for: itemID,
+                profile: profile,
+                maxBitrate: AVPlayerProfile.defaultMaxBitrate,
+                allowsDirect: allowsDirect,
+                mediaSourceID: mediaSourceID,
+            )
         }
+    }
+
+    init(
+        request: PlaybackRequest,
+        engine: any PlayerEngine,
+        features: [any PlaybackFeature],
+        positionInterval: Duration = .seconds(1),
+        loadStream: @escaping StreamLoader,
+    ) {
+        var queue = request.queue
+        if request.shuffles {
+            queue.shuffle()
+        }
+        self.queue = queue
+        self.engine = engine
+        self.features = features
+        self.positionInterval = positionInterval
+        self.loadStream = loadStream
     }
 
     /// Asks the server for a stream and starts playing it. Only the first call does anything, so
@@ -89,82 +101,146 @@ public final class PlaybackController: Identifiable {
     public func start() async {
         guard !hasStarted else { return }
         hasStarted = true
-        await load(allowsDirect: true, from: startPosition)
+        await load(allowsDirect: true, from: queue.current.startPosition, as: beginLoad())
     }
 
-    /// Stops playing and ends the play session, returning once the server has heard. Call when
-    /// the player closes.
+    /// Stops playing and ends the play session, returning once features have finished with it,
+    /// so the server has heard. Call when the player closes.
     public func stop() async {
         guard !isStopped else { return }
         isStopped = true
         let position = currentPosition
         stopWatching()
-        player.pause()
-        player.replaceCurrentItem(with: nil)
-        await reporter.stop(at: position)
+        engine.stop()
+        await endSession(at: position)
     }
 
-    private func load(allowsDirect: Bool, from position: Duration?) async {
-        guard !isStopped else { return }
-        do {
-            let stream = try await session.playbackStream(
-                for: itemID,
-                profile: profile,
-                maxBitrate: AVPlayerProfile.defaultMaxBitrate,
-                allowsDirect: allowsDirect,
-                mediaSourceID: stream?.mediaSourceID,
-            )
-            guard !isStopped else { return }
-            play(stream, from: position)
-        } catch {
-            guard !isStopped else { return }
-            state = .failed(error)
+    /// Plays another entry from its start position, after ending the current one's session.
+    public func play(entryAt index: Int) {
+        guard !isStopped, queue.entries.indices.contains(index) else { return }
+        let position = currentPosition
+        stopWatching()
+        engine.pause()
+        queue.currentIndex = index
+        stream = nil
+        state = .loading
+        let attempt = beginLoad()
+        Task {
+            await endSession(at: position)
+            await load(allowsDirect: true, from: queue.current.startPosition, as: attempt)
         }
     }
 
-    private func play(_ stream: PlaybackStream, from position: Duration?) {
+    /// Does nothing at the end of the queue.
+    public func playNext() {
+        play(entryAt: queue.currentIndex + 1)
+    }
+
+    /// Closes the player, as at the end of the queue; for features such as pass-out protection.
+    public func finish() {
+        guard !isStopped else { return }
+        engine.pause()
+        state = .ended
+    }
+
+    /// The attached feature of a type, so features can work together, such as Up Next asking
+    /// the segments feature where the credits start.
+    public func feature<Feature: PlaybackFeature>(_: Feature.Type) -> Feature? {
+        features.lazy.compactMap { $0 as? Feature }.first
+    }
+
+    private func beginLoad() -> Int {
+        loads += 1
+        return loads
+    }
+
+    private func load(allowsDirect: Bool, from position: Duration?, as attempt: Int) async {
+        guard !isStopped else { return }
+        let entry = queue.current
+        do {
+            let stream = try await loadStream(entry.itemID, allowsDirect, stream?.mediaSourceID)
+            guard !isStopped, attempt == loads else { return }
+            await play(stream, entry, from: position)
+        } catch {
+            guard !isStopped, attempt == loads else { return }
+            state = .failed(error)
+            await publish(.failed(error))
+        }
+    }
+
+    private func play(_ stream: PlaybackStream, _ entry: PlaybackQueue.Entry, from position: Duration?) async {
         self.stream = stream
-        let item = AVPlayerItem(url: stream.url)
-        #if os(tvOS) || os(iOS)
-            item.externalMetadata = metadata
-        #endif
-        player.replaceCurrentItem(with: item)
-        watch(item, resumingAt: position.flatMap { $0 > .zero ? $0 : nil })
+        status = .paused
+        isUnderWay = false
+        wasPaused = false
+        let events = engine.load(stream.url, from: position, metadata: entry.metadata)
+        isSessionOpen = true
+        await publish(.loaded(stream, entry))
+        follow(events)
     }
 
     /// Wholphin's `onPlayerError`: a file that won't direct play or direct stream gets another
     /// try as a transcode, from where it stopped. A transcode that fails is an error.
-    private func failed(_ error: any Error) {
+    private func failed(_ error: any Error) async {
         guard !isStopped, let stream else { return }
-        // Called from a watcher, which this cancels; the retry runs on its own.
         stopWatching()
+        let attempt = loads
+        await publish(.failed(error))
+        // Unless a feature moved on meanwhile.
+        guard !isStopped, attempt == loads else { return }
         guard stream.method != .transcode else {
             state = .failed(error)
             return
         }
         let position = currentPosition
         state = .loading
-        Task {
-            // The failed session ends before the transcode's starts.
-            await reporter.stop(at: position)
-            await load(allowsDirect: false, from: position > .zero ? position : startPosition)
-        }
+        let retry = beginLoad()
+        // The failed session ends before the transcode's starts.
+        await endSession(at: position)
+        await load(allowsDirect: false, from: position > .zero ? position : queue.current.startPosition, as: retry)
     }
 
     private func finished() async {
+        guard !isStopped else { return }
         stopWatching()
-        state = .ended
-        if let duration = player.currentItem?.duration.duration {
-            await reporter.stop(at: duration)
+        let attempt = loads
+        await publish(.ended)
+        // A feature played another entry, as Up Next does.
+        guard !isStopped, attempt == loads else { return }
+        if closesAtEnd {
+            state = .ended
+        }
+        if let duration = engine.duration {
+            await endSession(at: duration)
+        }
+    }
+
+    /// Ends the loaded stream's play session, if it's open, and waits until features have heard.
+    /// Runs on its own, so a stop report isn't cancelled with whatever asked for it.
+    private func endSession(at position: Duration) async {
+        if isSessionOpen {
+            isSessionOpen = false
+            let previous = sessionEnding
+            sessionEnding = Task {
+                await previous?.value
+                await publish(.stopped(position))
+            }
+        }
+        await sessionEnding?.value
+    }
+
+    private func publish(_ event: PlaybackEvent) async {
+        for feature in features {
+            await feature.handle(event, in: self)
         }
     }
 
     private var currentPosition: Duration {
-        player.currentTime().duration ?? .zero
+        engine.currentTime
     }
 
-    private var currentProgress: PlaybackProgress {
-        PlaybackProgress(position: currentPosition, isPaused: player.timeControlStatus == .paused)
+    private var progress: PlaybackProgress {
+        PlaybackProgress(position: currentPosition, isPaused: status == .paused)
     }
 
     private func stopWatching() {
@@ -173,120 +249,66 @@ public final class PlaybackController: Identifiable {
     }
 }
 
-/// Following the player.
+/// Following the engine.
 private extension PlaybackController {
-    func watch(_ item: AVPlayerItem, resumingAt position: Duration?) {
+    func follow(_ events: AsyncStream<PlayerEvent>) {
         stopWatching()
         watchers = [
             Task { [weak self] in
-                for await status in changes(of: item, \.status) {
-                    switch status {
-                    case .readyToPlay:
-                        await self?.ready(resumingAt: position)
+                for await event in events {
+                    guard let self else { return }
+                    switch event {
+                    case .ready:
+                        ready()
+                    case let .status(status):
+                        await changed(to: status)
+                    case .ended:
+                        // On their own, so the watchers they stop don't cancel what features do.
+                        Task { await finished() }
                         return
-                    case .failed:
-                        self?.failed(PlayerError.streamFailed(underlying: item.error))
+                    case let .failed(error):
+                        Task { await failed(error) }
                         return
-                    default:
-                        continue
                     }
-                }
-            },
-            Task { [weak self] in
-                let failures = NotificationCenter.default.notifications(
-                    named: AVPlayerItem.failedToPlayToEndTimeNotification,
-                    object: item,
-                )
-                for await _ in failures {
-                    self?.failed(PlayerError.streamFailed(underlying: item.error))
-                    return
-                }
-            },
-            Task { [weak self] in
-                let ends = NotificationCenter.default.notifications(
-                    named: AVPlayerItem.didPlayToEndTimeNotification,
-                    object: item,
-                )
-                for await _ in ends {
-                    await self?.finished()
-                    return
                 }
             },
         ]
     }
 
-    func ready(resumingAt position: Duration?) async {
-        // Once the item is ready, as Swiftfin does. Playing from the start after a failed seek
-        // would lose the user's place once the first progress report went out; a seek replaced
-        // by the user's own scrubbing is fine.
-        if let position, await !seek(to: position), currentPosition < .seconds(1) {
-            failed(PlayerError.resumeFailed)
-            return
-        }
+    func ready() {
         guard !isStopped else { return }
         state = .playing
-        player.play()
-        watchers.append(Task { [weak self] in
-            await self?.reportWhilePlaying()
-        })
+        engine.play()
     }
 
-    /// Exact, like Wholphin's resume, rather than the keyframe before it.
-    func seek(to position: Duration) async -> Bool {
-        await player.seek(
-            to: CMTime(seconds: position / .seconds(1), preferredTimescale: 600),
-            toleranceBefore: .zero,
-            toleranceAfter: .zero,
-        )
-    }
-
-    /// Like Wholphin: the start report once playback is under way, then progress every few
-    /// seconds and whenever it pauses or resumes.
-    func reportWhilePlaying() async {
-        let statuses = changes(of: player, \.timeControlStatus)
-        for await status in statuses where status == .playing {
-            break
+    /// Like Wholphin: playback counts as started once it's under way, and after that, pausing
+    /// and resuming are worth telling features about.
+    func changed(to status: PlayerStatus) async {
+        self.status = status
+        guard isUnderWay else {
+            guard status == .playing else { return }
+            isUnderWay = true
+            await publish(.started(progress))
+            // Unless the stream was replaced meanwhile.
+            guard !Task.isCancelled else { return }
+            watchers.append(Task { [weak self] in
+                await self?.tellPosition()
+            })
+            return
         }
-        guard !Task.isCancelled, let stream else { return }
-        reporter.start(stream, at: currentProgress)
-        watchers.append(Task { [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: Self.progressInterval)
-                self?.saveProgress()
-            }
-        })
-        var wasPaused = false
-        for await status in statuses where status != .waitingToPlayAtSpecifiedRate {
-            let isPaused = status == .paused
-            if isPaused != wasPaused {
-                wasPaused = isPaused
-                saveProgress()
-            }
+        guard status != .waiting else { return }
+        let isPaused = status == .paused
+        if isPaused != wasPaused {
+            wasPaused = isPaused
+            await publish(isPaused ? .paused(progress) : .resumed(progress))
         }
     }
 
-    /// Wholphin doesn't save a position at the very start.
-    func saveProgress() {
-        let progress = currentProgress
-        if progress.position > .zero {
-            reporter.progress(progress)
+    func tellPosition() async {
+        while !Task.isCancelled {
+            try? await Task.sleep(for: positionInterval)
+            guard !Task.isCancelled else { return }
+            await publish(.position(progress))
         }
-    }
-}
-
-/// Every change to a property, starting with its current value. Combine's `values` alone drops
-/// a change that comes before the loop asks for the next one, such as an item becoming ready.
-private func changes<Root: NSObject, Value>(
-    of object: Root,
-    _ keyPath: KeyPath<Root, Value>,
-) -> AsyncPublisher<Publishers.Buffer<NSObject.KeyValueObservingPublisher<Root, Value>>> {
-    object.publisher(for: keyPath).buffer(size: 8, prefetch: .keepFull, whenFull: .dropOldest).values
-}
-
-private extension CMTime {
-    /// `nil` for invalid or indefinite times, such as a live stream's duration.
-    var duration: Duration? {
-        guard isNumeric, seconds.isFinite else { return nil }
-        return .seconds(seconds)
     }
 }

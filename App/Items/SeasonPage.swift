@@ -16,7 +16,7 @@ struct SeasonPage: View {
     @FocusState private var focus: ItemFocus?
     @State private var memory = RowMemory()
     @State private var alert: ItemAlert?
-    @State private var playback: PlaybackController?
+    @State private var playback: PlaybackRequest?
 
     @State private var series: ItemDetails?
     @State private var seasons: [ItemDetails] = []

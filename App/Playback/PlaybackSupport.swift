@@ -1,16 +1,17 @@
 import AnemoneJellyfin
 import AnemonePlayback
-import AVFoundation
 
 extension BrowseModel {
-    /// A player for an item, starting at `position`, or the beginning when `nil`.
-    func playback(of details: ItemDetails, from position: Duration?) -> PlaybackController {
-        PlaybackController(
-            session: session,
-            itemID: details.id,
-            startPosition: position,
-            metadata: details.playerMetadata,
+    /// What a page asks for to play an item, starting at `position`, or the beginning when `nil`.
+    func playback(of details: ItemDetails, from position: Duration?) -> PlaybackRequest {
+        PlaybackRequest(
+            PlaybackQueue.Entry(itemID: details.id, startPosition: position, metadata: details.playerMetadata),
         )
+    }
+
+    /// The player for a request. Every player is built here, with the features every player gets.
+    func player(for request: PlaybackRequest) -> PlaybackController {
+        PlaybackController(session: session, request: request)
     }
 
     /// What the player says when it can't play.
@@ -42,23 +43,11 @@ extension BrowseModel {
 extension ItemDetails {
     /// What the player's info panel and Now Playing show: for episodes, the series, then the
     /// episode, as Wholphin's player titles them.
-    var playerMetadata: [AVMetadataItem] {
-        var metadata = [Self.metadata(.commonIdentifierTitle, item.displayTitle)]
+    var playerMetadata: PlaybackMetadata {
+        var metadata = PlaybackMetadata(title: item.displayTitle, overview: item.overview)
         if item.kind == .episode {
-            let subtitle = [item.episodeLabel, item.name].compactMap(\.self).joined(separator: " · ")
-            metadata.append(Self.metadata(.iTunesMetadataTrackSubTitle, subtitle))
-        }
-        if let overview = item.overview {
-            metadata.append(Self.metadata(.commonIdentifierDescription, overview))
+            metadata.subtitle = [item.episodeLabel, item.name].compactMap(\.self).joined(separator: " · ")
         }
         return metadata
-    }
-
-    private static func metadata(_ identifier: AVMetadataIdentifier, _ value: String) -> AVMetadataItem {
-        let item = AVMutableMetadataItem()
-        item.identifier = identifier
-        item.value = value as NSString
-        item.extendedLanguageTag = "und"
-        return item
     }
 }
