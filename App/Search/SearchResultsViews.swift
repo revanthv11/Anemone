@@ -195,13 +195,6 @@ extension SearchKind {
         }
     }
 
-    /// For focus and accessibility identifiers, as in `card.movie.<item>`.
-    var rowID: String {
-        "\(self)"
-    }
-
-    static let combinedRowID = "results"
-
     /// Wholphin's search cards: 16:9 for episodes, square for music. Videos and photos are 16:9
     /// and playlists square here, as in Anemone's other rows, where Wholphin's search uses 2:3.
     var cardShape: CardShape {
