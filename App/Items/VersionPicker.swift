@@ -121,8 +121,9 @@ private extension MediaVersion {
 #if DEBUG
     extension MediaVersion {
         /// Launching with `-fakeVersions <n>` gives every item at least n versions, copies of its
-        /// first, for trying the picker on a server without any. Debug builds only. Playing a
-        /// copy fails, since the server doesn't know it.
+        /// first, for trying the picker on a server without any. Debug builds only. The server
+        /// doesn't know the copies, so playing one plays the first instead and forgets the pick,
+        /// as for a version gone from the server.
         static func withLaunchArgumentFakes(_ versions: [MediaVersion]) -> [MediaVersion] {
             let count = UserDefaults.standard.integer(forKey: "fakeVersions")
             guard let first = versions.first, count > versions.count else { return versions }
