@@ -10,6 +10,9 @@ import Foundation
 /// A switch the stream can make on its own happens at once: audio in a file that plays
 /// directly, and text subtitles. Anything else asks the server for another stream and goes on
 /// from the same position, as Wholphin's `changeStreams` does.
+///
+/// Live TV is left to the server, as Wholphin and Swiftfin leave it: the request names no
+/// version or tracks, and the menus offer what the live stream can switch to by itself.
 @MainActor
 public final class TrackSelection: PlaybackFeature {
     /// What the feature asks the server; tests stand in for it.
@@ -33,6 +36,8 @@ public final class TrackSelection: PlaybackFeature {
         /// The subtitles that show; for "Only forced", the track it stands for now.
         var subtitle: MediaTrack?
         var stream: PlaybackStream?
+        /// A live channel, whose tracks are what its live stream reports.
+        var isLive = false
     }
 
     /// AVPlayer shows ASS and SSA subtitles as plain text, so the server burns them in. An engine
@@ -40,15 +45,15 @@ public final class TrackSelection: PlaybackFeature {
     public var burnsInStyledSubtitles = true
 
     private let server: Server
-    private let store: TrackChoiceStore
+    let store: TrackChoiceStore
     private let defaults: UserDefaults
     /// The Jellyfin profile's settings, fetched once per player.
     private var profile: ProfileTrackSettings?
-    private(set) var entry: Entry?
+    var entry: Entry?
     /// Counts fetches of tracks, so one a newer fetch replaced doesn't leave its item as the entry.
     private var fetches = 0
     /// Selecting the chosen tracks in a stream that just loaded.
-    private var applying: Task<Void, Never>?
+    var applying: Task<Void, Never>?
 
     public convenience init(session: JellyfinSession, defaults: UserDefaults = .standard) {
         self.init(
@@ -78,19 +83,27 @@ public final class TrackSelection: PlaybackFeature {
 
     /// The tracks to ask for, with their version: `mediaSourceID`, else the one picked on the item's
     /// page while the item has it, else the first. `nil` leaves them to the server, as when the
-    /// tracks can't be fetched. A retry or a switch for the same item asks for what's chosen now.
+    /// tracks can't be fetched or for live TV. A retry or a switch for the same item asks for
+    /// what's chosen now.
     func request(for itemID: MediaItem.ID, mediaSourceID: String?) async -> TrackRequest? {
         if let entry, entry.itemID == itemID {
-            return request(for: entry)
+            return entry.isLive ? nil : request(for: entry)
         }
         entry = nil
         fetches += 1
         let fetch = fetches
         async let fetchedProfile = Self.profile(profile, from: server)
         let picked = mediaSourceID == nil ? server.pickedVersion(itemID) : nil
-        guard let item = try? await server.itemTracks(itemID),
-              let source = picked.flatMap({ item.source($0) }) ?? item.source(mediaSourceID)
-        else { return nil }
+        guard let item = try? await server.itemTracks(itemID) else { return nil }
+        // A channel's version is a placeholder until the server opens its live stream, and the
+        // server reads track indices only with the version.
+        guard !item.isLive else {
+            if fetch == fetches {
+                entry = Entry(itemID: itemID, tracks: [], subtitleChoice: .off, isLive: true)
+            }
+            return nil
+        }
+        guard let source = picked.flatMap({ item.source($0) }) ?? item.source(mediaSourceID) else { return nil }
         profile = await fetchedProfile
         let entry = choose(in: item, source: source)
         if fetch == fetches {
@@ -172,7 +185,9 @@ public final class TrackSelection: PlaybackFeature {
     /// Takes in what the server sent: its tracks say how each subtitle comes.
     private func loaded(_ stream: PlaybackStream, itemID: MediaItem.ID, in controller: PlaybackController) {
         var entry = entry.flatMap { $0.itemID == itemID ? $0 : nil } ?? Self.entry(for: stream)
-        if !stream.tracks.isEmpty {
+        if entry.isLive {
+            entry = Self.entry(for: stream, isLive: true)
+        } else if !stream.tracks.isEmpty {
             entry.tracks = stream.tracks
             entry.audio = entry.audio.flatMap { stream.tracks.of(.audio).first(id: $0.id) }
             entry.subtitle = entry.subtitle.flatMap { stream.tracks.of(.subtitle).first(id: $0.id) }
@@ -186,8 +201,8 @@ public final class TrackSelection: PlaybackFeature {
         }
     }
 
-    /// When the tracks couldn't be chosen beforehand: what the server picked.
-    private static func entry(for stream: PlaybackStream) -> Entry {
+    /// When the tracks couldn't be chosen beforehand, or for live TV: what the server picked.
+    private static func entry(for stream: PlaybackStream, isLive: Bool = false) -> Entry {
         let subtitle = stream.subtitleStreamIndex.flatMap { stream.tracks.of(.subtitle).first(id: $0) }
         return Entry(
             itemID: stream.itemID,
@@ -196,12 +211,13 @@ public final class TrackSelection: PlaybackFeature {
             audio: stream.audioStreamIndex.flatMap { stream.tracks.of(.audio).first(id: $0) },
             subtitleChoice: subtitle.choice,
             subtitle: subtitle,
+            isLive: isLive,
         )
     }
 
     /// Selects the chosen tracks in the engine, where the stream carries them as tracks of
     /// its own, and turns off subtitles the player would otherwise pick by itself.
-    private func select(in engine: any PlayerEngine, for stream: PlaybackStream) async {
+    func select(in engine: any PlayerEngine, for stream: PlaybackStream) async {
         guard let entry, entry.stream == stream else { return }
         if stream.method == .directPlay, let audio = entry.audio {
             let options = await engine.tracks(.audio)
@@ -233,9 +249,9 @@ public final class TrackSelection: PlaybackFeature {
 
 /// The menus.
 extension TrackSelection {
-    private func showMenus(in controller: PlaybackController) {
+    func showMenus(in controller: PlaybackController) {
         guard let entry else { return }
-        let audio = entry.tracks.of(.audio)
+        let audio = entry.tracks.of(.audio).filter { offers($0, in: entry) }
         if audio.count > 1 {
             let options = audio.map { track in
                 option(
@@ -264,13 +280,13 @@ extension TrackSelection {
         } else {
             controller.accessories.removeMenu("audio")
         }
-        let subtitles = entry.tracks.of(.subtitle)
+        let subtitles = entry.tracks.of(.subtitle).filter { offers($0, in: entry) }
         guard !subtitles.isEmpty else {
             controller.accessories.removeMenu("subtitles")
             return
         }
         var options = [subtitleOption("subtitles.off", "Off", .off, controller)]
-        if subtitles.contains(where: \.isForcedOrSigns) {
+        if !entry.isLive, subtitles.contains(where: \.isForcedOrSigns) {
             options.append(subtitleOption("subtitles.forced", "Only forced", .onlyForced, controller))
         }
         options += subtitles.map { track in
@@ -282,6 +298,14 @@ extension TrackSelection {
             systemImage: "captions.bubble",
             options: options,
         ))
+    }
+
+    /// Whether the menus offer `track`: every one, except in a live stream, which offers those
+    /// the player can switch to by itself.
+    private func offers(_ track: MediaTrack, in entry: Entry) -> Bool {
+        guard entry.isLive else { return true }
+        guard let stream = entry.stream else { return false }
+        return TrackSwitching.switchesInPlace(to: track, in: stream, burnsInStyled: burnsInStyledSubtitles)
     }
 
     private func subtitleOption(
@@ -320,81 +344,5 @@ extension TrackSelection {
             showMenus(in: controller)
             Task { await self.switchTracks(from: previous, in: controller) }
         }
-    }
-}
-
-/// Switching and remembering.
-extension TrackSelection {
-    /// Shows the entry's tracks: in the stream that's playing when it can, else by asking the
-    /// server for another stream.
-    private func switchTracks(from previous: Entry, in controller: PlaybackController) async {
-        guard let entry, let stream = entry.stream else { return }
-        let engine = controller.engine
-        var reloads = false
-        if let audio = entry.audio, audio != previous.audio {
-            reloads = await TrackSwitching.audio(audio, in: stream, options: engine.tracks(.audio)) == .reload
-        }
-        if entry.subtitle != previous.subtitle {
-            let change = await TrackSwitching.subtitle(
-                from: previous.subtitle,
-                to: entry.subtitle,
-                in: stream,
-                options: engine.tracks(.subtitle),
-                burnsInStyled: burnsInStyledSubtitles,
-            )
-            reloads = reloads || change == .reload
-        }
-        guard self.entry?.stream == stream else { return }
-        if reloads {
-            applying?.cancel()
-            controller.reload()
-        } else {
-            await select(in: engine, for: stream)
-        }
-    }
-
-    /// Saves what changed for the item and, for episodes, its season and series, as Wholphin's
-    /// `saveTrackSelection` does.
-    private func remember(_ entry: Entry, previous: Entry) {
-        var picked = store.itemChoice(for: entry.itemID).flatMap { $0.mediaSourceID == entry.mediaSourceID ? $0 : nil }
-            ?? ItemTrackChoice(itemID: entry.itemID, mediaSourceID: entry.mediaSourceID)
-        var series: ((String, SeriesTrackChoice.Parent) -> SeriesTrackChoice)?
-        if let audio = entry.audio, audio != previous.audio {
-            picked.audioIndex = audio.index
-            // A track without a language says nothing about the next episode's.
-            if audio.language != nil {
-                series = { .init(parentID: $0, parent: $1, itemID: entry.itemID, track: audio, among: entry.tracks) }
-            }
-        } else if entry.subtitleChoice != previous.subtitleChoice {
-            picked.subtitle = entry.subtitleChoice
-            switch entry.subtitleChoice {
-            case .off:
-                series = {
-                    .init(parentID: $0, parent: $1, kind: .subtitle, itemID: entry.itemID, activation: .disabled)
-                }
-            case .onlyForced:
-                series = { .init(
-                    parentID: $0,
-                    parent: $1,
-                    kind: .subtitle,
-                    itemID: entry.itemID,
-                    activation: .onlyForced,
-                ) }
-            case .track:
-                if let subtitle = entry.subtitle, subtitle.language != nil {
-                    series = { .init(
-                        parentID: $0,
-                        parent: $1,
-                        itemID: entry.itemID,
-                        track: subtitle,
-                        among: entry.tracks,
-                    ) }
-                }
-            }
-        }
-        let parents = [(entry.seasonID, SeriesTrackChoice.Parent.season), (entry.seriesID, .series)]
-        store.save(picked, series: series.map { series in
-            parents.compactMap { id, parent in id.map { series($0, parent) } }
-        } ?? [])
     }
 }

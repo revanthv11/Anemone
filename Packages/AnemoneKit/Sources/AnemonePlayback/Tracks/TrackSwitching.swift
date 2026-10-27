@@ -86,6 +86,17 @@ enum TrackSwitching {
         track.isPicture || (burnsInStyled && track.isStyledText) || delivery(of: track, in: stream) == .burnedIn
     }
 
+    /// Whether the engine can switch to `track` in `stream` without another stream, going by
+    /// what the stream carries: audio in a file that plays directly, and subtitles it lists that
+    /// needn't be burned in. All a live stream offers, since its tracks can't be asked for.
+    static func switchesInPlace(to track: MediaTrack, in stream: PlaybackStream, burnsInStyled: Bool) -> Bool {
+        let carries = switch track.kind {
+        case .audio: stream.method == .directPlay
+        case .subtitle: !needsBurnIn(track, in: stream, burnsInStyled: burnsInStyled)
+        }
+        return carries && listed(track.kind, in: stream).contains { $0.index == track.index }
+    }
+
     /// The engine's track for `track`: the engine lists the stream's tracks of that kind in the
     /// server's order, so by position when the counts agree, else by name or language. Adapted
     /// from Swiftfin's `AVMediaPlayer.selectionOption`.

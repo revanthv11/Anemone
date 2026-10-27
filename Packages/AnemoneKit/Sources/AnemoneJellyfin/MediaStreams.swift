@@ -21,12 +21,22 @@ public struct ItemTracks: Hashable, Sendable {
     public let seasonID: String?
     /// In the server's order.
     public let sources: [Source]
+    /// A live TV channel: the server opens a live stream when it's asked how to play it, and
+    /// picks its version and tracks itself, since they aren't known before then.
+    public let isLive: Bool
 
-    public init(itemID: MediaItem.ID, seriesID: String? = nil, seasonID: String? = nil, sources: [Source]) {
+    public init(
+        itemID: MediaItem.ID,
+        seriesID: String? = nil,
+        seasonID: String? = nil,
+        sources: [Source],
+        isLive: Bool = false,
+    ) {
         self.itemID = itemID
         self.seriesID = seriesID
         self.seasonID = seasonID
         self.sources = sources
+        self.isLive = isLive
     }
 
     /// The version that plays: the one asked for, else the server's first, as PlaybackInfo
@@ -65,6 +75,7 @@ public extension JellyfinSession {
             sources: (dto.mediaSources ?? []).map { source in
                 ItemTracks.Source(id: source.id, tracks: (source.mediaStreams ?? []).compactMap(MediaTrack.init))
             },
+            isLive: dto.isLive,
         )
     }
 
@@ -118,6 +129,15 @@ extension MediaTrack {
             isText: stream.isTextSubtitleStream ?? (kind == .subtitle),
             delivery: stream.deliveryMethod.map(Delivery.init),
         )
+    }
+}
+
+private extension BaseItemDto {
+    /// A channel, as Wholphin (`TV_CHANNEL`) and Swiftfin (`isLiveStream`) tell one, or an item
+    /// whose version is a placeholder for a live stream, as a channel's is.
+    var isLive: Bool {
+        [.tvChannel, .liveTvChannel].contains(type) || channelType != nil
+            || (mediaSources ?? []).contains { $0.type == .placeholder || $0.isInfiniteStream == true }
     }
 }
 

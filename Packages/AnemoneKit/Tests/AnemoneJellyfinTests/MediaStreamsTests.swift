@@ -82,6 +82,24 @@ struct MediaStreamsTests {
 
         #expect(tracks.seriesID == nil)
         #expect(tracks.seasonID == nil)
+        #expect(!tracks.isLive)
+    }
+
+    @Test func `a TV channel and a placeholder for a live stream are live`() async throws {
+        _ = register(host: "channel-tracks.test", path: "/jf/Items/ch1", reply: .json("""
+        {"Id":"ch1","Type":"TvChannel","ChannelType":"TV","MediaSources":[
+         {"Id":"ch1","Type":"Placeholder","Protocol":"Http","IsInfiniteStream":true,"MediaStreams":[]}]}
+        """))
+        _ = register(host: "placeholder-tracks.test", path: "/jf/Items/x1", reply: .json("""
+        {"Id":"x1","Type":"Video","MediaSources":[{"Id":"x1","Type":"Placeholder","MediaStreams":[]}]}
+        """))
+
+        let channel = try await session(host: "channel-tracks.test").itemTracks(for: "ch1")
+        let placeholder = try await session(host: "placeholder-tracks.test").itemTracks(for: "x1")
+
+        #expect(channel.isLive)
+        #expect(channel.source(nil)?.tracks == [])
+        #expect(placeholder.isLive)
     }
 
     @Test func `the Jellyfin profile's language and subtitle settings`() async throws {
