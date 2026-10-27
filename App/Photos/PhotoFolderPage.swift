@@ -174,7 +174,7 @@ struct PhotoFolderPage: View {
 
     /// Play and Shuffle: every photo inside, albums included, as a slideshow from the first.
     /// Wholphin's Shuffle shows them in order; here it shuffles, once for the whole slideshow
-    /// (`ShuffledSlideshow`), as for a photo picked in a grid sorted at random.
+    /// (`ShuffledPages`), as for a photo picked in a grid sorted at random.
     private func startSlideshow(shuffled: Bool) {
         let query = SlideshowQuery(
             folderID: folder.id,
@@ -203,15 +203,8 @@ struct PhotoFolderPage: View {
         if !content.isLoaded {
             content = .loading
         }
-        let session = browse.session
-        let pager = LibraryPager { startIndex, limit, includeTotalCount in
-            try await session.libraryItems(
-                query,
-                startIndex: startIndex,
-                limit: limit,
-                includeTotalCount: includeTotalCount,
-            )
-        }
+        // A random order is drawn once, when the grid loads, and holds while it's open.
+        let pager = LibraryPager(loader: browse.session.libraryLoader(for: query))
         do {
             try await pager.start()
             guard !Task.isCancelled else { return }

@@ -193,15 +193,20 @@ struct PhotosAndThemesTests {
         #expect(Set(shown) == Set((0 ..< count).map { "p\($0)" }))
         #expect(shown != (0 ..< count).map { "p\($0)" })
         let requests = sent.all.withLock(\.self)
-        // The IDs once, without a sort, then three pages by ID, in the shuffled order.
+        // The IDs once, by name and with nothing else, then three pages by ID, in the shuffled
+        // order.
         #expect(requests.count == 4)
         let first = try #require(requests.first)
         #expect(first["ids"] == nil)
-        #expect(first["sortBy"] == nil)
+        #expect(first["sortBy"] == "SortName")
         #expect(first["parentId"] == "lib1")
         #expect(first["recursive"] == "true")
         #expect(first["includeItemTypes"] == "Photo")
         #expect(first["enableImages"] == "false")
+        #expect(first["enableUserData"] == "false")
+        #expect(first["fields"] == nil)
+        #expect(first["startIndex"] == "0")
+        #expect(first["limit"] == "1000")
         let pages = requests.dropFirst()
         let pageIDs: [[String]] = pages.map { page in
             let ids = page["ids"] ?? ""
@@ -211,6 +216,27 @@ struct PhotosAndThemesTests {
         let askedFor: [String] = pageIDs.flatMap(\.self)
         #expect(askedFor == shown)
         #expect(pages.allSatisfy { $0["fields"] == "Overview,Width,Height,DateCreated" })
+    }
+
+    @Test func `a big slideshow's IDs are fetched a thousand at a time until the last page`() async throws {
+        let count = 2100
+        let sent = SentRequests()
+        MockServer.register(host: "many-ids.test") { request in
+            let query = SentRequest(request).query
+            sent.all.withLock { $0.append(query) }
+            let start = Int(query["startIndex"] ?? "") ?? 0
+            let limit = Int(query["limit"] ?? "") ?? count
+            let items = (start ..< min(start + limit, count)).map { #"{"Id":"p\#($0)","Type":"Photo"}"# }
+            return .json(#"{"Items":[\#(items.joined(separator: ","))]}"#)
+        }
+        let query = SlideshowQuery(folderID: "lib1", sort: LibrarySort(.random), isRecursive: true)
+
+        let ids = try await session(host: "many-ids.test").slideshowItemIDs(query)
+
+        #expect(ids == (0 ..< count).map { "p\($0)" })
+        let requests = sent.all.withLock(\.self)
+        #expect(requests.map { $0["startIndex"] } == ["0", "1000", "2000"])
+        #expect(requests.allSatisfy { $0["limit"] == "1000" && $0["enableTotalRecordCount"] == "false" })
     }
 
     @Test func `a slideshow sorted otherwise is fetched a page at a time in that order`() async throws {
