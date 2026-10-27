@@ -58,6 +58,21 @@ public struct StreamRequest: Hashable, Sendable {
     }
 }
 
+extension JellyfinSession {
+    /// The stream `request` asks for, at up to `maxBitrate`.
+    func playbackStream(for request: StreamRequest, maxBitrate: Int) async throws -> PlaybackStream {
+        try await playbackStream(
+            for: request.itemID,
+            profile: request.profile,
+            maxBitrate: maxBitrate,
+            allowsDirect: request.allowsDirect,
+            mediaSourceID: request.mediaSourceID,
+            audioStreamIndex: request.audioStreamIndex,
+            subtitleStreamIndex: request.subtitleStreamIndex,
+        )
+    }
+}
+
 /// What happens while a controller plays its queue.
 public enum PlaybackEvent: Sendable {
     /// A stream for the current entry was loaded. Retrying as a transcode after a failure loads
@@ -67,7 +82,8 @@ public enum PlaybackEvent: Sendable {
     /// track the stream doesn't carry), which plays on from the same position. It comes in
     /// place of `loaded`, after the replaced stream's `stopped`: it's still the same entry, so
     /// what features keep for an entry, such as segments already skipped or an Up Next that was
-    /// cancelled, carries on.
+    /// cancelled, carries on. If playback was paused, it stays paused, and `started` comes when it
+    /// resumes.
     case reloaded(PlaybackStream)
     /// Playback got under way after loading.
     case started(PlaybackProgress)

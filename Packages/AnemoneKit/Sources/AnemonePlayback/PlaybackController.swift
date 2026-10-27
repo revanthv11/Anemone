@@ -54,6 +54,8 @@ public final class PlaybackController: Identifiable {
     /// Where the loaded stream starts, until the engine is ready there: the engine's time says
     /// 0 until then.
     @ObservationIgnored private var pendingStart: Duration?
+    /// Whether the loaded stream stays paused once it's ready, as after a reload while paused.
+    @ObservationIgnored private var staysPaused = false
     /// Whether the loaded stream's play session is open, so features hear `stopped` once.
     @ObservationIgnored private var isSessionOpen = false
     /// The last session's `stopped`, which a later stop waits for.
@@ -77,15 +79,7 @@ public final class PlaybackController: Identifiable {
             engine: AVPlayerEngine(),
             features: Self.features(for: session),
         ) { request in
-            try await session.playbackStream(
-                for: request.itemID,
-                profile: request.profile,
-                maxBitrate: AVPlayerProfile.defaultMaxBitrate,
-                allowsDirect: request.allowsDirect,
-                mediaSourceID: request.mediaSourceID,
-                audioStreamIndex: request.audioStreamIndex,
-                subtitleStreamIndex: request.subtitleStreamIndex,
-            )
+            try await session.playbackStream(for: request, maxBitrate: AVPlayerProfile.defaultMaxBitrate)
         }
     }
 
@@ -150,6 +144,7 @@ public final class PlaybackController: Identifiable {
         engine.pause()
         queue.currentIndex = index
         stream = nil
+        staysPaused = false
         state = .loading
         let attempt = beginLoad()
         Task {
@@ -166,10 +161,14 @@ public final class PlaybackController: Identifiable {
     /// Asks the server for the current entry again, after ending its play session, and plays
     /// the new stream on from where the old one was: for audio or subtitles the stream doesn't
     /// carry, as Wholphin's `changeStreams` does. Features hear `reloaded` rather than `loaded`,
-    /// since the entry is the same.
+    /// since the entry is the same. Paused, it stays paused until playback resumes.
     public func reload() {
         guard !isStopped, !hasEnded, stream != nil else { return }
         let position = currentPosition
+        // As the user left it; before it's under way, as the last load was going to.
+        if isUnderWay {
+            staysPaused = status == .paused
+        }
         stopWatching()
         engine.pause()
         state = .loading
@@ -212,12 +211,7 @@ public final class PlaybackController: Identifiable {
         return loads
     }
 
-    private func load(
-        allowsDirect: Bool,
-        from position: Duration?,
-        as attempt: Int,
-        isReload: Bool = false,
-    ) async {
+    private func load(allowsDirect: Bool, from position: Duration?, as attempt: Int, isReload: Bool = false) async {
         guard !isStopped else { return }
         let entry = queue.current
         self.allowsDirect = allowsDirect
@@ -366,6 +360,7 @@ private extension PlaybackController {
         pendingStart = nil
         guard !isStopped else { return }
         state = .playing
+        guard !staysPaused else { return }
         engine.play()
     }
 
@@ -377,6 +372,7 @@ private extension PlaybackController {
         guard isUnderWay else {
             guard status == .playing, case .playing = state else { return }
             isUnderWay = true
+            staysPaused = false
             await publish(.started(progress))
             // Unless the stream was replaced meanwhile.
             guard !Task.isCancelled else { return }

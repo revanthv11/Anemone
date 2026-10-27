@@ -153,6 +153,56 @@ struct PlaybackReloadTests {
         #expect(log.events.after("stopped 30.0 seconds") == ["reloaded m1 directPlay"])
     }
 
+    @Test func `a reload while paused stays paused until playback resumes`() async {
+        let engine = FakeEngine()
+        let log = EventLog()
+        let playback = PlaybackController(
+            request: PlaybackRequest(.item("m1")),
+            engine: engine,
+            features: [log],
+            loadStream: FakeStreams().load,
+        )
+        func ready(_ count: Int) async {
+            _ = await eventually { engine.loads.count == count }
+            engine.send(.ready)
+            _ = await eventually {
+                if case .playing = playback.state {
+                    true
+                } else {
+                    false
+                }
+            }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        await playback.start()
+        engine.send(.ready)
+        _ = await eventually { log.events.contains { $0.hasPrefix("started") } }
+        engine.currentTime = .seconds(30)
+        engine.pause()
+        #expect(await eventually { log.events.last == "paused 30.0 seconds" })
+
+        playback.reload()
+        await ready(2)
+        #expect(!engine.isPlaying)
+        #expect(log.events.after("stopped 30.0 seconds") == ["reloaded m1 directPlay"])
+        // Again, both once it's ready and before it is.
+        playback.reload()
+        await ready(3)
+        playback.reload()
+        #expect(await eventually { engine.loads.count == 4 })
+        playback.reload()
+        await ready(5)
+        #expect(!engine.isPlaying)
+        #expect(engine.loads.map(\.position) == [nil] + Array(repeating: .seconds(30), count: 4))
+
+        // Resuming gets it under way; a reload while playing plays on.
+        engine.play()
+        #expect(await eventually { log.events.last == "started 30.0 seconds" })
+        playback.reload()
+        await ready(6)
+        #expect(engine.isPlaying)
+    }
+
     @Test func `a reload before the stream is ready plays on from where it was to start`() async {
         let engine = FakeEngine()
         let playback = PlaybackController(
