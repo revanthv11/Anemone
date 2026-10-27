@@ -49,8 +49,8 @@ public final class PlaybackController: Identifiable {
     @ObservationIgnored private let positionInterval: Duration
     /// What's loaded in the engine.
     @ObservationIgnored private var stream: PlaybackStream?
-    /// Whether the last load allowed direct play, which `reload()` keeps.
-    @ObservationIgnored private var allowsDirect = true
+    /// What `reload()` keeps for the current entry.
+    @ObservationIgnored private var reloading = Reloading()
     /// Where the loaded stream starts, until the engine is ready there: the engine's time says 0 until then.
     @ObservationIgnored private var pendingStart: Duration?
     /// Whether the loaded stream stays paused once it's ready, as after a reload while paused.
@@ -144,6 +144,7 @@ public final class PlaybackController: Identifiable {
         queue.currentIndex = index
         stream = nil
         staysPaused = false
+        reloading.hasReloaded = false
         state = .loading
         let attempt = beginLoad()
         Task {
@@ -157,24 +158,22 @@ public final class PlaybackController: Identifiable {
         play(entryAt: queue.currentIndex + 1)
     }
 
-    /// Asks the server for the current entry again, after ending its play session, and plays
-    /// the new stream on from where the old one was: for audio or subtitles the stream doesn't
-    /// carry, as Wholphin's `changeStreams` does. Features hear `reloaded` rather than `loaded`,
-    /// since the entry is the same. Paused, it stays paused until playback resumes.
+    /// Asks the server for the current entry again, after ending its play session, and plays the
+    /// new stream on from where the old one was, for tracks the stream doesn't carry, as Wholphin's
+    /// `changeStreams` does. Features hear `reloaded`, not `loaded`: it's the same entry. Paused,
+    /// it stays paused until playback resumes; while the server is asked, it waits (`Reloading`).
     public func reload() {
-        guard !isStopped, !hasEnded, stream != nil else { return }
+        guard !isStopped, !hasEnded, stream != nil, reloading.starts() else { return }
         let position = currentPosition
         // As the user left it; before it's under way, as the last load was going to.
-        if isUnderWay {
-            staysPaused = status == .paused
-        }
+        staysPaused = isUnderWay ? status == .paused : staysPaused
         stopWatching()
         engine.pause()
         state = .loading
         let attempt = beginLoad()
         Task {
             await endSession(at: position)
-            await load(allowsDirect: allowsDirect, from: position, as: attempt, isReload: true)
+            await load(allowsDirect: reloading.allowsDirect, from: position, as: attempt)
         }
     }
 
@@ -206,50 +205,51 @@ public final class PlaybackController: Identifiable {
     }
 
     private func beginLoad() -> Int {
+        reloading.isAsking = true
         loads += 1
         return loads
     }
 
-    private func load(allowsDirect: Bool, from position: Duration?, as attempt: Int, isReload: Bool = false) async {
+    private func load(allowsDirect: Bool, from position: Duration?, as attempt: Int) async {
         guard !isStopped else { return }
         let entry = queue.current
-        self.allowsDirect = allowsDirect
+        reloading.allowsDirect = allowsDirect
         var request = StreamRequest(itemID: entry.itemID, allowsDirect: allowsDirect, profile: engine.deviceProfile)
         // The version a retry or a reload keeps.
         request.mediaSourceID = stream?.mediaSourceID
+        reloading.asksAgain = false
         for feature in features {
             await feature.prepare(&request)
         }
         guard !isStopped, attempt == loads else { return }
         do {
             let stream = try await loadStream(request)
-            guard !isStopped, attempt == loads else {
+            guard !isStopped, attempt == loads, !reloading.asksAgain else {
                 // Features never hear of a stream nothing plays, so a live stream it opened is closed here.
                 await feature(LiveStreamClosing.self)?.discard(stream)
-                return
+                // A reload that came meanwhile asks again.
+                guard !isStopped, attempt == loads else { return }
+                return await load(allowsDirect: allowsDirect, from: position, as: attempt)
             }
-            await play(stream, entry, from: position, isReload: isReload)
+            await play(stream, entry, from: position)
         } catch {
             guard !isStopped, attempt == loads else { return }
+            reloading.isAsking = false
             state = .failed(error)
             await publish(.failed(error))
         }
     }
 
-    private func play(
-        _ stream: PlaybackStream,
-        _ entry: PlaybackQueue.Entry,
-        from position: Duration?,
-        isReload: Bool,
-    ) async {
+    private func play(_ stream: PlaybackStream, _ entry: PlaybackQueue.Entry, from position: Duration?) async {
         self.stream = stream
+        reloading.isAsking = false
         status = .paused
         isUnderWay = false
         wasPaused = false
         pendingStart = position ?? .zero
         let events = engine.load(stream.url, from: position, metadata: entry.metadata)
         isSessionOpen = true
-        await publish(isReload ? .reloaded(stream) : .loaded(stream, entry))
+        await publish(reloading.hasReloaded ? .reloaded(stream) : .loaded(stream, entry))
         follow(events)
     }
 

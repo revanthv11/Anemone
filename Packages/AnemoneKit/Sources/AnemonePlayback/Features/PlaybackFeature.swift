@@ -86,14 +86,14 @@ extension JellyfinSession {
 /// What happens while a controller plays its queue.
 public enum PlaybackEvent: Sendable {
     /// A stream for the current entry was loaded. Retrying as a transcode after a failure loads
-    /// it again.
+    /// it again, unless the entry was reloaded: then the retry is `reloaded` too.
     case loaded(PlaybackStream, PlaybackQueue.Entry)
     /// The current entry's stream was replaced by another, asked for with `reload()` (as for a
     /// track the stream doesn't carry), which plays on from the same position. It comes in
     /// place of `loaded`, after the replaced stream's `stopped`: it's still the same entry, so
     /// what features keep for an entry, such as segments already skipped or an Up Next that was
     /// cancelled, carries on. If playback was paused, it stays paused, and `started` comes when it
-    /// resumes.
+    /// resumes. A transcode retry after a reloaded stream fails comes as `reloaded` as well.
     case reloaded(PlaybackStream)
     /// Playback got under way after loading.
     case started(PlaybackProgress)
