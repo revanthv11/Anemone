@@ -147,6 +147,42 @@
             #expect(list.items?.map(\.id) == Array((6 ... 45).reversed()))
         }
 
+        @Test func `a reload cancelled while it waits its turn ends at once, and the next still waits`() async throws {
+            let pages = HeldPages(Array((1 ... 45).reversed()))
+            let list = SeerrRequestList()
+            try await list.reload(reading: pages.reader)
+            pages.hold(20)
+            let more = Task { try await list.readMore(near: 37, reading: pages.reader) }
+            #expect(await pages.nextHeld() == 20)
+
+            let ended = Flag()
+            let cancelled = Task {
+                defer { ended.isSet = true }
+                try await list.reload(reading: pages.reader)
+            }
+            for _ in 0 ..< 10 {
+                await Task.yield()
+            }
+            cancelled.cancel()
+
+            // It ends while the read under way is still held, having read nothing.
+            #expect(await eventually { ended.isSet })
+            #expect(pages.skips == [0, 20])
+            // A reload after it still waits for the read, not only for the cancelled one.
+            let reload = Task { try await list.reload(reading: pages.reader) }
+            for _ in 0 ..< 50 {
+                await Task.yield()
+            }
+            #expect(pages.skips == [0, 20])
+
+            pages.release(20)
+            try await more.value
+            try await reload.value
+            await #expect(throws: CancellationError.self) { try await cancelled.value }
+            #expect(pages.skips == [0, 20, 0, 20])
+            #expect(list.items?.map(\.id) == Array((6 ... 45).reversed()))
+        }
+
         @Test func `a reload shows each page as it comes in, keeping the rest until their page does`() async throws {
             let pages = HeldPages(Array((1 ... 45).reversed()))
             let list = SeerrRequestList()
@@ -170,6 +206,23 @@
             #expect(list.items?.map(\.id) == firstPage + Array((6 ... 25).reversed()))
             #expect(pages.skips.suffix(2) == [0, 20])
         }
+    }
+
+    /// Set once something has happened, for a test to wait on.
+    @MainActor
+    private final class Flag {
+        var isSet = false
+    }
+
+    /// Whether `condition` holds within `timeout`, checking every millisecond.
+    @MainActor
+    private func eventually(timeout: Duration = .seconds(2), _ condition: () -> Bool) async -> Bool {
+        let deadline = ContinuousClock.now + timeout
+        while !condition() {
+            guard ContinuousClock.now < deadline else { return false }
+            try? await Task.sleep(for: .milliseconds(1))
+        }
+        return true
     }
 
     /// A stand-in for Seerr's list of requests, `ids` newest first, each for the movie of the
