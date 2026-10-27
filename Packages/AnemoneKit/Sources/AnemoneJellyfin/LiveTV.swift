@@ -108,12 +108,13 @@ public extension JellyfinSession {
         )
     }
 
-    /// The folders recordings are kept in, each a tab of the Live TV page as in Wholphin.
+    /// The folders recordings are kept in, each a tab of the Live TV page as in Wholphin. Wholphin's
+    /// `CollectionFolderLiveTv` lists each folder's top level with the video sort options, whatever
+    /// its collection type, which is how the library grid lists a plain folder; so each comes back
+    /// as one, even the server's "Recorded Movies" and "Recorded Shows".
     func liveTVRecordingFolders() async throws -> [Library] {
         try await (send(Paths.getRecordingFolders(userID: userID)).items ?? []).compactMap { dto in
-            var folder = Library(dto)
-            folder?.isRecordingFolder = true
-            return folder
+            dto.id.map { Library(id: $0, name: dto.name ?? "Recordings", kind: .folders) }
         }
     }
 

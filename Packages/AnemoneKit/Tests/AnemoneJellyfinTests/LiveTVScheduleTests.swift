@@ -66,30 +66,32 @@ struct LiveTVScheduleTests: LiveTVServerTesting {
 
     @Test func `recording folders become libraries`() async throws {
         let sent = register(host: "folders.test", replies: ["GET /LiveTv/Recordings/Folders": .json(#"""
-        {"Items":[{"Id":"f1","Name":"Recordings"},{"Id":"f2","Name":"Shows","CollectionType":"tvshows"}]}
+        {"Items":[{"Id":"f1"},{"Id":"f2","Name":"Recorded Shows","CollectionType":"tvshows"},{"Name":"No ID"}]}
         """#)])
 
         let folders = try await session(host: "folders.test").liveTVRecordingFolders()
 
         #expect(folders.map(\.id) == ["f1", "f2"])
-        #expect(folders.map(\.kind) == [.mixed, .shows])
-        #expect(folders.map(\.isRecordingFolder) == [true, true])
+        #expect(folders.map(\.name) == ["Recordings", "Recorded Shows"])
+        #expect(folders.map(\.kind) == [.folders, .folders])
         #expect(sent.request("GET /LiveTv/Recordings/Folders")?.query["userId"] == "u1")
     }
 
-    @Test func `a recording folder lists its top level with the video sort options, as Wholphin does`() {
-        var shows = Library(id: "f2", name: "Shows", kind: .shows)
-        shows.isRecordingFolder = true
+    @Test func `a recording folder lists its top level with the video sort options, as Wholphin does`() async throws {
+        _ = register(host: "folder-grid.test", replies: ["GET /LiveTv/Recordings/Folders": .json(#"""
+        {"Items":[{"Id":"f2","Name":"Recorded Shows","CollectionType":"tvshows"}]}
+        """#)])
+        let shows = try #require(try await session(host: "folder-grid.test").liveTVRecordingFolders().first)
 
         let parameters = LibraryQuery(library: shows).itemsParameters(userID: "u1")
 
+        #expect(parameters.parentID == "f2")
         #expect(parameters.isRecursive == false)
-        #expect(parameters.includeItemTypes == [.series])
+        #expect(parameters.includeItemTypes == nil)
         #expect(shows.sortFields == [
             .name, .premiereDate, .dateCreated, .datePlayed, .communityRating, .criticRating, .officialRating,
             .runtime, .playCount, .random,
         ])
-        #expect(Library(id: "tv", name: "Shows", kind: .shows).sortFields.contains(.seriesDatePlayed))
     }
 
     /// One recording under way, and one the server sent without times, which isn't listed.

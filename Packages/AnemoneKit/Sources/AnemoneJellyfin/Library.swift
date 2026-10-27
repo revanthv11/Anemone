@@ -25,9 +25,6 @@ public struct Library: Hashable, Identifiable, Sendable {
     public let id: String
     public let name: String
     public let kind: Kind
-    /// A Live TV recording folder, which Wholphin's `CollectionFolderLiveTv` lists without
-    /// looking into subfolders and with the video sort options, whatever its kind.
-    public var isRecordingFolder = false
 
     public init(id: String, name: String, kind: Kind) {
         self.id = id
