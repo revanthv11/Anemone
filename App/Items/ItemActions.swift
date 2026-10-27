@@ -1,3 +1,4 @@
+import AnemoneUI
 import SwiftUI
 
 /// An icon button that shows its title while focused, like Wholphin's expandable buttons.
@@ -5,13 +6,25 @@ struct ActionButton: View {
     let title: String
     let systemImage: String
     var tint: Color?
+    /// What VoiceOver reads in place of the title, where the title reads badly aloud, as a time.
+    var spokenTitle: Text?
+    /// For a button that turns something on or off, whether it's on: VoiceOver reads the title,
+    /// then "On" or "Off".
+    var isOn: Bool?
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        let button = Button(action: action) {
             ActionLabel(title: title, systemImage: systemImage, tint: tint)
         }
-        .accessibilityLabel(title)
+        .accessibilityLabel(spokenTitle ?? Text(title))
+        if let isOn {
+            button
+                .accessibilityValue(isOn ? Text("On") : Text("Off"))
+                .accessibilityAddTraits(.isToggle)
+        } else {
+            button
+        }
     }
 }
 
@@ -44,7 +57,11 @@ struct PlaybackButtons: View {
 
     var body: some View {
         if let resumePosition {
-            ActionButton(title: "Resume from \(resumePosition.clockText)", systemImage: "play.fill") {
+            ActionButton(
+                title: "Resume from \(resumePosition.clockText)",
+                systemImage: "play.fill",
+                spokenTitle: Text("Resume from \(resumePosition.spokenPosition)"),
+            ) {
                 play(resumePosition)
             }
             .focused(focus, equals: .action(.play))
@@ -64,7 +81,8 @@ struct PlaybackButtons: View {
     }
 }
 
-/// Mark watched or unwatched.
+/// Mark watched or unwatched. VoiceOver reads it as a switch, "Watched, on", since the title
+/// says what pressing it does rather than how the item stands.
 struct PlayedButton: View {
     let isPlayed: Bool
     let action: () -> Void
@@ -73,22 +91,29 @@ struct PlayedButton: View {
         ActionButton(
             title: isPlayed ? "Mark as unwatched" : "Mark as watched",
             systemImage: isPlayed ? "eye" : "eye.slash",
+            spokenTitle: Text("Watched"),
+            isOn: isPlayed,
             action: action,
         )
         .accessibilityIdentifier("action.played")
     }
 }
 
-/// Add to or remove from favourites.
+/// Add to or remove from favourites, with the theme's heart. VoiceOver reads it as a switch,
+/// "Favorite, on".
 struct FavoriteButton: View {
     let isFavorite: Bool
     let action: () -> Void
+
+    @Environment(\.theme) private var theme
 
     var body: some View {
         ActionButton(
             title: isFavorite ? "Remove from favorites" : "Add to favorites",
             systemImage: isFavorite ? "heart.fill" : "heart",
-            tint: isFavorite ? .red : nil,
+            tint: isFavorite ? theme.favorite.color : nil,
+            spokenTitle: Text("Favorite"),
+            isOn: isFavorite,
             action: action,
         )
         .accessibilityIdentifier("action.favorite")
@@ -139,9 +164,11 @@ extension View {
 struct PageMessage: View {
     let message: String
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         Text(message)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(theme.secondaryText)
             .multilineTextAlignment(.center)
             .frame(maxWidth: 1000)
             .focusable()

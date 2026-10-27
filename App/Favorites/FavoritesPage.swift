@@ -29,6 +29,7 @@ private struct FavoritesContentView: View {
 
     @Environment(BrowseModel.self) private var browse
     @Environment(ItemContextActions.self) private var actions
+    @Environment(\.theme) private var theme
     @FocusState private var focus: ItemFocus?
     @State private var memory = RowMemory()
     @State private var content: FavoritesContent?
@@ -97,7 +98,7 @@ private struct FavoritesContentView: View {
         if let content {
             if content.sections.isEmpty, content.failedKinds.isEmpty {
                 Text("You have no favorites yet. Add them with the heart on an item's page, or hold Select on a card.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryText)
                     .focusable()
                     .accessibilityIdentifier("favorites.empty")
             }
@@ -115,7 +116,7 @@ private struct FavoritesContentView: View {
             }
         } else if let problem {
             Text(problem)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.secondaryText)
                 .focusable()
         } else {
             ProgressView()
@@ -177,11 +178,14 @@ private struct FavoritesContentView: View {
 private struct FavoritesHeader: View {
     let item: ItemDetails?
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(item?.cardTitle ?? "Favorites")
                 .font(.title2.bold())
                 .lineLimit(1)
+                .accessibilityAddTraits(.isHeader)
             if let item {
                 if item.item.kind == .episode, let subtitle = item.cardSubtitle {
                     Text(subtitle)
@@ -195,6 +199,7 @@ private struct FavoritesHeader: View {
                 .lineLimit(3, reservesSpace: true)
                 .frame(maxWidth: ItemLayout.textWidth, alignment: .leading)
         }
+        .foregroundStyle(theme.onBackground)
     }
 }
 

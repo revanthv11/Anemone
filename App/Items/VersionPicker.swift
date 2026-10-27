@@ -34,6 +34,8 @@ struct VersionPicker: View {
                 ActionButton(title: "Version", systemImage: "square.stack") {
                     isChoosing = true
                 }
+                // "Version, 1080p": the one that plays.
+                .accessibilityValue(versions.first { $0.id == chosenID }?.name ?? "")
                 .accessibilityIdentifier("action.version")
             }
         }
@@ -92,6 +94,8 @@ private struct VersionList: View {
                         Spacer()
                         if version.id == chosenID {
                             Image(systemName: "checkmark")
+                                // The row says it's selected instead.
+                                .accessibilityHidden(true)
                         }
                     }
                 }

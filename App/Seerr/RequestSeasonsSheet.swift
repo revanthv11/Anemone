@@ -27,14 +27,17 @@
                             .disabled(requestable.isEmpty)
                             .accessibilityIdentifier("request.allSeasons")
                         ForEach(seasons) { season in
+                            let name = season.name ?? "Season \(season.number)"
                             Toggle(isOn: binding(for: season)) {
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text(season.name ?? "Season \(season.number)")
-                                    Text(caption(season))
+                                    Text(name)
+                                    Text(caption(season).joined(separator: " · "))
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
                             }
+                            // With pauses where the caption has dots.
+                            .accessibilityLabel(([name] + caption(season)).joined(separator: ", "))
                             .disabled(!season.isRequestable)
                             .accessibilityIdentifier("request.season.\(season.number)")
                         }
@@ -99,7 +102,8 @@
             }
         }
 
-        private func caption(_ season: SeerrSeason) -> String {
+        /// How many episodes, and what the server has of it, under the season's name.
+        private func caption(_ season: SeerrSeason) -> [String] {
             var parts: [String] = []
             if let count = season.episodeCount {
                 parts.append("\(count) episode\(count == 1 ? "" : "s")")
@@ -109,7 +113,7 @@
             } else if season.requestStatus != .unknown {
                 parts.append(season.requestStatus.label)
             }
-            return parts.joined(separator: " · ")
+            return parts
         }
     }
 

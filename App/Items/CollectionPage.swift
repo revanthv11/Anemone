@@ -10,6 +10,7 @@ struct CollectionPage: View {
     @Binding var collection: ItemDetails
 
     @Environment(BrowseModel.self) private var browse
+    @Environment(\.theme) private var theme
     @FocusState private var focus: ItemFocus?
     @State private var memory = RowMemory()
     /// In the order the sort asks for.
@@ -36,6 +37,7 @@ struct CollectionPage: View {
                     collectionHeader
                 }
             }
+            .foregroundStyle(theme.onBackground)
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(height: Self.headerHeight, alignment: .bottomLeading)
             .padding(.horizontal, ItemLayout.horizontalInset)
@@ -180,7 +182,7 @@ struct CollectionPage: View {
                 Text(display.filter.isEmpty
                     ? "There's nothing in this collection yet."
                     : "Nothing in this collection matches the filters.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.secondaryText)
             }
             if let typeRows {
                 ForEach(typeRows) { section in
@@ -224,6 +226,7 @@ private struct EntryHeader: View {
             Text(entry.cardTitle)
                 .font(.title2.bold())
                 .lineLimit(1)
+                .accessibilityAddTraits(.isHeader)
             if entry.item.kind == .episode, let subtitle = entry.cardSubtitle {
                 Text(subtitle)
                     .font(.title3)

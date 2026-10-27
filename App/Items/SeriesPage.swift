@@ -9,6 +9,7 @@ struct SeriesPage: View {
     @Binding var series: ItemDetails
 
     @Environment(BrowseModel.self) private var browse
+    @Environment(\.theme) private var theme
     @FocusState private var focus: ItemFocus?
     @State private var memory = RowMemory()
     @State private var seasons: [ItemDetails] = []
@@ -93,6 +94,7 @@ struct SeriesPage: View {
                     .focused($focus, equals: .overview)
             }
         }
+        .foregroundStyle(theme.onBackground)
         .frame(maxWidth: ItemLayout.textWidth, alignment: .leading)
     }
 

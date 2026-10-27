@@ -34,6 +34,7 @@ struct TrailerButton: View {
                     Button("\(title(at: index)) · \(trailer.sourceName)") {
                         play(trailer)
                     }
+                    .accessibilityLabel(Text("\(title(at: index)), \(trailer.sourceName)"))
                     .accessibilityIdentifier("trailer.\(index)")
                 }
             }

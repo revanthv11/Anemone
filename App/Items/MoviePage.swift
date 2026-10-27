@@ -11,6 +11,7 @@ struct MoviePage: View {
     @Binding var item: ItemDetails
 
     @Environment(BrowseModel.self) private var browse
+    @Environment(\.theme) private var theme
     @FocusState private var focus: ItemFocus?
     @State private var memory = RowMemory()
     @State private var similar: [ItemDetails] = []
@@ -77,6 +78,7 @@ struct MoviePage: View {
                 Text(item.item.episode?.seriesName ?? "")
                     .font(.title.bold())
                     .lineLimit(1)
+                    .accessibilityAddTraits(.isHeader)
                     .accessibilityIdentifier("detail.title")
                 Text(item.item.name)
                     .font(.title3)
@@ -102,6 +104,7 @@ struct MoviePage: View {
                     .font(.callout)
             }
         }
+        .foregroundStyle(theme.onBackground)
         .frame(maxWidth: ItemLayout.textWidth, alignment: .leading)
     }
 

@@ -9,6 +9,7 @@ struct PersonPage: View {
 
     @Environment(BrowseModel.self) private var browse
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.theme) private var theme
     @FocusState private var focus: ItemFocus?
     @State private var memory = RowMemory()
     @State private var filmography: [FilmographyRow: [ItemDetails]] = [:]
@@ -84,29 +85,18 @@ struct PersonPage: View {
                 cornerRadius: 24,
                 placeholderSymbol: "person.fill",
             )
+            // The name beside it says who it is.
+            .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 12) {
                 Text(person.item.name)
                     .font(.title.bold())
+                    .foregroundStyle(theme.onBackground)
                     .lineLimit(2)
+                    .accessibilityAddTraits(.isHeader)
                     .accessibilityIdentifier("detail.title")
                     .padding(.bottom, 8)
-                if let born = person.premiereDate {
-                    if person.endDate == nil, let age = person.age() {
-                        Text("Born: \(born.longDayText) (\(age) years old)")
-                    } else {
-                        Text("Born: \(born.longDayText)")
-                    }
-                }
-                if let birthPlace = person.birthPlace {
-                    Text("Birthplace: \(birthPlace)")
-                }
-                if let died = person.endDate {
-                    if let age = person.age() {
-                        Text("Died: \(died.longDayText) (\(age) years old)")
-                    } else {
-                        Text("Died: \(died.longDayText)")
-                    }
-                }
+                facts
+                    .foregroundStyle(theme.onBackground)
                 if let overview = person.item.overview {
                     OverviewButton(title: person.item.name, overview: overview)
                         .focused($focus, equals: .overview)
@@ -122,9 +112,33 @@ struct PersonPage: View {
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(32)
-            .background(.white.opacity(0.06), in: .rect(cornerRadius: 24))
+            // Wholphin's `surfaceColorAtElevation(1.dp)`: the surface tinted with 5% of the
+            // primary colour, as Material's tonal elevation does.
+            .background(theme.primary.withAlpha(0.05).over(theme.surface), in: .rect(cornerRadius: 24))
         }
         .focusSection()
+    }
+
+    /// Born, birthplace and died, each as Wholphin lists them.
+    @ViewBuilder
+    private var facts: some View {
+        if let born = person.premiereDate {
+            if person.endDate == nil, let age = person.age() {
+                Text("Born: \(born.longDayText) (\(age) years old)")
+            } else {
+                Text("Born: \(born.longDayText)")
+            }
+        }
+        if let birthPlace = person.birthPlace {
+            Text("Birthplace: \(birthPlace)")
+        }
+        if let died = person.endDate {
+            if let age = person.age() {
+                Text("Died: \(died.longDayText) (\(age) years old)")
+            } else {
+                Text("Died: \(died.longDayText)")
+            }
+        }
     }
 
     private static let photoWidth: CGFloat = 300
