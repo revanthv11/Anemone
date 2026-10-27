@@ -75,7 +75,9 @@
                     Task { await requestMovie(is4K: true) }
                 }
             }
-            .sheet(isPresented: $isChoosingSeasons) {
+            // Back to the first button once the sheet has gone, since focus can't move while it's
+            // up, and the button it came from may have changed from Request to Requested.
+            .sheet(isPresented: $isChoosingSeasons, onDismiss: { focus = .action(.play) }, content: {
                 RequestSeasonsSheet(
                     details: details,
                     canRequest: connection.canRequestSeries,
@@ -84,7 +86,7 @@
                     isChoosingSeasons = false
                     Task { await requestSeries(seasons, is4K: is4K) }
                 }
-            }
+            })
         }
 
         @ViewBuilder
@@ -109,7 +111,7 @@
                     .font(.title.bold())
                     .lineLimit(2)
                     .accessibilityIdentifier("detail.title")
-                Text(quickDetails(details))
+                Text(details.quickDetails)
                     .font(.callout)
                     .lineLimit(1)
                 if !details.genres.isEmpty {
@@ -206,23 +208,6 @@
             }
         }
 
-        private func quickDetails(_ details: DiscoverDetails) -> String {
-            var parts: [String] = []
-            if let year = details.item.year {
-                parts.append(String(year))
-            }
-            if let runtime = details.runtime, runtime > 0 {
-                parts.append(runtime >= 60 ? "\(runtime / 60)h \(runtime % 60)m" : "\(runtime)m")
-            }
-            if let rating = details.rating, rating > 0 {
-                parts.append(String(format: "★ %.1f", rating))
-            }
-            if let label = details.item.availability.label {
-                parts.append(label)
-            }
-            return parts.joined(separator: " · ")
-        }
-
         // MARK: Loading and requesting
 
         private func load() async {
@@ -283,14 +268,35 @@
         private func perform(_ what: String, _ change: (SeerrConnection) async throws -> Void) async {
             guard let connection = seerr?.connection else { return }
             isWorking = true
-            defer { isWorking = false }
             do {
                 try await change(connection)
             } catch {
                 alert = .failed("Couldn't \(what). \(error.seerrReason)")
             }
             await reload(connection)
+            // The buttons take focus again only once they're enabled.
+            isWorking = false
             focus = .action(.play)
+        }
+    }
+
+    private extension DiscoverDetails {
+        /// The year, runtime, rating and availability, in one line under the title.
+        var quickDetails: String {
+            var parts: [String] = []
+            if let year = item.year {
+                parts.append(String(year))
+            }
+            if let runtime, runtime > 0 {
+                parts.append(runtime >= 60 ? "\(runtime / 60)h \(runtime % 60)m" : "\(runtime)m")
+            }
+            if let rating, rating > 0 {
+                parts.append(String(format: "★ %.1f", rating))
+            }
+            if let label = item.availability.label {
+                parts.append(label)
+            }
+            return parts.joined(separator: " · ")
         }
     }
 
