@@ -8,7 +8,6 @@ struct SearchRows: View {
     let results: SearchResults
     let kinds: [SearchKind]
     let focus: FocusState<ItemFocus?>.Binding
-    let memory: RowMemory
 
     var body: some View {
         ForEach(kinds, id: \.self) { kind in
@@ -18,7 +17,7 @@ struct SearchRows: View {
             case let .failed(message)?:
                 SearchPlaceholder(title: kind.title, message: message)
             case let .found(items)? where !items.isEmpty:
-                SearchResultsRow(kind: kind, items: items, focus: focus, memory: memory)
+                SearchResultsRow(kind: kind, items: items, focus: focus, memory: results.memory)
             case .found?, nil:
                 EmptyView()
             }

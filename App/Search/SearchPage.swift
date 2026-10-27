@@ -43,7 +43,6 @@ struct SearchPage: View {
     @State private var focusesResults = false
     @State private var showsOptions = false
     @FocusState private var focus: ItemFocus?
-    @State private var memory = RowMemory()
 
     var body: some View {
         ScrollView(.vertical) {
@@ -56,7 +55,7 @@ struct SearchPage: View {
                 } else if isCombined {
                     CombinedResults(results: results, focus: $focus)
                 } else {
-                    SearchRows(results: results, kinds: request.kinds, focus: $focus, memory: memory)
+                    SearchRows(results: results, kinds: request.kinds, focus: $focus)
                 }
             }
             .padding(.horizontal, ItemLayout.horizontalInset)
@@ -73,7 +72,7 @@ struct SearchPage: View {
             await search(request)
         }
         .onChange(of: focus) { _, focus in
-            memory.note(focus)
+            results.memory.note(focus)
         }
         .onChange(of: stack?.path.isEmpty ?? true) { _, isEmpty in
             // Opening a result is what makes a search worth keeping.
@@ -217,7 +216,7 @@ struct SearchPage: View {
                 return
             case let .found(items)? where !items.isEmpty:
                 focusesResults = false
-                focus = memory.entry(row: kind.rowID, first: items.first?.id)
+                focus = results.memory.entry(row: kind.rowID, first: items.first?.id)
                 return
             default:
                 continue
@@ -246,6 +245,9 @@ struct SearchResults {
     var term = ""
     var rows: [SearchKind: State] = [:]
     var combined: CombinedSearch?
+    /// Each row's last-focused card. It's part of the results, so a new search enters its rows
+    /// at their first cards, not at cards remembered from an earlier search that it may not have.
+    var memory = RowMemory()
 }
 
 struct CombinedSearch {
