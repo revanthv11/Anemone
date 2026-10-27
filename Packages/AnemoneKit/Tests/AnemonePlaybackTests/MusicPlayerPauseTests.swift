@@ -118,21 +118,23 @@ extension MusicPlayerTests {
     }
 
     @Test func `removing or skipping the song while paused moves on, still paused`() async {
-        let remote = RecordingRemote()
-        let player = player(remote: remote)
+        let center = FakeCenter()
+        let player = player(nowPlaying: NowPlaying.Slot(center: center))
         player.play(songs("a", "b", "c"))
         await startSong(1, in: player)
         player.pause()
 
         player.removeEntry(at: 0)
         #expect(player.status == .paused)
-        #expect(remote.statuses.last == .paused)
         _ = await eventually { engines.made.count == 2 && engine?.loads.isEmpty == false }
         engine?.send(.ready)
         #expect(await eventually { player.songEngine?.isReady == true })
         #expect(player.current?.id == "b")
         #expect(player.status == .paused)
         #expect(engine?.isPlaying == false)
+        // Now Playing shows the song waiting, paused.
+        #expect(center.shown?.metadata.title == "Song b")
+        #expect(center.shown?.isPlaying == false)
 
         player.next()
         _ = await eventually { engines.made.count == 3 && engine?.loads.isEmpty == false }

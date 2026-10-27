@@ -47,7 +47,8 @@ protocol NowPlayingCenter: AnyObject {
 }
 
 /// The app's `MPNowPlayingInfoCenter` and `MPRemoteCommandCenter`. Adapted from Swiftfin's
-/// `NowPlayableObserver` and `NowPlayableCommand`.
+/// `NowPlayableObserver` and `NowPlayableCommand`. There's one, in `NowPlaying.Slot.shared`, so the
+/// targets it adds are the only ones, whichever player added them.
 @MainActor
 final class SystemNowPlayingCenter: NowPlayingCenter {
     /// Turns image data into the system's artwork, an `MPMediaItemArtwork`.
@@ -81,7 +82,7 @@ final class SystemNowPlayingCenter: NowPlayingCenter {
         }
         if shown.map({ !$0.showsSameEntry(as: info) }) ?? true {
             properties = info.entryProperties
-            if let artwork = info.artwork.flatMap(makeArtwork) {
+            if let artwork = info.artwork.flatMap({ makeArtwork($0.data) }) {
                 properties[MPMediaItemPropertyArtwork] = artwork
             }
         }

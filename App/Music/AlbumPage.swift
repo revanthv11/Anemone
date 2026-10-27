@@ -117,9 +117,15 @@ struct AlbumPage: View {
         }
     }
 
-    /// Like Wholphin, playing from a song queues it and the songs after it.
+    /// Like Wholphin, playing from a song queues it and the songs after it. Play or Shuffle pressed
+    /// before the songs are in queues the album as the player fetches it, so the press isn't lost.
     private func play(from index: Int, shuffled: Bool) {
-        guard let songs, songs.indices.contains(index) else { return }
+        guard let songs else {
+            player.play(.album(details.id), shuffled: shuffled, browse: browse) { alert = .failed($0) }
+            showsNowPlaying = true
+            return
+        }
+        guard songs.indices.contains(index) else { return }
         player.play(Array(songs[index...]), shuffled: shuffled)
         showsNowPlaying = true
     }

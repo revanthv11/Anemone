@@ -56,8 +56,8 @@ struct NowPlayingTests {
         #expect(shown.metadata.title == "Pioneer One")
         #expect(shown.position == .seconds(60))
         #expect(!shown.isPlaying)
-        #expect(await eventually { nowPlaying.info?.artwork == Data("art poster.jpg".utf8) })
-        #expect(center.published.last??.artwork == Data("art poster.jpg".utf8))
+        #expect(await eventually { nowPlaying.info?.artwork?.data == Data("art poster.jpg".utf8) })
+        #expect(center.shown?.artwork?.data == Data("art poster.jpg".utf8))
 
         engine.currentTime = .seconds(61)
         engine.send(.ready)
@@ -238,7 +238,7 @@ struct NowPlayingTests {
         )
         var info = NowPlayingInfo(
             metadata: PlaybackMetadata(title: "Pioneer One", subtitle: "S1:E1 · Earthfall"),
-            artwork: Data("art".utf8),
+            artwork: NowPlayingArtwork(url: Self.poster, data: Data("art".utf8)),
             position: .seconds(1),
         )
 
@@ -258,7 +258,7 @@ struct NowPlayingTests {
 
         // The next entry gets its own.
         info.metadata.subtitle = "S1:E2 · The Man From Mars"
-        info.artwork = Data("art 2".utf8)
+        info.artwork = NowPlayingArtwork(url: URL(filePath: "/poster2.jpg"), data: Data("art 2".utf8))
         center.publish(info)
         #expect(system.artworks.count == 2)
         #expect((system.written.last ?? nil)?[MPMediaItemPropertyArtwork] as? NSObject === system.artworks.last)
@@ -268,62 +268,5 @@ struct NowPlayingTests {
         #expect(system.written.last.flatMap(\.self) == nil)
         center.publish(info)
         #expect(system.artworks.count == 3)
-    }
-}
-
-/// What `SystemNowPlayingCenter` made and handed to the system.
-@MainActor
-final class FakeSystem {
-    var artworks: [NSObject] = []
-    var written: [[String: Any]?] = []
-}
-
-/// Records what Now Playing would show, and stands in for the remote.
-@MainActor
-final class FakeCenter: NowPlayingCenter {
-    private(set) var published: [NowPlayingInfo?] = []
-    private(set) var commands: Set<RemoteCommand> = []
-    private(set) var skipIntervals: (forward: Duration, backward: Duration)?
-    private var handler: (@MainActor (RemoteRequest) -> Bool)?
-
-    var isHandling: Bool {
-        handler != nil
-    }
-
-    func publish(_ info: NowPlayingInfo?) {
-        published.append(info)
-    }
-
-    func handle(
-        _ commands: Set<RemoteCommand>,
-        skipIntervals: (forward: Duration, backward: Duration),
-        with handler: @escaping @MainActor @Sendable (RemoteRequest) -> Bool,
-    ) {
-        self.commands = commands
-        self.skipIntervals = skipIntervals
-        self.handler = handler
-    }
-
-    func stopHandling() {
-        commands = []
-        handler = nil
-    }
-
-    /// A press on the remote; `false` when nothing handled it.
-    func send(_ request: RemoteRequest) -> Bool {
-        handler?(request) ?? false
-    }
-}
-
-/// The artwork Now Playing asked for.
-final class ArtworkRequests: Sendable {
-    private let requests = Mutex<[URL]>([])
-
-    var urls: [URL] {
-        requests.withLock(\.self)
-    }
-
-    func append(_ url: URL) {
-        requests.withLock { $0.append(url) }
     }
 }

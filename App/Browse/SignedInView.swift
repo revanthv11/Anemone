@@ -6,6 +6,7 @@ import SwiftUI
 /// in place of Wholphin's navigation drawer, which also puts Favorites before the libraries.
 struct SignedInView: View {
     enum Destination: Hashable {
+        case nowPlaying
         case home
         case search
         case favorites
@@ -32,6 +33,7 @@ struct SignedInView: View {
     var body: some View {
         let libraries = browse.libraryPreferences.pins.arrange(browse.libraries, id: \.id)
         TabView(selection: $selection) {
+            NowPlayingTab(selection: $selection)
             Tab("Home", systemImage: "house", value: Destination.home) {
                 HomeView(isSelected: selection == .home)
             }
