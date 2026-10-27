@@ -171,6 +171,7 @@ struct LibraryItemsPage: View {
                 openRandom(from: pager)
             }
             .disabled(pager.count == 0)
+            .accessibilityIdentifier("library.random")
         }
     }
 

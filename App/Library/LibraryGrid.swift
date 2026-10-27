@@ -8,7 +8,7 @@ import SwiftUI
 /// row, and the Genres and Studios tabs.
 ///
 /// One `LazyVGrid` in a vertical `ScrollView`, with no focus section of its own; see
-/// docs/spikes/home-focus.md.
+/// docs/spikes/home-focus.md. A grid of less than a row gets one, as `SmallGridFocus` says.
 struct LibraryGrid<Header: View, Card: View>: View {
     let pager: LibraryPager
     let options: GridViewOptions
@@ -211,6 +211,7 @@ struct LibraryGrid<Header: View, Card: View>: View {
             default: false
             }
         }
+        .modifier(SmallGridFocus(isOn: pager.count > 0 && pager.count < options.columnCount))
     }
 
     private var trailingInset: CGFloat {
@@ -288,6 +289,25 @@ struct LibraryGrid<Header: View, Card: View>: View {
 private final class MeasuredLayout {
     var headerHeight: CGFloat = 0
     var cardHeight: CGFloat = 0
+}
+
+/// A focus section across the page for a grid whose only row stops short of the header's
+/// buttons on the right, so Down from any of them reaches a card, as in Wholphin, whose grid is a
+/// focus group as wide as the page; tvOS on its own moves down only to what's below. A full row
+/// already reaches under every button, and a bigger grid can't have a section anyway (see
+/// `LibraryGrid`), but one of less than a row costs nothing.
+private struct SmallGridFocus: ViewModifier {
+    let isOn: Bool
+
+    func body(content: Content) -> some View {
+        if isOn {
+            content
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .focusSection()
+        } else {
+            content
+        }
+    }
 }
 
 /// Kept outside SwiftUI's state, so updating it doesn't redraw the grid.
