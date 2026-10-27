@@ -12,7 +12,9 @@ import XCTest
 ///         -destination "id=<simulator>" -only-testing:AnemoneUITests/SmokeUITests
 ///
 /// `test-without-building` after a `build-for-testing` works the same way. To play a particular
-/// Continue Watching item rather than the first, add `TEST_RUNNER_ANEMONE_SMOKE_ITEM=<item ID>`.
+/// Continue Watching item rather than the first, add `TEST_RUNNER_ANEMONE_SMOKE_ITEM=<item ID>`;
+/// on a server others are using, always do, since the first item may be what someone else just
+/// watched.
 @MainActor
 final class SmokeUITests: XCTestCase {
     private let environment = ProcessInfo.processInfo.environment
