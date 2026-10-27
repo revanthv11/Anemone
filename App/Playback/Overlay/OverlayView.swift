@@ -141,7 +141,7 @@ struct OverlayView: View {
             }
         }
         .onChange(of: playback.queue.currentIndex) {
-            overlay.seeker.cancel()
+            overlay.entryChanged()
         }
         .onChange(of: details?.previews?.trickplay, initial: true) { _, trickplay in
             sheets = trickplay.map { TrickplaySheets(trickplay: $0, session: session) }
@@ -233,6 +233,7 @@ struct OverlayView: View {
         case nil: overlay.controlsVisible ? .control : .video
         case .seekBar: .seekBar
         case .action: .action
+        case .skipSegment: .skipButton
         default: .control
         }
         overlay.pulse()

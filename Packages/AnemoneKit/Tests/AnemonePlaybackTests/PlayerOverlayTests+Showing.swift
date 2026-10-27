@@ -78,7 +78,8 @@ extension PlayerOverlayTests {
         #expect(await eventually { skipping.current == outro })
         #expect(overlay.skippableSegment == outro)
         overlay.skipRest(of: outro)
-        #expect(await eventually { engine.currentTime == outro.end })
+        // Just past its end, as segment skipping's own skip lands.
+        #expect(await eventually { engine.currentTime == outro.end + .milliseconds(1) })
         #expect(await eventually { overlay.skippableSegment == nil })
         #expect(overlay.controlsVisible)
     }

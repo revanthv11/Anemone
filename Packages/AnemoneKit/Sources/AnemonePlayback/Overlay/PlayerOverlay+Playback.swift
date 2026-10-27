@@ -33,11 +33,12 @@ public extension PlayerOverlay {
         play(entryAt: index)
     }
 
-    /// Plays another queue entry, as the queue row does.
+    /// Plays another queue entry, as the queue row does. From the credits, the entry playing is
+    /// marked played, as when Up Next moves on from them.
     func play(entryAt index: Int) {
         seeker.cancel()
         hideControls()
-        controller.play(entryAt: index)
+        controller.play(entryAt: index, markingCurrentPlayed: controller.hasReachedCredits)
     }
 
     /// Jumps to a chapter and hides the controls, as Wholphin's chapter row does.
@@ -46,10 +47,11 @@ public extension PlayerOverlay {
         hideControls()
     }
 
-    /// Skips the rest of a segment from the controls, as Wholphin's button there does: to its
-    /// end, or the end of the video when it runs past it.
+    /// Skips the rest of a segment from the controls, as Wholphin's button there does: just past
+    /// its end, as `SegmentSkipping`'s own skip lands (so playback is out of the segment however
+    /// the engine rounds), or the end of the video when it runs past it.
     func skipRest(of segment: MediaSegment) {
-        seeker.jump(to: segment.end)
+        seeker.jump(to: segment.end + .milliseconds(1))
         pulse()
     }
 }
