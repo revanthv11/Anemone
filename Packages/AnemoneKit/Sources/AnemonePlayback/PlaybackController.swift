@@ -76,9 +76,11 @@ public final class PlaybackController: Identifiable {
             try await session.playbackStream(
                 for: itemID,
                 profile: profile,
-                maxBitrate: AVPlayerProfile.defaultMaxBitrate,
+                maxBitrate: AVPlayerProfile.maxBitrate,
                 allowsDirect: allowsDirect,
-                mediaSourceID: mediaSourceID,
+                // The version picked on the item's page, unless a retry keeps the one playing.
+                mediaSourceID: mediaSourceID
+                    ?? MediaVersionChoices.standard.choice(for: itemID, userID: session.userID),
             )
         }
     }

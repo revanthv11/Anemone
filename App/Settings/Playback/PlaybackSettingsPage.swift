@@ -15,6 +15,10 @@ struct PlaybackSettingsPage: View {
             .accessibilityIdentifier("settings.playback.autoplay")
             NavigationLink("Player Controls", destination: PlayerControlsSettingsPage.init)
                 .accessibilityIdentifier("settings.playback.playerControls")
+            NavigationLink("Player") {
+                PlayerSettingsPage()
+            }
+            .accessibilityIdentifier("settings.player")
         }
         .navigationTitle("Playback")
     }
