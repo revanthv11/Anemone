@@ -93,6 +93,7 @@
                     to: account.serverURL,
                     with: account.credentials,
                     configuration: configuration(),
+                    renewal: savedCredentials,
                 )
                 return .connected(connection, isManagedByServer: false)
             } catch {
@@ -112,6 +113,7 @@
                 atAddress: address,
                 with: SeerrAccount.credentials(method: method, username: username, secret: secret),
                 configuration: configuration,
+                renewal: savedCredentials,
             )
             let account = SeerrAccount(
                 serverURL: connection.serverURL,
@@ -126,6 +128,18 @@
         /// Forgets the profile's own account, as Wholphin's `removeServerForCurrentUser`.
         public func remove() throws {
             try accounts.save(nil, for: profile)
+        }
+
+        /// The profile's own account's password or API key, read from the Keychain again each time
+        /// its connection signs in again, so it isn't kept in memory; none once the account is
+        /// for another server or gone. The plugin's login signs in again from memory instead.
+        private var savedCredentials: SeerrConnection.Renewal {
+            { [accounts, profile] serverURL in
+                guard let account = (try? accounts.account(for: profile)) ?? nil, account.serverURL == serverURL else {
+                    return nil
+                }
+                return account.credentials
+            }
         }
     }
 

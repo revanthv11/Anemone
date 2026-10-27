@@ -19,6 +19,9 @@
         @ObservationIgnored let browse: BrowseModel
         @ObservationIgnored private let signIn: SeerrSignIn
         @ObservationIgnored private var hasStarted = false
+        /// Counts sign-ins, adding and removing, so only the latest sets `status`: a Retry while
+        /// the first sign-in is still under way wins even when the first ends last.
+        @ObservationIgnored private var attempt = 0
 
         init(browse: BrowseModel) {
             self.browse = browse
@@ -47,6 +50,7 @@
         /// calls it again, which also reads the plugin's settings again, as Wholphin's
         /// `retryServerFromPlugin` does.
         func connect() async {
+            let attempt = nextAttempt()
             status = nil
             // Read here rather than inside `connect`, which treats any failure as no settings
             // too, so the add-server page can offer the plugin's address.
@@ -59,20 +63,48 @@
             } catch {
                 settings = nil
             }
+            guard attempt == self.attempt else { return }
             suggestedAddress = settings?.address
-            status = await signIn.connect { settings }
+            let status = await signIn.connect { settings }
+            guard attempt == self.attempt else { return }
+            show(status, attempt: attempt)
         }
 
         /// Signs in at what the user typed and keeps it as the profile's account.
         func add(address: String, method: SeerrAccount.Method, username: String?, secret: String) async throws {
             let connection = try await signIn.add(address: address, method: method, username: username, secret: secret)
-            status = .connected(connection, isManagedByServer: false)
+            show(.connected(connection, isManagedByServer: false), attempt: nextAttempt())
         }
 
         /// Forgets the profile's own account. A server the plugin set up can't be removed.
         func remove() throws {
             try signIn.remove()
+            _ = nextAttempt()
             status = .notConfigured(suggestedAddress: suggestedAddress)
+        }
+
+        private func nextAttempt() -> Int {
+            attempt += 1
+            return attempt
+        }
+
+        /// Shows `status`, then a failure in its place should Seerr sign its connection out for
+        /// good: the session went and signing in again, with the plugin's login or the Keychain's
+        /// password, didn't work. Settings then offers Retry.
+        private func show(_ status: SeerrStatus, attempt: Int) {
+            self.status = status
+            guard case let .connected(connection, isManagedByServer) = status else { return }
+            let failure = SeerrFailure(
+                address: connection.serverURL.absoluteString,
+                error: SeerrError.invalidCredentials,
+                isManagedByServer: isManagedByServer,
+            )
+            connection.onSignedOut { [weak self] in
+                Task { @MainActor in
+                    guard let self, attempt == self.attempt else { return }
+                    self.status = .failed(failure)
+                }
+            }
         }
 
         /// The plugin's Seerr settings, or made-up ones in DEBUG builds launched with
