@@ -133,7 +133,7 @@ struct LibraryRecommendedTests {
         #expect(random["limit"] == "7")
     }
 
-    @Test func `TV suggestions start from watched episodes' series`() async throws {
+    @Test func `suggestions for TV start from watched episodes' series`() async throws {
         let sent = Recorder()
         MockServer.register(host: "suggest-tv.test") { request in
             if sent.record(request).query["isPlayed"] == "true" {

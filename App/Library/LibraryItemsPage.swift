@@ -301,15 +301,8 @@ private extension LibraryItemsPage {
                 return MockCollections.loader
             }
         #endif
-        let session = browse.session
-        return { startIndex, limit, includeTotalCount in
-            try await session.libraryItems(
-                query,
-                startIndex: startIndex,
-                limit: limit,
-                includeTotalCount: includeTotalCount,
-            )
-        }
+        // A random order is drawn once, when the grid loads, and holds while it's open.
+        return browse.session.libraryLoader(for: query)
     }
 
     private func openRandom(from pager: LibraryPager) {
