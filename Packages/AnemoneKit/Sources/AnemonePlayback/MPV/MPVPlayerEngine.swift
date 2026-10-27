@@ -20,7 +20,10 @@ public final class MPVPlayerEngine: PlayerEngine {
     private var listener: Task<Void, Never>?
     /// The stream loading or loaded, until another replaces it or the engine stops.
     private var current: MPVLoad?
-    /// The newest playlist entry libmpv has named, for a load whose entry libmpv didn't say.
+    /// The newest playlist entry libmpv has made, as far as the engine knows: the newest it has
+    /// named, or one more for each load it took without naming the entry it made. libmpv makes
+    /// one entry for each `loadfile`, numbered in order, so a load whose entry libmpv didn't say
+    /// is the first entry to start after this.
     private var newestEntry: Int64 = 0
     private let seeks: MPVSeeks
     private var lastTime = Duration.zero
@@ -85,7 +88,8 @@ public final class MPVPlayerEngine: PlayerEngine {
             return stream
         }
         current = MPVLoad(events: events, url: url, entry: entry, newerThan: newestEntry)
-        newestEntry = max(newestEntry, entry ?? 0)
+        // Counting a load without a named entry too, so another after it doesn't take its entry.
+        newestEntry = entry.map { max(newestEntry, $0) } ?? newestEntry + 1
         lastTime = start ?? .zero
         reportedStatus = nil
         isHDR = false
@@ -110,11 +114,13 @@ public final class MPVPlayerEngine: PlayerEngine {
     /// with a playback restart; a newer seek replaces this one, and one libmpv refuses, as on a
     /// live stream, doesn't get there (see `MPVSeeks`).
     public func seek(to position: Duration) async -> Bool {
-        guard let client, current?.isReady == true,
-              client.command(["seek", Self.seconds(position), "absolute+exact"])
-        else { return false }
-        lastTime = position
-        let landed = await seeks.land()
+        guard let client, current?.isReady == true else { return false }
+        let arguments = ["seek", Self.seconds(position), "absolute+exact"]
+        let landed = await seeks.land { id in
+            guard client.commandAsync(arguments, id: id) else { return false }
+            lastTime = position
+            return true
+        }
         #if DEBUG
             Logger.mpv.info("seek to \(Self.seconds(position), privacy: .public): \(landed ? "landed" : "didn't land")")
         #endif
@@ -178,6 +184,14 @@ public final class MPVPlayerEngine: PlayerEngine {
         client?.command(arguments)
     }
 
+    /// How long the server says the stream loaded from `url` runs, which tells its end from a
+    /// cut-off better than libmpv's duration (see `isRealEnd`); nothing if another stream has
+    /// replaced it.
+    public func setRuntime(_ runtime: Duration?, forStreamFrom url: URL) {
+        guard current?.url == url else { return }
+        current?.runtime = runtime
+    }
+
     /// Adds the subtitle files beside the stream loaded from `url` once libmpv has opened it,
     /// showing the server's default; nothing if another stream has replaced it. MPV's profile
     /// has the server deliver such files as External, so they aren't in the stream itself.
@@ -229,6 +243,8 @@ extension MPVPlayerEngine {
             restarted()
         case let .endFile(entry, reason) where current?.owns(entry) == true:
             ended(reason)
+        case let .commandReply(id, succeeded):
+            seeks.replied(id, succeeded: succeeded)
         case let .property(name, value):
             changed(name, to: value)
         case .shutdown:
@@ -307,10 +323,10 @@ extension MPVPlayerEngine {
     }
 
     /// With `keep-open`, the last frame stays up at the end, as with AVPlayer, for Up Next. An
-    /// end well before the duration is a read or network error (see `isRealEnd(at:of:)`).
+    /// end well before the duration is a read or network error (see `isRealEnd(at:of:runtime:)`).
     private func reachedEnd() {
         guard var load = current, load.isReady, !load.hasEnded else { return }
-        guard Self.isRealEnd(at: currentTime, of: duration) else {
+        guard Self.isRealEnd(at: currentTime, of: duration, runtime: load.runtime) else {
             return fail(MPVError.endedEarly)
         }
         load.hasEnded = true

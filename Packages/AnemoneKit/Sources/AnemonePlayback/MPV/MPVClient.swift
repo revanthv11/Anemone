@@ -14,6 +14,11 @@ protocol MPVClient: AnyObject {
     /// took it.
     @discardableResult
     func command(_ arguments: [String]) -> Bool
+    /// Runs a command such as `seek` without waiting for it, and says whether libmpv queued it.
+    /// libmpv answers with a `commandReply` event naming `id`, which comes after what it said
+    /// before running the command and before what it says about what the command started.
+    @discardableResult
+    func commandAsync(_ arguments: [String], id: UInt64) -> Bool
     /// Runs `loadfile`, saying which playlist entry libmpv made for the file, or that it
     /// refused the command.
     func loadFile(_ arguments: [String]) -> MPVLoadResult
@@ -69,7 +74,8 @@ enum MPVEvent: Equatable, Sendable {
     case startFile(entry: Int64)
     /// The entry's file was opened, and decoding starts.
     case fileLoaded(entry: Int64)
-    /// libmpv started a seek in the entry; a playback restart follows once it lands.
+    /// libmpv started a seek in the entry; a playback restart follows once it lands. It doesn't
+    /// say which seek: the newest whose `commandReply` came before it (see `MPVSeeks`).
     case seek(entry: Int64)
     /// Playback of the entry restarted after loading or after a seek: the picture is at the
     /// new position.
@@ -78,6 +84,8 @@ enum MPVEvent: Equatable, Sendable {
     /// it, or it was a playlist. A file that won't open fails this way without ever loading.
     /// With `keep-open`, reaching the end doesn't unload it; `eof-reached` says so.
     case endFile(entry: Int64, MPVEndReason)
+    /// libmpv ran the command sent with `commandAsync` as `id`, or refused it.
+    case commandReply(id: UInt64, succeeded: Bool)
     /// An observed property changed; see `LibMPVClient.observed`.
     case property(String, MPVValue)
     /// libmpv is shutting down.

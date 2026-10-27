@@ -135,6 +135,23 @@ struct PlaybackTests {
         ))
     }
 
+    @Test func `the stream carries how long the version runs, when the server knows`() async throws {
+        _ = register(host: "runtime.test", path: "/jf/Items/m1/PlaybackInfo", reply: .json("""
+        {"PlaySessionId":"ps1","MediaSources":[{"Id":"src1","SupportsDirectPlay":true,"RunTimeTicks":6015000000}]}
+        """))
+        _ = register(host: "live-runtime.test", path: "/jf/Items/ch1/PlaybackInfo", reply: .json("""
+        {"PlaySessionId":"ps1","MediaSources":[{"Id":"ch1","SupportsDirectPlay":true,"LiveStreamId":"live1"}]}
+        """))
+
+        let file = try await session(host: "runtime.test")
+            .playbackStream(for: "m1", profile: Self.profile, maxBitrate: 1000)
+        let channel = try await session(host: "live-runtime.test")
+            .playbackStream(for: "ch1", profile: Self.profile, maxBitrate: 1000)
+
+        #expect(file.runtime == .milliseconds(601_500))
+        #expect(channel.runtime == nil)
+    }
+
     @Test func `the server's refusal comes back as a playback error`() async throws {
         _ = register(host: "refused.test", path: "/jf/Items/m1/PlaybackInfo", reply: .json("""
         {"ErrorCode":"NotAllowed","MediaSources":[]}

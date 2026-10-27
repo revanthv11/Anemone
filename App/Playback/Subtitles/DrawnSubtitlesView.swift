@@ -44,8 +44,8 @@ struct DrawnSubtitlesView: View {
 
 /// Says when the system player's transport bar shows, so the subtitles can move above it as the
 /// player's own do. AVKit tells only its controller's delegate, which Anemone doesn't otherwise
-/// set: this finds the system player showing `player` and becomes its delegate, unless something
-/// else already is (then the subtitles stay where they are).
+/// set: this finds the system player showing `player` and stands in front of whatever delegate
+/// it has (`ForwardingDelegate`), passing everything on to it, and steps aside when it goes.
 private struct TransportBarWatcher: UIViewRepresentable {
     let player: AVPlayer
     @Binding var isVisible: Bool
@@ -58,12 +58,18 @@ private struct TransportBarWatcher: UIViewRepresentable {
         FinderView(player: player, delegate: context.coordinator)
     }
 
-    func updateUIView(_: FinderView, context: Context) {
+    func updateUIView(_ view: FinderView, context: Context) {
         context.coordinator.isVisible = $isVisible
+        // In front again of a delegate set since.
+        view.attach()
+    }
+
+    static func dismantleUIView(_ view: FinderView, coordinator _: Coordinator) {
+        view.detach()
     }
 
     @MainActor
-    final class Coordinator: NSObject, AVPlayerViewControllerDelegate {
+    final class Coordinator: ForwardingDelegate, AVPlayerViewControllerDelegate {
         var isVisible: Binding<Bool>
 
         init(isVisible: Binding<Bool>) {
@@ -71,12 +77,17 @@ private struct TransportBarWatcher: UIViewRepresentable {
         }
 
         func playerViewController(
-            _: AVPlayerViewController,
+            _ controller: AVPlayerViewController,
             willTransitionToVisibilityOfTransportBar visible: Bool,
             with coordinator: any AVPlayerViewControllerAnimationCoordinator,
         ) {
             let isVisible = isVisible
             coordinator.addCoordinatedAnimations({ isVisible.wrappedValue = visible }, completion: nil)
+            (forwardee as? any AVPlayerViewControllerDelegate)?.playerViewController?(
+                controller,
+                willTransitionToVisibilityOfTransportBar: visible,
+                with: coordinator,
+            )
         }
     }
 
@@ -84,7 +95,7 @@ private struct TransportBarWatcher: UIViewRepresentable {
     final class FinderView: UIView {
         private let player: AVPlayer
         private weak var delegate: Coordinator?
-        private var isAttached = false
+        private weak var controller: AVPlayerViewController?
 
         init(player: AVPlayer, delegate: Coordinator) {
             self.player = player
@@ -108,14 +119,19 @@ private struct TransportBarWatcher: UIViewRepresentable {
             attach()
         }
 
-        private func attach() {
-            guard !isAttached, let root = window?.rootViewController,
-                  let controller = Self.controller(showing: player, from: root)
-            else { return }
-            isAttached = true
-            if controller.delegate == nil {
-                controller.delegate = delegate
+        /// Stands in front of the controller's delegate, once it's found.
+        func attach() {
+            guard let delegate else { return }
+            if controller == nil, let root = window?.rootViewController {
+                controller = Self.controller(showing: player, from: root)
             }
+            guard let controller else { return }
+            delegate.standInFront(of: controller, at: \.delegate)
+        }
+
+        func detach() {
+            guard let delegate, let controller else { return }
+            delegate.stepAside(from: controller, at: \.delegate)
         }
 
         private static func controller(

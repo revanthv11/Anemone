@@ -1,6 +1,7 @@
 import AnemoneCore
 import AnemoneJellyfin
 import Foundation
+import JellyfinAPI
 
 /// Chooses each entry's audio and subtitles before the server is asked for a stream, offers
 /// Audio and Subtitles menus in the player, and remembers what the user picks for the item and,
@@ -10,8 +11,9 @@ import Foundation
 /// A switch the stream can make on its own happens at once: audio in a file that plays
 /// directly, and text subtitles, which the server sends AVPlayer as files of their own for
 /// Anemone to draw (`DrawnSubtitles`). MPV shows such files itself (`MPVExternalSubtitles`), so
-/// while it plays they're its tracks, as they were before Anemone drew any. Anything else asks
-/// the server for another stream and goes on from the same position, as Wholphin's
+/// while it plays they're its tracks, as they were before Anemone drew any, and it shows ASS and
+/// picture subtitles itself too, so they aren't burned in (`SubtitleRendering`). Anything else
+/// asks the server for another stream and goes on from the same position, as Wholphin's
 /// `changeStreams` does.
 ///
 /// Live TV is left to the server, as Wholphin and Swiftfin leave it: the request names no
@@ -43,10 +45,6 @@ public final class TrackSelection: PlaybackFeature {
         var isLive = false
     }
 
-    /// AVPlayer shows ASS and SSA subtitles as plain text, so the server burns them in. An engine
-    /// that draws them itself, as MPV will (Phase 4), turns this off.
-    public var burnsInStyledSubtitles = true
-
     private let server: Server
     let store: TrackChoiceStore
     private let defaults: UserDefaults
@@ -57,6 +55,12 @@ public final class TrackSelection: PlaybackFeature {
     private var fetches = 0
     /// Selecting the chosen tracks in a stream that just loaded.
     var applying: Task<Void, Never>?
+    /// The player, once it has loaded a stream, which `prepare(_:)` tells that the picks are in.
+    private weak var controller: PlaybackController?
+    /// Counts picks in the menus, and the picks the last request for a stream asked for, so a
+    /// pick that request has already doesn't ask the server again.
+    var picks = 0
+    var requestedPicks = 0
 
     public convenience init(session: JellyfinSession, defaults: UserDefaults = .standard) {
         self.init(
@@ -77,21 +81,30 @@ public final class TrackSelection: PlaybackFeature {
         self.defaults = defaults
     }
 
-    /// Asks the server for the tracks chosen for the entry, with each request for a stream.
+    /// Asks the server for the tracks chosen for the entry, with each request for a stream. Picks
+    /// made while the server was asked before this, which asked for a reload, are in it.
     public func prepare(_ request: inout StreamRequest) async {
-        guard let tracks = await self.request(for: request.itemID, mediaSourceID: request.mediaSourceID) else {
-            return
-        }
-        tracks.apply(to: &request)
+        requestedPicks = picks
+        controller?.reloading.includesPicks()
+        let tracks = await self.request(
+            for: request.itemID,
+            mediaSourceID: request.mediaSourceID,
+            profile: request.profile,
+        )
+        tracks?.apply(to: &request)
     }
 
     /// The tracks to ask for, with their version: `mediaSourceID`, else the one picked on the item's
     /// page while the item has it, else the first. `nil` leaves them to the server, as when the
     /// tracks can't be fetched or for live TV. A retry or a switch for the same item asks for
-    /// what's chosen now.
-    func request(for itemID: MediaItem.ID, mediaSourceID: String?) async -> TrackRequest? {
+    /// what's chosen now. `profile`, the engine's, says whether ASS is burned in.
+    func request(
+        for itemID: MediaItem.ID,
+        mediaSourceID: String?,
+        profile engineProfile: DeviceProfile? = nil,
+    ) async -> TrackRequest? {
         if let entry, entry.itemID == itemID {
-            return entry.isLive ? nil : request(for: entry)
+            return entry.isLive ? nil : request(for: entry, profile: engineProfile)
         }
         entry = nil
         fetches += 1
@@ -113,10 +126,11 @@ public final class TrackSelection: PlaybackFeature {
         if fetch == fetches {
             self.entry = entry
         }
-        return request(for: entry)
+        return request(for: entry, profile: engineProfile)
     }
 
     public func handle(_ event: PlaybackEvent, in controller: PlaybackController) async {
+        self.controller = controller
         switch event {
         case let .loaded(stream, queued):
             loaded(stream, itemID: queued.itemID, in: controller)
@@ -131,7 +145,7 @@ public final class TrackSelection: PlaybackFeature {
 
     // MARK: Choosing
 
-    private var preferences: TrackPreferences {
+    var preferences: TrackPreferences {
         TrackPreferences.current(profile: profile ?? ProfileTrackSettings(), in: defaults)
     }
 
@@ -177,18 +191,24 @@ public final class TrackSelection: PlaybackFeature {
         )
     }
 
-    private func request(for entry: Entry) -> TrackRequest {
-        TrackRequest(
+    /// ASS and SSA are burned in unless the engine shows them itself, as MPV does.
+    private func request(for entry: Entry, profile: DeviceProfile?) -> TrackRequest {
+        let burnsIn = entry.subtitle.map { subtitle in
+            subtitle.isStyledText && !(profile.map { TrackRequest.showsStyled(subtitle, with: $0) } ?? false)
+        }
+        return TrackRequest(
             mediaSourceID: entry.mediaSourceID,
             audioIndex: entry.audio?.index,
             subtitleIndex: entry.subtitle?.index,
-            burnsInSubtitles: burnsInStyledSubtitles && entry.subtitle?.isStyledText == true,
+            burnsInSubtitles: burnsIn ?? false,
         )
     }
 
     /// Takes in what the server sent: its tracks say how each subtitle comes.
     private func loaded(_ stream: PlaybackStream, itemID: MediaItem.ID, in controller: PlaybackController) {
-        var entry = entry.flatMap { $0.itemID == itemID ? $0 : nil } ?? Self.entry(for: stream)
+        // A live stream is live even when its channel couldn't be looked up beforehand.
+        var entry = entry.flatMap { $0.itemID == itemID ? $0 : nil }
+            ?? Self.entry(for: stream, isLive: stream.liveStreamID != nil)
         if entry.isLive {
             entry = Self.entry(for: stream, isLive: true)
         } else if !stream.tracks.isEmpty {
@@ -220,11 +240,11 @@ public final class TrackSelection: PlaybackFeature {
         )
     }
 
-    /// Whether Anemone draws the text subtitles the server sends as files of their own: over
-    /// AVPlayer. MPV adds those files to its own tracks and shows them itself, so drawing them
-    /// too would show every line twice.
-    static func drawsFiles(in engine: any PlayerEngine) -> Bool {
-        engine.mpv == nil
+    /// What the engine playing shows of subtitles itself. MPV adds the files the server sends
+    /// beside the stream to its own tracks and shows them itself, so drawing them too would show
+    /// every line twice, and it shows ASS and picture subtitles, which AVPlayer can't.
+    static func rendering(in engine: any PlayerEngine) -> SubtitleRendering {
+        engine.mpv == nil ? .avPlayer : .mpv
     }
 
     /// Has text subtitles that come as a file of their own drawn over AVPlayer, and selects the
@@ -233,8 +253,10 @@ public final class TrackSelection: PlaybackFeature {
     func select(in controller: PlaybackController, for stream: PlaybackStream) async {
         guard let entry, entry.stream == stream else { return }
         let engine = controller.engine
-        let drawsFiles = Self.drawsFiles(in: engine)
-        let drawn = entry.subtitle.flatMap { drawsFiles && TrackSwitching.isSentAsFile($0, in: stream) ? $0 : nil }
+        let rendering = Self.rendering(in: engine)
+        let drawn = entry.subtitle.flatMap {
+            rendering.drawsFiles && TrackSwitching.isSentAsFile($0, in: stream) ? $0 : nil
+        }
         controller.feature(DrawnSubtitles.self)?.show(drawn, in: stream)
         if stream.method == .directPlay, let audio = entry.audio {
             let options = await engine.tracks(.audio)
@@ -247,7 +269,7 @@ public final class TrackSelection: PlaybackFeature {
         guard !Task.isCancelled, self.entry?.stream == stream else { return }
         let wanted = drawn == nil
             ? entry.subtitle.flatMap {
-                TrackSwitching.playerTrack(for: $0, in: stream, options: options, drawsFiles: drawsFiles)
+                TrackSwitching.playerTrack(for: $0, in: stream, options: options, rendering: rendering)
             }
             : nil
         if wanted?.id != options.first(where: \.isSelected)?.id {
@@ -258,9 +280,9 @@ public final class TrackSelection: PlaybackFeature {
     /// AVPlayer showed no HLS subtitles that were selected before playback got under way, the
     /// server's default included, until they were selected again; so they are, once it has.
     private func reselectSubtitles(in engine: any PlayerEngine) async {
-        let drawsFiles = Self.drawsFiles(in: engine)
+        let rendering = Self.rendering(in: engine)
         guard let entry, let stream = entry.stream, let subtitle = entry.subtitle,
-              !(drawsFiles && TrackSwitching.isSentAsFile(subtitle, in: stream))
+              !(rendering.drawsFiles && TrackSwitching.isSentAsFile(subtitle, in: stream))
         else { return }
         let options = await engine.tracks(.subtitle)
         guard self.entry?.stream == stream,
@@ -268,116 +290,10 @@ public final class TrackSelection: PlaybackFeature {
                   for: subtitle,
                   in: stream,
                   options: options,
-                  drawsFiles: drawsFiles,
+                  rendering: rendering,
               )
         else { return }
         await engine.select(nil, .subtitle)
         await engine.select(wanted, .subtitle)
-    }
-}
-
-/// The menus.
-extension TrackSelection {
-    func showMenus(in controller: PlaybackController) {
-        guard let entry else { return }
-        let drawsFiles = Self.drawsFiles(in: controller.engine)
-        let audio = entry.tracks.of(.audio).filter { offers($0, in: entry, drawsFiles: drawsFiles) }
-        if audio.count > 1 {
-            let options = audio.map { track in
-                option(
-                    "audio.\(track.index)",
-                    track.menuTitle,
-                    track.id == entry.audio?.id,
-                    controller,
-                ) { entry, prefs in
-                    entry.audio = track
-                    // "Only forced" follows the audio's language.
-                    if entry.subtitleChoice == .onlyForced {
-                        entry.subtitle = StreamChoice.onlyForced(
-                            in: entry.tracks,
-                            audioLanguage: track.language,
-                            preferences: prefs,
-                        )
-                    }
-                }
-            }
-            controller.accessories.show(PlayerMenu(
-                id: "audio",
-                title: "Audio",
-                systemImage: "speaker.wave.2",
-                options: options,
-            ))
-        } else {
-            controller.accessories.removeMenu("audio")
-        }
-        let subtitles = entry.tracks.of(.subtitle).filter { offers($0, in: entry, drawsFiles: drawsFiles) }
-        guard !subtitles.isEmpty else {
-            controller.accessories.removeMenu("subtitles")
-            return
-        }
-        var options = [subtitleOption("subtitles.off", "Off", .off, controller)]
-        if !entry.isLive, subtitles.contains(where: \.isForcedOrSigns) {
-            options.append(subtitleOption("subtitles.forced", "Only forced", .onlyForced, controller))
-        }
-        options += subtitles.map { track in
-            subtitleOption("subtitles.\(track.index)", track.menuTitle, .track(index: track.index), controller)
-        }
-        controller.accessories.show(PlayerMenu(
-            id: "subtitles",
-            title: "Subtitles",
-            systemImage: "captions.bubble",
-            options: options,
-        ))
-    }
-
-    /// Whether the menus offer `track`: every one, except in a live stream, which offers those
-    /// the player can switch to by itself.
-    private func offers(_ track: MediaTrack, in entry: Entry, drawsFiles: Bool) -> Bool {
-        guard entry.isLive else { return true }
-        guard let stream = entry.stream else { return false }
-        return TrackSwitching.switchesInPlace(
-            to: track,
-            in: stream,
-            burnsInStyled: burnsInStyledSubtitles,
-            drawsFiles: drawsFiles,
-        )
-    }
-
-    private func subtitleOption(
-        _ id: String,
-        _ title: String,
-        _ choice: SubtitleChoice,
-        _ controller: PlaybackController,
-    ) -> PlayerMenu.Option {
-        option(id, title, entry?.subtitleChoice == choice, controller) { entry, prefs in
-            entry.subtitleChoice = choice
-            entry.subtitle = switch choice {
-            case .off:
-                nil
-            case .onlyForced:
-                StreamChoice.onlyForced(in: entry.tracks, audioLanguage: entry.audio?.language, preferences: prefs)
-            case let .track(index):
-                entry.tracks.of(.subtitle).first(id: index)
-            }
-        }
-    }
-
-    /// A menu option that changes the entry's choice, remembers it and switches to it.
-    private func option(
-        _ id: String,
-        _ title: String,
-        _ isSelected: Bool,
-        _ controller: PlaybackController,
-        change: @escaping @MainActor (inout Entry, TrackPreferences) -> Void,
-    ) -> PlayerMenu.Option {
-        PlayerMenu.Option(id: id, title: title, isSelected: isSelected) { [weak self, weak controller] in
-            guard let self, let controller, let previous = entry, previous.stream != nil else { return }
-            var entry = previous
-            change(&entry, preferences)
-            self.entry = entry
-            remember(entry, previous: previous)
-            showMenus(in: controller)
-            Task { await self.switchTracks(from: previous, in: controller) }
-        }
     }
 }

@@ -65,6 +65,10 @@ extension PlaybackController {
         guard !isStopped, let stream else { return }
         stopWatching()
         let attempt = loads
+        if stream.method != .transcode {
+            // A reload while features hear of the failure asks for the transcode too.
+            reloading.directFailed()
+        }
         await publish(.failed(error))
         // Unless a feature moved on meanwhile.
         guard !isStopped, attempt == loads else { return }
