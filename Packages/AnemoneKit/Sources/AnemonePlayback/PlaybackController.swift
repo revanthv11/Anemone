@@ -73,14 +73,23 @@ public final class PlaybackController: Identifiable {
             engine: engine,
             features: Self.features(for: session),
         ) { itemID, allowsDirect, mediaSourceID in
-            try await session.playbackStream(
-                for: itemID,
+            let maxBitrate = AVPlayerProfile.maxBitrate
+            // A retry keeps the version playing.
+            if let mediaSourceID {
+                return try await session.playbackStream(
+                    for: itemID,
+                    profile: profile,
+                    maxBitrate: maxBitrate,
+                    allowsDirect: allowsDirect,
+                    mediaSourceID: mediaSourceID,
+                )
+            }
+            // Otherwise the version picked on the item's page, while the server still has it.
+            return try await session.playbackStream(
+                forPickedVersionOf: itemID,
                 profile: profile,
-                maxBitrate: AVPlayerProfile.maxBitrate,
+                maxBitrate: maxBitrate,
                 allowsDirect: allowsDirect,
-                // The version picked on the item's page, unless a retry keeps the one playing.
-                mediaSourceID: mediaSourceID
-                    ?? MediaVersionChoices.standard.choice(for: itemID, userID: session.userID),
             )
         }
     }

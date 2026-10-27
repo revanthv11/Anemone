@@ -58,6 +58,47 @@ public extension JellyfinSession {
         let item = try await send(Paths.getItem(itemID: itemID, userID: userID))
         return (item.mediaSources ?? []).compactMap(MediaVersion.init)
     }
+
+    /// `playbackStream(for:…)` for the version the user picked for the item, as Wholphin's
+    /// `ItemPlayback` does, or the server's first when none is picked. PlaybackInfo's answer
+    /// settles whether the server still has the picked version: it answers one it no longer has
+    /// with no versions and no compatible stream. Such a choice is forgotten, and the server's
+    /// first version plays instead, wherever the item is played from.
+    func playbackStream(
+        forPickedVersionOf itemID: MediaItem.ID,
+        profile: DeviceProfile,
+        maxBitrate: Int,
+        allowsDirect: Bool = true,
+        choices: MediaVersionChoices = .standard,
+    ) async throws -> PlaybackStream {
+        guard let picked = choices.choice(for: itemID, userID: userID) else {
+            return try await playbackStream(
+                for: itemID,
+                profile: profile,
+                maxBitrate: maxBitrate,
+                allowsDirect: allowsDirect,
+            )
+        }
+        let response = try await playbackInfo(
+            for: itemID,
+            profile: profile,
+            maxBitrate: maxBitrate,
+            allowsDirect: allowsDirect,
+            mediaSourceID: picked,
+        )
+        let offersPicked = response.mediaSources?.contains { $0.id?.caseInsensitiveCompare(picked) == .orderedSame }
+        let isGone = offersPicked != true && (response.errorCode == nil || response.errorCode == .noCompatibleStream)
+        guard isGone else {
+            return try stream(from: response, for: itemID)
+        }
+        choices.forget(itemID, userID: userID)
+        return try await playbackStream(
+            for: itemID,
+            profile: profile,
+            maxBitrate: maxBitrate,
+            allowsDirect: allowsDirect,
+        )
+    }
 }
 
 extension MediaVersion {

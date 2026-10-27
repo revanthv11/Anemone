@@ -1,6 +1,7 @@
 @testable import AnemoneJellyfin
 import Foundation
 import JellyfinAPI
+import Synchronization
 import Testing
 
 /// An item's versions from the fake server, and remembering which one the user picked.
@@ -102,10 +103,94 @@ struct MediaVersionsTests {
         #expect(choices.choice(for: "m6", userID: "u1") == nil)
     }
 
+    /// A server whose item `m1` has the versions `s4k` and `s1080`, answering PlaybackInfo as
+    /// Jellyfin does: for a version it doesn't have, with none and no compatible stream.
+    private func versionsServer(host: String) -> PlaybackInfoLog {
+        let sent = PlaybackInfoLog()
+        MockServer.register(host: host) { request in
+            guard request.url?.path() == "/jf/Items/m1/PlaybackInfo" else { return nil }
+            let request = SentRequest(request)
+            sent.all.withLock { $0.append(request) }
+            let asked = request.json["MediaSourceId"] as? String
+            let versions: [String] = ["s4k", "s1080"].filter { asked == nil || $0 == asked }
+            guard !versions.isEmpty else {
+                return .json(#"{"MediaSources":[],"ErrorCode":"NoCompatibleStream"}"#)
+            }
+            let sources = versions.map { #"{"Id":"\#($0)","SupportsDirectPlay":true}"# }
+            return .json(#"{"PlaySessionId":"ps1","MediaSources":[\#(sources.joined(separator: ","))]}"#)
+        }
+        return sent
+    }
+
+    private static let profile = DeviceProfile(name: "Test profile")
+
+    @Test func `the picked version plays`() async throws {
+        let sent = versionsServer(host: "picked.test")
+        let choices = try Self.choices()
+        choices.choose("s1080", for: "m1", userID: "u1")
+
+        let stream = try await session(host: "picked.test")
+            .playbackStream(forPickedVersionOf: "m1", profile: Self.profile, maxBitrate: 1000, choices: choices)
+
+        #expect(sent.requests.map { $0.json["MediaSourceId"] as? String } == ["s1080"])
+        #expect(stream.mediaSourceID == "s1080")
+        #expect(choices.choice(for: "m1", userID: "u1") == "s1080")
+    }
+
+    @Test func `a picked version gone from the server is forgotten, and the first plays`() async throws {
+        let sent = versionsServer(host: "gone.test")
+        let choices = try Self.choices()
+        choices.choose("s720", for: "m1", userID: "u1")
+
+        let stream = try await session(host: "gone.test")
+            .playbackStream(forPickedVersionOf: "m1", profile: Self.profile, maxBitrate: 1000, choices: choices)
+
+        let bodies = sent.requests.map(\.json)
+        #expect(bodies.count == 2)
+        #expect(bodies.first?["MediaSourceId"] as? String == "s720")
+        #expect(bodies.last?["MediaSourceId"] == nil)
+        #expect(stream.mediaSourceID == "s4k")
+        #expect(choices.choice(for: "m1", userID: "u1") == nil)
+    }
+
+    @Test func `without a pick, the server's first version plays`() async throws {
+        let sent = versionsServer(host: "nopick.test")
+
+        let stream = try await session(host: "nopick.test")
+            .playbackStream(forPickedVersionOf: "m1", profile: Self.profile, maxBitrate: 1000, choices: Self.choices())
+
+        #expect(sent.requests.count == 1)
+        #expect(sent.requests.first?.json["MediaSourceId"] == nil)
+        #expect(stream.mediaSourceID == "s4k")
+    }
+
+    @Test func `a picked version the server refuses to play is an error, not forgotten`() async throws {
+        MockServer.register(host: "refusedversion.test") { _ in
+            .json(#"{"MediaSources":[],"ErrorCode":"NotAllowed"}"#)
+        }
+        let choices = try Self.choices()
+        choices.choose("s1080", for: "m1", userID: "u1")
+
+        await #expect(throws: PlaybackError.notAllowed) {
+            try await session(host: "refusedversion.test")
+                .playbackStream(forPickedVersionOf: "m1", profile: Self.profile, maxBitrate: 1000, choices: choices)
+        }
+        #expect(choices.choice(for: "m1", userID: "u1") == "s1080")
+    }
+
     /// A store of its own, empty.
     private static func choices() throws -> MediaVersionChoices {
         let suite = "MediaVersionsTests.\(UUID().uuidString)"
         try #require(UserDefaults(suiteName: suite)).removePersistentDomain(forName: suite)
         return MediaVersionChoices(suiteName: suite)
+    }
+}
+
+/// Every PlaybackInfo request a fake server saw, in order.
+private final class PlaybackInfoLog: Sendable {
+    let all = Mutex<[SentRequest]>([])
+
+    var requests: [SentRequest] {
+        all.withLock(\.self)
     }
 }

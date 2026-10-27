@@ -38,6 +38,30 @@ struct PlaybackSettingsTests {
         #expect(body["MediaSourceId"] as? String == "v1080")
     }
 
+    @Test func `a picked version the server no longer has gives way to its first, from any queue`() async throws {
+        let host = "goneversion.test"
+        let userID = "settings-user-\(UUID().uuidString)"
+        let server = PlaybackInfoServer.register(host: host)
+        MediaVersionChoices.standard.choose("v720", for: "m1", userID: userID)
+        defer { MediaVersionChoices.standard.forget("m1", userID: userID) }
+        let session = try JellyfinSession(
+            serverURL: #require(URL(string: "https://\(host)/jf")),
+            userID: userID,
+            accessToken: "tok",
+            identity: ClientIdentity(deviceName: "Test TV", deviceID: "device-1", appVersion: "0.1.0"),
+            sessionConfiguration: { PlaybackInfoServer.sessionConfiguration() },
+        )
+        // Played from Up Next, say, without the item's page loading first.
+        let playback = PlaybackController(session: session, request: PlaybackRequest(.item("m1")))
+
+        await playback.start()
+        await playback.stop()
+
+        // The server answers without the version, as Jellyfin answers one it no longer has.
+        #expect(server.bodies.map { $0["MediaSourceId"] as? String } == ["v720", nil])
+        #expect(MediaVersionChoices.standard.choice(for: "m1", userID: userID) == nil)
+    }
+
     @Test func `the limit is Wholphin's 100 Mbit/s until it's changed`() {
         #expect(Preferences.maxBitrate.defaultValue == 100_000_000)
         #expect(AVPlayerProfile.bitrateChoices.contains(Preferences.maxBitrate.defaultValue))
