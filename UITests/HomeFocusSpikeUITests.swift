@@ -78,12 +78,6 @@ final class HomeFocusSpikeUITests: XCTestCase {
         print("[spike] \(variant): 8 presses down the page took \(downPage)")
     }
 
-    private func press(_ button: XCUIRemote.Button, times: Int = 1) {
-        for _ in 0 ..< times {
-            XCUIRemote.shared.press(button)
-        }
-    }
-
     /// The header updates 150 ms after focus moves, so wait until the reported item stops changing.
     private func settledFocus(_ label: XCUIElement) -> String {
         var previous = label.label
@@ -102,12 +96,5 @@ final class HomeFocusSpikeUITests: XCTestCase {
         let start = Date()
         work()
         return String(format: "%.1f s", Date().timeIntervalSince(start))
-    }
-
-    private func attachScreenshot(_ app: XCUIApplication, name: String) {
-        let attachment = XCTAttachment(screenshot: app.screenshot())
-        attachment.name = name
-        attachment.lifetime = .keepAlways
-        add(attachment)
     }
 }
