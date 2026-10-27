@@ -207,7 +207,17 @@ For pass-out protection, the system player keeps remote presses to itself. Pausi
 
 #### 3c: media segments: skip intro, credits, recap and more
 
-Not started. Intro, credits, recap, preview and commercial segments: ignore, ask (a skip button), or auto-skip.
+- [x] The item's segments from `GET /MediaSegments/{itemId}`: its own, of a known type, with a start before the end, in the order they play (checks adapted from Swiftfin's)
+- [x] `SegmentSkipping`, a playback feature ported from Wholphin's `PlaybackViewModel`: for each kind, ignore it, ask (a "Skip Intro", "Skip Outro", "Skip Recap", "Skip Preview" or "Skip Ads" button over the video, which goes after 10 s), or skip it automatically. A segment is skipped or offered once per entry, so seeking back into one plays it; a retry as a transcode keeps that memory, the next entry starts afresh. A skip lands just past the segment's end, or at the end of the video, which then ends
+- [x] The segment playing is published whatever the setting (`current`, and `onChange`), so Up Next can come up at the credits, as Wholphin's does. The skip button waits while a card such as Up Next shows, as Wholphin hides it while Up Next is up
+- [x] Settings › Playback › Skip Segments: a choice per kind, with Wholphin's names and defaults (ask for intros, outros and commercials; ignore previews and recaps)
+- [x] Debug builds take `-fakeSegments "intro:5-30,outro:45-100000"` (seconds) to give every item those segments, for servers without any; launch arguments such as `-skipIntros autoSkip` set a choice for one run
+
+Tested live in the simulator against the local fixture server (Jellyfin 12.3 with the Chapter Segments Provider plugin), on a ten-minute video with Recap, Intro, Commercial, Credits and Preview segments and a counter burned into the picture: with the default settings the recap played with no button, "Skip Intro" appeared at 0:20 with focus, Select jumped to 1:20 and playback went on, and left alone the button went after 10 s and didn't come back; with recaps and intros skipped automatically, playback went from 0:00 to 1:20 within seconds and carried on from there; with intros ignored, the intro played with no button; with a fake segment running to the end skipped automatically, playback ended, the player closed and the server marked the video watched. The settings page showed each kind's choice and changed it. XCUITest can't see the system player's contextual actions, so those checks rest on screenshots.
+
+Not verified live: commercial, preview and outro segments (the same code as intros and recaps; the unit tests cover them), the button waiting for an Up Next card (Up Next isn't merged yet), and keeping what was skipped across a retry as a transcode (unit tests only).
+
+Not yet: Wholphin's skip button in its own playback controls for the rest of a segment, which waits for Anemone's overlay (3e), and dismissing the button with Back, which the system player keeps for itself.
 
 #### 3d: audio and subtitle choice
 
