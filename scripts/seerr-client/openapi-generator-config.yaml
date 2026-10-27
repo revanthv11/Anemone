@@ -1,0 +1,29 @@
+# swift-openapi-generator's configuration for the Seerr client in AnemoneSeerr.
+# Only the endpoints Anemone uses are generated, to keep the client small; add a path here and
+# run scripts/generate-seerr-client.sh again to use another.
+generate:
+  - types
+  - client
+accessModifier: internal
+namingStrategy: idiomatic
+filter:
+  paths:
+    - /auth/me
+    - /auth/local
+    - /auth/jellyfin
+    - /settings/public
+    - /search
+    - /discover/trending
+    - /discover/movies
+    - /discover/movies/upcoming
+    - /discover/tv
+    - /discover/tv/upcoming
+    - /movie/{movieId}
+    - /movie/{movieId}/similar
+    - /movie/{movieId}/recommendations
+    - /tv/{tvId}
+    - /tv/{tvId}/similar
+    - /tv/{tvId}/recommendations
+    - /person/{personId}/combined_credits
+    - /request
+    - /request/{requestId}

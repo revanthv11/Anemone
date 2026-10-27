@@ -24,6 +24,11 @@ let package = Package(
         .package(url: "https://github.com/kean/Get", from: "2.2.1"),
         // Image loading and caching for artwork.
         .package(url: "https://github.com/kean/Nuke", from: "13.2.0"),
+        // What the Seerr client that scripts/generate-seerr-client.sh generates runs on. Always
+        // resolved, so Package.resolved is the same with or without ANEMONE_SEERR (docs/seerr.md).
+        .package(url: "https://github.com/apple/swift-openapi-runtime", from: "1.13.0"),
+        .package(url: "https://github.com/apple/swift-openapi-urlsession", from: "1.4.0"),
+        .package(url: "https://github.com/apple/swift-http-types", from: "1.7.0"),
     ],
     targets: [
         .target(name: "AnemoneCore"),
@@ -43,7 +48,16 @@ let package = Package(
                 .product(name: "JellyfinAPI", package: "jellyfin-sdk-swift"),
             ],
         ),
-        .target(name: "AnemoneSeerr", dependencies: ["AnemoneCore"]),
+        // Built empty unless ANEMONE_SEERR is set; see docs/seerr.md.
+        .target(
+            name: "AnemoneSeerr",
+            dependencies: [
+                "AnemoneCore",
+                .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
+                .product(name: "OpenAPIURLSession", package: "swift-openapi-urlsession"),
+                .product(name: "HTTPTypes", package: "swift-http-types"),
+            ],
+        ),
         .target(
             name: "AnemoneUI",
             dependencies: [
@@ -54,6 +68,7 @@ let package = Package(
         ),
         .testTarget(name: "AnemoneCoreTests", dependencies: ["AnemoneCore"]),
         .testTarget(name: "AnemoneJellyfinTests", dependencies: ["AnemoneJellyfin"]),
+        .testTarget(name: "AnemoneSeerrTests", dependencies: ["AnemoneSeerr", "AnemoneCore"]),
         .testTarget(
             name: "AnemonePlaybackTests",
             dependencies: [
