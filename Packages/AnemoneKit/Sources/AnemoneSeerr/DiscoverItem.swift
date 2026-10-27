@@ -97,6 +97,10 @@
 
         /// Unique in a row that mixes movies and series, unlike the TMDB ID.
         public var id: String {
+            Self.id(kind: kind, tmdbID: tmdbID)
+        }
+
+        static func id(kind: SeerrMediaKind, tmdbID: Int) -> String {
             "\(kind.rawValue)-\(tmdbID)"
         }
 

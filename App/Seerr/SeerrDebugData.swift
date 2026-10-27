@@ -237,7 +237,7 @@
                 "createdAt": "2026-10-20T10:00:00.000Z",
             ]
             if !nested, let title = state.titles[request.titleID] {
-                result["media"] = ["tmdbId": title.id, "status": title.status]
+                result["media"] = mediaInfo(title, state)
             }
             return result
         }

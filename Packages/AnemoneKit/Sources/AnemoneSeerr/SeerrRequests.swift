@@ -70,7 +70,14 @@
         ///
         /// Fixed while porting: Wholphin reads only the first page, at Seerr's default of 10
         /// requests, so a user with more never sees the older ones. `SeerrRequestList` reads on.
-        func requests(skip: Int = 0, take: Int = requestsPageSize) async throws -> SeerrRequestsPage {
+        ///
+        /// - Parameter known: titles found before, by `DiscoverItem.id`, which aren't looked up
+        ///   again. What the server has of one, and where, are taken from its request instead.
+        func requests(
+            skip: Int = 0,
+            take: Int = requestsPageSize,
+            known: [DiscoverItem.ID: DiscoverItem] = [:],
+        ) async throws -> SeerrRequestsPage {
             struct Wanted {
                 let request: SeerrRequest
                 let tmdbID: Int
@@ -82,15 +89,23 @@
             // Seerr counts every request the user may see. Without that count, a full page may
             // have more after it.
             let hasMore = !requests.isEmpty && (page.pageInfo?.results.map { end < $0 } ?? (requests.count >= take))
+            var found: [Int: SeerrRequestedItem] = [:]
             let wanted = requests.compactMap { request -> Wanted? in
                 guard let tmdbID = request.media?.tmdbId,
                       let kind = SeerrMediaKind(mediaType: request._type), kind != .person
                 else { return nil }
-                return Wanted(request: SeerrRequest(request), tmdbID: tmdbID, kind: kind)
+                let wanted = Wanted(request: SeerrRequest(request), tmdbID: tmdbID, kind: kind)
+                if let title = known[DiscoverItem.id(kind: kind, tmdbID: tmdbID)] {
+                    found[wanted.request.id] = SeerrRequestedItem(
+                        request: wanted.request,
+                        item: title.updated(from: request.media, request: wanted.request, user: user.id),
+                    )
+                }
+                return wanted
             }
-            var found: [Int: SeerrRequestedItem] = [:]
+            let unknown = wanted.filter { found[$0.request.id] == nil }
             try await withThrowingTaskGroup(of: SeerrRequestedItem?.self) { group in
-                var next = wanted.makeIterator()
+                var next = unknown.makeIterator()
                 func addNext() {
                     guard let wanted = next.next() else { return }
                     group.addTask {
@@ -220,6 +235,21 @@
                 return .processing
             }
             return .unknown
+        }
+    }
+
+    extension DiscoverItem {
+        /// A title found before, with what the server has of it, and where, as its request's
+        /// `media` now says. A series counts that request as `series(_:)` counts the user's own.
+        func updated(from media: Components.Schemas.MediaInfo?, request: SeerrRequest, user: Int) -> DiscoverItem {
+            guard let media else { return self }
+            var item = self
+            item.availability = SeerrAvailability(status: media.status)
+            if kind == .series {
+                item.availability = SeerrRequest.availability(item.availability, requests: [request], user: user)
+            }
+            item.jellyfinItemID = media.jellyfinItemID
+            return item
         }
     }
 

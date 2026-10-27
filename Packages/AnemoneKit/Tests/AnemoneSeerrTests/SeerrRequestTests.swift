@@ -220,6 +220,37 @@
             #expect(sent?.query == ["take": "20", "skip": "0"])
         }
 
+        @Test func `a title found before isn't looked up again, and its request says where it is`() async throws {
+            let host = "known.seerr.test"
+            let seerr = try await connection(to: host) { request in
+                switch request.path {
+                case "/api/v1/request":
+                    .json(#"""
+                    {"pageInfo":{"page":1,"pages":1,"results":2},"results":[
+                      {"id":2,"status":2,"type":"tv","requestedBy":{"id":7},
+                       "media":{"tmdbId":1399,"status":5,"jellyfinMediaId":"9bd5926326d651153928e0d11c6ee7cb"}},
+                      {"id":1,"status":1,"type":"movie","media":{"tmdbId":550,"status":2},"requestedBy":{"id":7}}
+                    ]}
+                    """#)
+                case "/api/v1/movie/550":
+                    .json(#"{"id":550,"title":"Fight Club"}"#)
+                default:
+                    .status(404)
+                }
+            }
+            // Looked up while Seerr didn't have it yet.
+            let thrones = DiscoverItem(tmdbID: 1399, kind: .series, title: "Thrones", availability: .pending)
+
+            let page = try await seerr.requests(known: [thrones.id: thrones])
+
+            #expect(page.items.map(\.item.title) == ["Thrones", "Fight Club"])
+            #expect(page.items.first?.item.availability == .available)
+            #expect(page.items.first?.item.jellyfinItemID == "9bd5926326d651153928e0d11c6ee7cb")
+            let paths = SeerrMockServer.requests(to: host).map(\.path)
+            #expect(!paths.contains("/api/v1/tv/1399"))
+            #expect(paths.contains("/api/v1/movie/550"))
+        }
+
         @Test func `without Seerr's count, a full page of requests may have more`() async throws {
             let seerr = try await connection(to: "uncounted.seerr.test") { request in
                 switch request.path {
