@@ -337,7 +337,8 @@ private extension PlaybackController {
         watchers = [
             Task { [weak self] in
                 for await event in events {
-                    guard let self else { return }
+                    // Cancelled, it still gets what the replaced stream buffered, such as its pause.
+                    guard let self, !Task.isCancelled else { return }
                     switch event {
                     case .ready:
                         ready()
