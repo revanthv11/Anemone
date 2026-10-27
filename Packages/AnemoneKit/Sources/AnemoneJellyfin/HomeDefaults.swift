@@ -85,8 +85,8 @@ public enum HomeLibraryRowType: String, Hashable, Sendable, CaseIterable {
 public enum HomeFavoriteKind {
     /// The types the user's libraries can hold, plus people, who aren't in any library.
     public static func available(for libraries: [Library]) -> [String] {
-        let kinds = Set(libraries.flatMap { kinds(in: $0.kind) } + ["Person"])
-        return order.filter(kinds.contains)
+        let present = Set(libraries.flatMap { kinds(in: $0.kind) } + ["Person"])
+        return order.filter(present.contains)
     }
 
     /// "Movies" for `Movie`, as Wholphin's `formatTypeName`.
