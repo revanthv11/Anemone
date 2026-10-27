@@ -324,6 +324,14 @@ struct SlideshowTests {
         defaults.set("2000", forKey: Preferences.slideshowDuration.key)
 
         #expect(Slideshow.delay(in: defaults) == .seconds(2))
+        // Read as the preference reads it, so text that isn't a number gives the default, and
+        // a number out of range does too.
+        defaults.set(" 2500 ", forKey: Preferences.slideshowDuration.key)
+        #expect(Slideshow.delay(in: defaults) == .milliseconds(2500))
+        defaults.set("2000.5", forKey: Preferences.slideshowDuration.key)
+        #expect(Slideshow.delay(in: defaults) == .seconds(5))
+        defaults.set("500", forKey: Preferences.slideshowDuration.key)
+        #expect(Slideshow.delay(in: defaults) == .seconds(5))
     }
 }
 

@@ -49,8 +49,9 @@
         /// The titles found so far, by `DiscoverItem.id`, so reading a request again doesn't look
         /// its title up again.
         @ObservationIgnored private var titles: [DiscoverItem.ID: DiscoverItem] = [:]
-        /// The latest reload or read, which the next waits for.
-        @ObservationIgnored private var latest: Task<Void, any Error>?
+        /// The latest reload's or read's turn, which the next waits for. It ends once that reload
+        /// or read has, and every turn before it.
+        @ObservationIgnored private var latest: Task<Void, Never>?
 
         public init(pageSize: Int = SeerrConnection.requestsPageSize) {
             self.pageSize = pageSize
@@ -85,20 +86,39 @@
         }
 
         /// Runs `work` once the reload or read before it has finished. Cancelling the caller
-        /// cancels `work`.
+        /// cancels `work`, and while it's still waiting for its turn, throws at once.
         private func inTurn(_ work: @escaping @MainActor @Sendable () async throws -> Void) async throws {
             let previous = latest
             let task = Task { @MainActor in
-                _ = await previous?.result
-                try Task.checkCancellation()
+                try await Self.wait(for: previous)
                 try await work()
             }
-            latest = task
+            // The next turn waits for this one and the one before it, so turns never overlap,
+            // even when this one stopped waiting because it was cancelled.
+            latest = Task {
+                await previous?.value
+                _ = await task.result
+            }
             try await withTaskCancellationHandler {
                 try await task.value
             } onCancel: {
                 task.cancel()
             }
+        }
+
+        /// Waits for `turn` to end, or throws `CancellationError` as soon as the task is
+        /// cancelled: waiting for a task's value goes on through a cancellation.
+        private static func wait(for turn: Task<Void, Never>?) async throws {
+            if let turn {
+                let (ended, end) = AsyncStream<Never>.makeStream()
+                Task {
+                    await turn.value
+                    end.finish()
+                }
+                // Ends when the turn has, or at once when this task is cancelled.
+                for await _ in ended {}
+            }
+            try Task.checkCancellation()
         }
 
         /// Reads the pages read so far again. Each page replaces the requests it covers as it

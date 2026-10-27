@@ -75,8 +75,9 @@ extension MusicPlayer {
     /// Play or Shuffle on a playlist of songs, which plays as music, as Wholphin's playlist page
     /// plays one through its `MusicService` (`PlaylistDetails`). Wholphin goes by the playlist's
     /// media type, or failing that by its items being all songs; this goes by the items. When the
-    /// page hasn't loaded them yet, they're fetched here as songs, once, and play as they came.
-    /// `false` for any other playlist, which is the video player's.
+    /// page hasn't loaded them yet, the player pages the playlist in itself and goes by its first
+    /// page (`play(playlist:shuffled:)`). `false` for any other playlist, which is the video
+    /// player's, and for one whose first page couldn't be fetched, which the video player tries.
     func playPlaylist(
         _ playlist: ItemDetails,
         entries: [ItemDetails]?,
@@ -85,13 +86,8 @@ extension MusicPlayer {
         failed: @escaping (String) -> Void,
     ) async -> Bool {
         guard let entries else {
-            let session = browse.session
             let id = playlist.id
-            guard let fetched = await browse.optional(attempt { try await session.playlistSongs(id) }),
-                  let songs = fetched
-            else { return false }
-            play(songs, shuffled: shuffled)
-            return true
+            return await browse.optional(attempt { try await self.play(playlist: id, shuffled: shuffled) }) ?? false
         }
         guard !entries.isEmpty, entries.allSatisfy({ $0.item.kind == .audio }) else { return false }
         play(.playlist(playlist.id), shuffled: shuffled, browse: browse, failed: failed)

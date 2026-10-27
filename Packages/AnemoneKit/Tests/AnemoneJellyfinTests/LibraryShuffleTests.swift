@@ -50,6 +50,45 @@ struct LibraryShuffleTests {
         #expect(pages.allSatisfy { $0["fields"] == "SortName,Overview" && $0["sortBy"] == nil })
     }
 
+    @Test func `a big random grid counts its IDs with the first page, then asks for the rest together`() async throws {
+        let count = 5500
+        let sent = serveTitles(host: "random-big.test", count: count)
+        let query = LibraryQuery(library: movies, sort: LibrarySort(.random))
+
+        let ids = try await librarySession(host: "random-big.test").libraryItemIDs(query)
+
+        #expect(ids == (0 ..< count).map(Self.id))
+        let requests = sent.requests.map(\.query)
+        #expect(requests.count == 6)
+        let first = try #require(requests.first)
+        #expect(first["startIndex"] == "0")
+        #expect(first["enableTotalRecordCount"] == "true")
+        // Up to the count, in any order, since they go out together; none counted again.
+        let rest = requests.dropFirst()
+        #expect(Set(rest.map { $0["startIndex"] }) == ["1000", "2000", "3000", "4000", "5000"])
+        #expect(rest.allSatisfy { $0["enableTotalRecordCount"] == "false" && $0["limit"] == "1000" })
+    }
+
+    @Test func `a random grid's page missing titles removed since closes up`() async throws {
+        let gone: Set = [7, 120, 121, 249]
+        _ = serveTitles(host: "random-gone.test", count: 250, gone: gone)
+        let query = LibraryQuery(library: movies, sort: LibrarySort(.random))
+        let pager = try LibraryPager(loader: librarySession(host: "random-gone.test").libraryLoader(for: query))
+
+        try await pager.start()
+        var shown: [MediaItem.ID] = []
+        var index = 0
+        while index < pager.count {
+            try shown.append(#require(await pager.load(at: index)).id)
+            index += 1
+        }
+
+        // No place is left waiting for a title the server no longer has.
+        #expect(pager.count == 246)
+        #expect(Set(shown) == Set((0 ..< 250).filter { !gone.contains($0) }.map(Self.id)))
+        #expect(shown.count == 246)
+    }
+
     @Test func `a random grid's pages keep their order when asked for again`() async throws {
         let sent = serveTitles(host: "random-again.test", count: 30)
         let query = LibraryQuery(library: movies, sort: LibrarySort(.random))
@@ -88,14 +127,16 @@ struct LibraryShuffleTests {
     }
 
     /// Answers `/Items` from `count` movies: a page of them by `startIndex` and `limit`, or those
-    /// asked for by ID, in the server's order rather than the one asked for.
-    private func serveTitles(host: String, count: Int) -> Recorder {
+    /// asked for by ID, in the server's order rather than the one asked for. Those in `gone` were
+    /// removed after their IDs were listed, so asking for them by ID leaves them out.
+    private func serveTitles(host: String, count: Int, gone: Set<Int> = []) -> Recorder {
         let sent = Recorder()
         MockServer.register(host: host) { request in
             let query = sent.record(request).query
             let indexes: [Int]
             if let ids = query["ids"] {
-                indexes = ids.split(separator: ",").compactMap { Int($0.dropFirst()) }.sorted()
+                indexes = ids.split(separator: ",").compactMap { Int($0.dropFirst()) }.filter { !gone.contains($0) }
+                    .sorted()
             } else {
                 let start = Int(query["startIndex"] ?? "") ?? 0
                 let limit = Int(query["limit"] ?? "") ?? count

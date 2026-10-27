@@ -245,11 +245,16 @@ public struct MusicPage: Sendable {
     /// How many entries the server sent, before those that aren't songs were left out (from a
     /// playlist), so the next page starts after them.
     public let serverCount: Int
+    /// Whether every entry the server sent is a song by its type, counting any that couldn't be
+    /// read, which `items` leaves out. A playlist's first page tells by this whether the playlist
+    /// plays as music.
+    public let isAllSongs: Bool
 
-    public init(items: [MusicItem], totalCount: Int?, serverCount: Int? = nil) {
+    public init(items: [MusicItem], totalCount: Int?, serverCount: Int? = nil, isAllSongs: Bool = true) {
         self.items = items
         self.totalCount = totalCount
         self.serverCount = serverCount ?? items.count
+        self.isAllSongs = isAllSongs
     }
 }
 

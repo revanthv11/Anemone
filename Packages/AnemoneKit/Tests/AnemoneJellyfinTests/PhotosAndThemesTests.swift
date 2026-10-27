@@ -218,6 +218,37 @@ struct PhotosAndThemesTests {
         #expect(pages.allSatisfy { $0["fields"] == "Overview,Width,Height,DateCreated" })
     }
 
+    @Test @MainActor
+    func `a shuffled slideshow closes up over photos removed since its IDs were listed`() async throws {
+        let gone: Set = ["p3", "p150", "p151", "p249"]
+        MockServer.register(host: "shuffled-gone.test") { request in
+            guard request.url?.path() == "/jf/Items" else { return nil }
+            let query = SentRequest(request).query
+            guard let ids = query["ids"] else {
+                let items = (0 ..< 250).map { #"{"Id":"p\#($0)","Type":"Photo"}"# }
+                return .json(#"{"Items":[\#(items.joined(separator: ","))],"TotalRecordCount":250}"#)
+            }
+            let items = ids.split(separator: ",").map(String.init).filter { !gone.contains($0) }
+                .map { #"{"Id":"\#($0)","Name":"\#($0)","Type":"Photo"}"# }
+            return .json(#"{"Items":[\#(items.joined(separator: ","))]}"#)
+        }
+        let query = SlideshowQuery(folderID: "lib1", sort: LibrarySort(.random), isRecursive: true)
+        let pager = try SlideshowPager(loader: session(host: "shuffled-gone.test").slideshowLoader(for: query))
+
+        try await pager.start()
+        var shown: [MediaItem.ID] = []
+        var index = 0
+        while index < pager.count {
+            try shown.append(#require(await pager.load(at: index)).id)
+            index += 1
+        }
+
+        // Every place has a photo: none waits for one the server no longer has.
+        #expect(pager.count == 246)
+        #expect(shown.count == 246)
+        #expect(Set(shown) == Set((0 ..< 250).map { "p\($0)" }).subtracting(gone))
+    }
+
     @Test func `a big slideshow's IDs are fetched a thousand at a time until the last page`() async throws {
         let count = 2100
         let sent = SentRequests()
@@ -235,8 +266,10 @@ struct PhotosAndThemesTests {
 
         #expect(ids == (0 ..< count).map { "p\($0)" })
         let requests = sent.all.withLock(\.self)
+        // This server doesn't count, so each page follows the one before.
         #expect(requests.map { $0["startIndex"] } == ["0", "1000", "2000"])
-        #expect(requests.allSatisfy { $0["limit"] == "1000" && $0["enableTotalRecordCount"] == "false" })
+        #expect(requests.map { $0["enableTotalRecordCount"] } == ["true", "false", "false"])
+        #expect(requests.allSatisfy { $0["limit"] == "1000" })
     }
 
     @Test func `a slideshow sorted otherwise is fetched a page at a time in that order`() async throws {
