@@ -67,10 +67,18 @@ final class BrowseModel {
     /// Settings show. Only once Home has loaded; a failed refresh keeps the rows already showing.
     func refresh() async {
         guard case .loaded = home else { return }
+        // The default rows follow the libraries, so they're built again: a library added since
+        // gets its row.
+        let rows = homeRowsSource == .default ? nil : homeRows
         do {
-            let content = try await session.home(rows: homeRows, options: homeOptions(isRefresh: true))
+            let content = try await session.home(rows: rows, options: homeOptions(isRefresh: true))
             // Skipped when Home was left meanwhile, or stopped showing rows (reloading, signed out).
-            guard !Task.isCancelled, case let .loaded(current) = home, current != content else { return }
+            guard !Task.isCancelled, case let .loaded(current) = home else { return }
+            if rows == nil, homeRowsSource == .default, homeRows != content.configs {
+                // Settings › Home lists them, unless the user saved rows meanwhile.
+                homeRows = content.configs
+            }
+            guard current != content else { return }
             if libraries != content.libraries {
                 libraries = content.libraries
             }
