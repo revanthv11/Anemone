@@ -81,6 +81,10 @@ public enum AVPlayerProfile {
 
     /// HLS in fragmented MP4, which AVPlayer needs for HEVC. The order of the video codecs is
     /// the server's order of preference when it has to encode.
+    ///
+    /// Then HLS in MPEG-TS, which the server uses only for live TV: unless a tuner allows fMP4,
+    /// it sends live channels with the most compatible profile, an HLS one in TS, and without
+    /// one it offers a progressive stream AVPlayer can't play. Wholphin's profiles are TS.
     private static func transcodingProfiles(_ decoders: VideoDecoders) -> [TranscodingProfile] {
         [
             TranscodingProfile(
@@ -94,6 +98,17 @@ public enum AVPlayerProfile {
                 minSegments: 2,
                 type: .video,
                 videoCodec: list(decoders.hevc ? ["hevc", "h264"] : ["h264"]),
+            ),
+            TranscodingProfile(
+                protocol: .hls,
+                audioCodec: list("aac", "ac3", "eac3"),
+                container: "ts",
+                context: .streaming,
+                isBreakOnNonKeyFrames: true,
+                maxAudioChannels: "8",
+                minSegments: 2,
+                type: .video,
+                videoCodec: "h264",
             ),
         ]
     }
