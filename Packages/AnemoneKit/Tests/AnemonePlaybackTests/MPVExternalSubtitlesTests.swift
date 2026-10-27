@@ -111,7 +111,20 @@ struct MPVExternalSubtitlesTests {
         await controller.stop()
     }
 
-    @Test func `the files MPV asks for as External are text subtitles`() {
-        #expect(MPVExternalSubtitles.formats == ["vtt", "webvtt", "srt", "subrip", "ttml", "ass", "ssa"])
+    /// libmpv's FFmpeg reads no TTML, so MPV asks for it as SRT, which the server converts to.
+    @Test func `the files MPV fetches as they are are text subtitles it reads, not TTML`() throws {
+        #expect(MPVExternalSubtitles.formats == ["vtt", "webvtt", "srt", "subrip", "ass", "ssa"])
+        let stream = PlaybackStream(
+            itemID: "m1",
+            url: URL(filePath: "/m1.mp4"),
+            method: .directPlay,
+            mediaSourceID: "src1",
+            tracks: [MediaTrack(index: 3, kind: .subtitle, codec: "ttml", isExternal: true, delivery: .external)],
+        )
+
+        let subtitles = try StubServer.session(host: "external-ttml.test")
+            .externalSubtitles(of: stream, formats: MPVExternalSubtitles.formats)
+
+        #expect(subtitles.map { $0.url.path() } == ["/jf/Videos/m1/src1/Subtitles/3/Stream.srt"])
     }
 }

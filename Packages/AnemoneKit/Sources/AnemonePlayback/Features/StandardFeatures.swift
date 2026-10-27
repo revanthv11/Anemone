@@ -22,6 +22,7 @@ public extension PlaybackController {
             PlaybackSpeedMenu(),
             MPVSubtitleMenus(session: session),
             MPVExternalSubtitles(session: session),
+            MPVRuntime(),
         ]
     }
 }

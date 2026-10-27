@@ -62,6 +62,16 @@ import os
             return status >= 0
         }
 
+        @discardableResult
+        func commandAsync(_ arguments: [String], id: UInt64) -> Bool {
+            guard !isDestroyed else { return false }
+            let status = Self.withCStrings(arguments) { mpv_command_async(handle.mpv, id, $0) }
+            if status < 0 {
+                Logger.mpv.warning("\(arguments.first ?? "", privacy: .public): \(Self.describe(status))")
+            }
+            return status >= 0
+        }
+
         /// `loadfile` answers with the new entry's `playlist_entry_id` (mpv's input.rst). A load
         /// libmpv took without saying which entry it made still plays (see `MPVLoad`).
         func loadFile(_ arguments: [String]) -> MPVLoadResult {
@@ -206,6 +216,9 @@ import os
                     return nil
                 }
                 return .property(String(cString: property.name), value(of: property))
+            case MPV_EVENT_COMMAND_REPLY:
+                // Only `commandAsync` sends commands that libmpv replies to.
+                return .commandReply(id: event.reply_userdata, succeeded: event.error >= 0)
             case MPV_EVENT_SHUTDOWN:
                 return .shutdown
             case MPV_EVENT_LOG_MESSAGE:

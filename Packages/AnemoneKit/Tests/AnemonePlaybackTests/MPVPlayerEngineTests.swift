@@ -74,6 +74,26 @@ struct MPVPlayerEngineTests {
         #expect(log.events == ["paused", "ready", "paused", "failed"])
     }
 
+    /// Two loads in a row that libmpv took without naming their entries: the second's is the
+    /// one after the first's, so the first file's events aren't taken for the second's.
+    @Test func `a load without a named entry doesn't take the entry of one before it`() async {
+        let client = FakeMPVClient()
+        let engine = MPVPlayerEngine.testing(client)
+        client.hidesEntries = true
+        let first = engine.loadLog()
+        let second = engine.loadLog("/next.mkv")
+
+        // libmpv had started the first file before the second replaced it.
+        engine.handle(.startFile(entry: client.entries[0]))
+        engine.handle(.endFile(entry: client.entries[0], .stopped))
+        engine.start(client.entries[1])
+
+        #expect(await eventually { second.events == ["paused", "ready", "paused"] })
+        #expect(await eventually { first.isFinished })
+        #expect(first.events == ["paused"])
+        #expect(!second.isFinished)
+    }
+
     @Test func `pausing, buffering and seeking set the status once it's ready`() async {
         let client = FakeMPVClient()
         let engine = MPVPlayerEngine.testing(client)
