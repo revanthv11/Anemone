@@ -161,7 +161,21 @@ Not started. Wholphin's search page: type-ahead, results in rows by type, search
 
 #### 2e: home row types, customization and server sync
 
-Not started. The other row types (combined Continue Watching and Next Up, Recently Released, Genres, Studios, Favorites, Live TV rows, Suggestions, ByParent, GetItems, CustomEndpoint), customization in Settings › Home, server sync, the companion plugin, and Import from Wholphin.
+- [x] Wholphin's home-row JSON schema v1 as `HomeRowConfig` Codable types in AnemoneCore, written as Wholphin writes it and read as leniently: unknown rows are skipped, unknown enum values take their defaults, a newer version is refused
+- [x] Every row type: Continue Watching, Next Up, the two combined (most recently watched first, a next episode dated by the episode before it or its premiere, as Wholphin's `DatePlayedService`), Recently Added, Recently Released, Genres and Studios (cards open the library's grid for that genre or studio), Favorites by type, Suggestions (Wholphin's mix, kept for 12 hours), a collection's or playlist's items with a sort, item queries, and other plugins' endpoints (paths on the server only)
+- [x] Live TV rows (Watch Live, Channels, Active Recordings) read a `HomeLiveTVSource`, which Live TV (5a) fills; until then they stay empty, and `-homeMockLiveTV YES` shows made-up rows in DEBUG builds
+- [x] Each row's view options drawn on Home: height, spacing, image type, aspect ratio, titles, series art, and the episode settings
+- [x] Settings › Home: add, remove, reorder and configure rows; combine or split Continue Watching and Next Up; Wholphin's items-per-row, rewatching and max-days settings; the series removed from Next Up
+- [x] Rows are saved in the DisplayPreferences entry of client `Anemone` (id `default`, key `home_settings`) and read from it first, then from the companion plugin's `GET /wholphin/homesettings` when `GET /wholphin/public` finds it, then Wholphin's default. Reset forgets the saved rows
+- [x] Import from Wholphin copies its entry (client `Wholphin`, id `default`, key `home_settings`)
+- [x] Remove from Next Up as Wholphin's `removeNextUp`, on a long press of a Next Up card until the card menu (2h) takes it over
+- The default page is now Wholphin's: Continue Watching and Next Up combined, then Recently Added per library (Watch Live for Live TV), with Wholphin's default card look (posters, no titles)
+
+Tested live in the simulator against the Jellyfin 12.3 demo server: adding a Genres row for Movies and moving it up a place, relaunching and finding it there and in Settings, read back from the server; a genre card opening its movies and Back returning to the card; switching the combined row off and on; Import from Wholphin with `-homeMockWholphin YES`, since the demo user has no Wholphin entry and Anemone only reads one; and Reset, which put the entry back to no saved rows, as it was before. PR #8's checks still pass: Back from an item page returns to the card that opened it and row memory holds, Home picks up changed rows when it's chosen again in the sidebar, and with a throwaway hook that dropped the opened card from the next refresh, focus landed on the row's first card. Jellyfin 12.3 puts a null `tvhome` in every DisplayPreferences entry, which jellyfin-sdk-swift 3.3.0's `[String: String]` can't decode, so the entry is read and written as plain JSON.
+
+Not verified live: Remove from Next Up (it marks an episode unwatched, outside this stream's demo lane), the companion plugin (the demo server doesn't have it), Suggestions, Studios, Favorites, item-query and custom-endpoint rows, and the Live TV rows; unit tests cover each request.
+
+Not yet: Wholphin's live preview beside the settings, display presets, and loading the web client's home sections. 4:3 cards are drawn 16:9 and content scale isn't applied, since Anemone's cards have three shapes and fill their frame.
 
 #### 2f: library tabs and layouts
 
