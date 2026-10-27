@@ -294,7 +294,7 @@ private struct PlaylistPicker: View {
                                 PlaylistLabel(playlist: playlist)
                             }
                             .disabled(isSaving)
-                            .accessibilityValue(playlist.entryID == nil ? "" : "Has this item")
+                            .accessibilityValue(playlist.holdsItem ? "Has this item" : "")
                             .accessibilityIdentifier("playlist.\(playlist.id)")
                         }
                     }
@@ -326,8 +326,8 @@ private struct PlaylistPicker: View {
         isSaving = true
         defer { isSaving = false }
         do {
-            if let entry = playlist.entryID {
-                try await browse.session.removeFromPlaylist(playlist.id, entryID: entry)
+            if playlist.holdsItem {
+                try await browse.session.removeFromPlaylist(playlist.id, itemID: item.id)
             } else {
                 try await browse.session.addToPlaylist(playlist.id, itemID: item.id)
             }
@@ -343,7 +343,7 @@ private struct PlaylistLabel: View {
 
     var body: some View {
         HStack(spacing: 24) {
-            Image(systemName: playlist.entryID == nil ? "plus" : "checkmark")
+            Image(systemName: playlist.holdsItem ? "checkmark" : "plus")
                 .frame(width: 40)
             Text(playlist.name.isEmpty ? "Untitled" : playlist.name)
             Spacer()
