@@ -40,7 +40,7 @@ The generated sources in `Packages/AnemoneKit/Sources/AnemoneSeerr/Generated` ar
 As in Wholphin at `cecfdae`, when a profile signs in, Anemone:
 
 1. reads the Seerr server the companion plugin ([jellyfin-plugin-wholphin](https://github.com/damontecres/jellyfin-plugin-wholphin)) sets up for everyone, from `GET /wholphin/seerrsettings`, and signs in with its API key or shared account. That login stays in memory: it's never saved, and a change in the plugin shows up the next time the profile signs in. Settings › Seerr shows such a server as "Managed by server", with Retry instead of Remove;
-2. otherwise, or when that fails, signs in with the server the profile added in Settings › Seerr. Its address, how it signs in and its password or API key are kept in the Keychain, one item per profile.
+2. otherwise, or when that fails, signs in with the server the profile added in Settings › Seerr. Its address, how it signs in and its password or API key are kept in the Keychain, one item per profile, under a service of their own (`com.revanthv11.anemone.seerr`), apart from the sign-ins item that's shared with the Top Shelf.
 
 ## Trying it without a Seerr server
 

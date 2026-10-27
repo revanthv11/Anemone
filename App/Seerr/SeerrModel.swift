@@ -24,7 +24,9 @@
             self.browse = browse
             let profile = SeerrAccountStore.Profile(serverID: browse.server.id, userID: browse.session.userID)
             signIn = SeerrSignIn(
-                accounts: SeerrAccountStore(store: KeychainStore(service: "com.revanthv11.anemone")),
+                // A service of its own, so the sign-ins item's move into the Top Shelf's shared
+                // group (`SharedStorage`) leaves Seerr's accounts alone.
+                accounts: SeerrAccountStore(store: KeychainStore(service: "com.revanthv11.anemone.seerr")),
                 profile: profile,
                 configuration: Self.configuration,
             )
