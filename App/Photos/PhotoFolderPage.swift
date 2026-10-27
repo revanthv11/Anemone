@@ -17,6 +17,7 @@ struct PhotoFolderPage: View {
     @State private var content = Content.loading
     @State private var focusedIndex = 0
     @State private var slideshow: SlideshowStart?
+    @State private var hasFocusedSort = false
     @FocusState private var isSortFocused: Bool
 
     private enum Content {
@@ -100,6 +101,13 @@ struct PhotoFolderPage: View {
         // An album opens with focus on the sort, above its first cards. Otherwise the grid's
         // alphabet bar, whose default focus is the only one on the page, takes it.
         .defaultFocus($isSortFocused, folder.isAlbum)
+        .onAppear {
+            // The alphabet bar's default focus wins on its own now, so the sort is focused once
+            // the grid is up; only the first time, so closing the viewer returns to the card.
+            guard folder.isAlbum, !hasFocusedSort else { return }
+            hasFocusedSort = true
+            Task { isSortFocused = true }
+        }
     }
 
     private func header(count: Int?, @ViewBuilder trailing: () -> some View = { EmptyView() }) -> some View {
