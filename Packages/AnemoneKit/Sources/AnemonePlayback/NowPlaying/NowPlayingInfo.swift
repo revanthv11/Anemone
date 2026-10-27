@@ -39,16 +39,18 @@ public struct NowPlayingInfo: Equatable, Sendable {
         self.queueCount = queueCount
     }
 
-    /// For `MPNowPlayingInfoCenter`, without the artwork, which needs a platform image. The rate
-    /// is 0 while paused, so the system stops the clock; while playing, it moves the position on
-    /// by itself between updates.
+    /// For `MPNowPlayingInfoCenter`, without the artwork, which needs a platform image.
     var properties: [String: Any] {
+        var properties = entryProperties
+        setTiming(in: &properties)
+        return properties
+    }
+
+    /// What stays the same while the entry plays at its place in the queue.
+    var entryProperties: [String: Any] {
         var properties: [String: Any] = [
             MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.video.rawValue,
             MPMediaItemPropertyTitle: metadata.title,
-            MPNowPlayingInfoPropertyElapsedPlaybackTime: position / .seconds(1),
-            MPNowPlayingInfoPropertyPlaybackRate: Double(isPlaying ? rate : 0),
-            MPNowPlayingInfoPropertyDefaultPlaybackRate: Double(rate),
             MPNowPlayingInfoPropertyPlaybackQueueIndex: queueIndex,
             MPNowPlayingInfoPropertyPlaybackQueueCount: queueCount,
         ]
@@ -56,9 +58,25 @@ public struct NowPlayingInfo: Equatable, Sendable {
         if let subtitle = metadata.subtitle {
             properties[MPMediaItemPropertyArtist] = subtitle
         }
+        return properties
+    }
+
+    /// Whether `other` shows the same entry, artwork and queue place, so only the timing changed.
+    func showsSameEntry(as other: Self) -> Bool {
+        metadata == other.metadata && artwork == other.artwork
+            && queueIndex == other.queueIndex && queueCount == other.queueCount
+    }
+
+    /// Updates what moves while the entry plays. The rate is 0 while paused, so the system stops
+    /// the clock; while playing, it moves the position on by itself between updates.
+    func setTiming(in properties: inout [String: Any]) {
+        properties[MPNowPlayingInfoPropertyElapsedPlaybackTime] = position / .seconds(1)
+        properties[MPNowPlayingInfoPropertyPlaybackRate] = Double(isPlaying ? rate : 0)
+        properties[MPNowPlayingInfoPropertyDefaultPlaybackRate] = Double(rate)
         if let duration, duration > .zero {
             properties[MPMediaItemPropertyPlaybackDuration] = duration / .seconds(1)
+        } else {
+            properties.removeValue(forKey: MPMediaItemPropertyPlaybackDuration)
         }
-        return properties
     }
 }

@@ -50,23 +50,55 @@ protocol NowPlayingCenter: AnyObject {
 /// `NowPlayableObserver` and `NowPlayableCommand`.
 @MainActor
 final class SystemNowPlayingCenter: NowPlayingCenter {
-    private var targets: [(command: MPRemoteCommand, target: Any)] = []
+    /// Turns image data into the system's artwork, an `MPMediaItemArtwork`.
+    typealias ArtworkMaker = @MainActor (Data) -> AnyObject?
+    /// Hands the properties to `MPNowPlayingInfoCenter`.
+    typealias Writer = @MainActor ([String: Any]?) -> Void
 
+    private let makeArtwork: ArtworkMaker
+    private let write: Writer
+    private var targets: [(command: MPRemoteCommand, target: Any)] = []
+    /// What's shown, and the properties that show it, artwork included.
+    private var shown: NowPlayingInfo?
+    private var properties: [String: Any] = [:]
+
+    init(
+        makeArtwork: @escaping ArtworkMaker = SystemNowPlayingCenter.artwork(from:),
+        write: @escaping Writer = { MPNowPlayingInfoCenter.default().nowPlayingInfo = $0 },
+    ) {
+        self.makeArtwork = makeArtwork
+        self.write = write
+    }
+
+    /// Builds the properties, artwork and all, once per entry (and again when its artwork
+    /// arrives); after that, the position updates only change the timing.
     func publish(_ info: NowPlayingInfo?) {
         guard let info else {
-            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+            shown = nil
+            properties = [:]
+            write(nil)
             return
         }
-        var properties = info.properties
-        #if canImport(UIKit)
-            if let image = info.artwork.flatMap(UIImage.init(data:)) {
-                // Not on the main actor: MediaPlayer asks for the image on a queue of its own.
-                properties[MPMediaItemPropertyArtwork] = MPMediaItemArtwork(boundsSize: image.size) { @Sendable _ in
-                    image
-                }
+        if shown.map({ !$0.showsSameEntry(as: info) }) ?? true {
+            properties = info.entryProperties
+            if let artwork = info.artwork.flatMap(makeArtwork) {
+                properties[MPMediaItemPropertyArtwork] = artwork
             }
+        }
+        shown = info
+        info.setTiming(in: &properties)
+        write(properties)
+    }
+
+    /// Decodes the image once; MediaPlayer then asks the artwork for it on a queue of its own,
+    /// not on the main actor.
+    static func artwork(from data: Data) -> AnyObject? {
+        #if canImport(UIKit)
+            guard let image = UIImage(data: data) else { return nil }
+            return MPMediaItemArtwork(boundsSize: image.size) { @Sendable _ in image }
+        #else
+            return nil
         #endif
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = properties
     }
 
     func handle(

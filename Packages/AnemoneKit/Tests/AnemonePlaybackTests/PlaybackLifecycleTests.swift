@@ -10,7 +10,11 @@ struct PlaybackLifecycleTests {
 
     private func controller(pausesInBackground: Bool = true) throws -> PlaybackController {
         let app = app
-        let lifecycle = PlaybackLifecycle(changes: { app.changes() }, keepAlive: { app.keepAlives += 1 })
+        let lifecycle = PlaybackLifecycle(
+            changes: { app.changes() },
+            isInBackground: { app.isInBackground },
+            keepAlive: { app.keepAlives += 1 },
+        )
         lifecycle.pausesInBackground = pausesInBackground
         return try PlaybackController(
             request: PlaybackRequest(queue: #require(PlaybackQueue(entries: [.item("m1")]))),
@@ -79,6 +83,23 @@ struct PlaybackLifecycleTests {
         await playback.stop()
     }
 
+    @Test func `going home while the stream is still loading pauses it once it gets going`() async throws {
+        let playback = try controller()
+        // Before the player hears anything from the app.
+        app.isInBackground = true
+
+        await playback.start()
+        engine.send(.ready)
+
+        #expect(await eventually { lastChange?.hasPrefix("paused") == true })
+        #expect(!engine.isPlaying)
+        #expect(app.keepAlives == 1)
+        app.isInBackground = false
+        app.send(.foreground)
+        #expect(await eventually { engine.isPlaying })
+        await playback.stop()
+    }
+
     @Test func `players that go on in the background are left alone`() async throws {
         let playback = try controller(pausesInBackground: false)
         await play(playback)
@@ -105,6 +126,8 @@ struct PlaybackLifecycleTests {
 @MainActor
 final class FakeApp {
     var keepAlives = 0
+    /// What the app's state says, as against what it announces.
+    var isInBackground = false
     private var continuation: AsyncStream<PlaybackLifecycle.Change>.Continuation?
 
     var isWatched: Bool {

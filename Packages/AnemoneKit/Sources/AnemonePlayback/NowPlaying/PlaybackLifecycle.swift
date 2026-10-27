@@ -16,6 +16,8 @@ public final class PlaybackLifecycle: PlaybackFeature {
 
     /// The app going to and from the background.
     typealias Changes = @MainActor () -> AsyncStream<Change>
+    /// Whether the app is in the background now.
+    typealias State = @MainActor () -> Bool
     /// Asks tvOS for a few seconds in the background, so the pause gets reported.
     typealias KeepAlive = @MainActor () -> Void
 
@@ -23,6 +25,7 @@ public final class PlaybackLifecycle: PlaybackFeature {
     public var pausesInBackground = true
 
     private let changes: Changes
+    private let isAppInBackground: State
     private let keepAlive: KeepAlive
     private weak var controller: PlaybackController?
     private var watching: Task<Void, Never>?
@@ -33,14 +36,19 @@ public final class PlaybackLifecycle: PlaybackFeature {
 
     public convenience init() {
         #if os(tvOS) || os(iOS)
-            self.init(changes: Self.appChanges, keepAlive: Self.keepAppAlive)
+            self.init(
+                changes: Self.appChanges,
+                isInBackground: { UIApplication.shared.applicationState == .background },
+                keepAlive: Self.keepAppAlive,
+            )
         #else
-            self.init(changes: { AsyncStream { $0.finish() } }, keepAlive: {})
+            self.init(changes: { AsyncStream { $0.finish() } }, isInBackground: { false }, keepAlive: {})
         #endif
     }
 
-    init(changes: @escaping Changes, keepAlive: @escaping KeepAlive) {
+    init(changes: @escaping Changes, isInBackground: @escaping State, keepAlive: @escaping KeepAlive) {
         self.changes = changes
+        isAppInBackground = isInBackground
         self.keepAlive = keepAlive
     }
 
@@ -48,6 +56,9 @@ public final class PlaybackLifecycle: PlaybackFeature {
         self.controller = controller
         switch event {
         case .loaded:
+            // The changes only say what happens from here on, and the app may have gone home
+            // while the stream was loading.
+            isInBackground = isAppInBackground()
             watch()
         case .started, .resumed:
             isPlaying = true

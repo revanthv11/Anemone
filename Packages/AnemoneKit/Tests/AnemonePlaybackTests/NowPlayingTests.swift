@@ -226,6 +226,56 @@ struct NowPlayingTests {
         #expect(artworkRequests.urls == [Self.poster])
         await playback.stop()
     }
+
+    @Test func `the system's artwork is made once per entry, and position updates change only the timing`() throws {
+        let system = FakeSystem()
+        let center = SystemNowPlayingCenter(
+            makeArtwork: { _ in
+                system.artworks.append(NSObject())
+                return system.artworks.last
+            },
+            write: { system.written.append($0) },
+        )
+        var info = NowPlayingInfo(
+            metadata: PlaybackMetadata(title: "Pioneer One", subtitle: "S1:E1 · Earthfall"),
+            artwork: Data("art".utf8),
+            position: .seconds(1),
+        )
+
+        center.publish(info)
+        info.isPlaying = true
+        info.position = .seconds(2)
+        info.duration = .seconds(2700)
+        center.publish(info)
+
+        #expect(system.artworks.count == 1)
+        let shown = try #require(system.written.last ?? nil)
+        #expect(shown[MPMediaItemPropertyArtwork] as? NSObject === system.artworks.first)
+        #expect(shown[MPMediaItemPropertyTitle] as? String == "Pioneer One")
+        #expect(shown[MPNowPlayingInfoPropertyElapsedPlaybackTime] as? Double == 2)
+        #expect(shown[MPNowPlayingInfoPropertyPlaybackRate] as? Double == 1)
+        #expect(shown[MPMediaItemPropertyPlaybackDuration] as? Double == 2700)
+
+        // The next entry gets its own.
+        info.metadata.subtitle = "S1:E2 · The Man From Mars"
+        info.artwork = Data("art 2".utf8)
+        center.publish(info)
+        #expect(system.artworks.count == 2)
+        #expect((system.written.last ?? nil)?[MPMediaItemPropertyArtwork] as? NSObject === system.artworks.last)
+
+        center.publish(nil)
+        #expect(system.written.count == 4)
+        #expect(system.written.last.flatMap(\.self) == nil)
+        center.publish(info)
+        #expect(system.artworks.count == 3)
+    }
+}
+
+/// What `SystemNowPlayingCenter` made and handed to the system.
+@MainActor
+final class FakeSystem {
+    var artworks: [NSObject] = []
+    var written: [[String: Any]?] = []
 }
 
 /// Records what Now Playing would show, and stands in for the remote.
