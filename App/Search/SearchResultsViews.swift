@@ -95,6 +95,7 @@ struct CombinedResults: View {
                             ItemCard(details: details, shape: .poster)
                         }
                         .buttonStyle(.borderless)
+                        .cardMenu()
                         .focused(focus, equals: .card(row: SearchKind.combinedRowID, item: details.id))
                         .accessibilityIdentifier("card.\(SearchKind.combinedRowID).\(details.id)")
                     }

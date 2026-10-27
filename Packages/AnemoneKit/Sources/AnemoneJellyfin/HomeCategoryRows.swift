@@ -35,23 +35,27 @@ extension JellyfinSession {
     }
 
     /// A backdrop for each genre, from one of its items picked at random. Kept while the page
-    /// refreshes, as Wholphin keeps them, so the art doesn't change every time Home shows.
+    /// refreshes, as Wholphin keeps them, so the art doesn't change every time Home shows; a genre
+    /// new since, or whose lookup failed, is looked up then.
     private func genreImages(
         _ genreIDs: [String],
         in parentID: String,
         context: HomeRowContext,
     ) async -> [String: ItemImage] {
         let cache = context.options.cache
-        if context.options.isRefresh, let cached = await cache.genreImages(for: parentID) {
-            return cached
+        var art = context.options.isRefresh ? await cache.genreArt(for: parentID) ?? GenreArt() : GenreArt()
+        let missing = genreIDs.filter { !art.lookedUp.contains($0) }
+        guard !missing.isEmpty else { return art.images }
+        let found = await boundedMap(missing.count, width: 4) { index in
+            await (missing[index], attempt { try await genreImage(missing[index], in: parentID) })
         }
-        let images = await boundedMap(genreIDs.count, width: 4) { index in
-            let image = try? await genreImage(genreIDs[index], in: parentID)
-            return (genreIDs[index], image ?? nil)
+        for (id, result) in found {
+            guard case let .success(image) = result else { continue }
+            art.lookedUp.insert(id)
+            art.images[id] = image
         }
-        let found = Dictionary(images.compactMap { id, image in image.map { (id, $0) } }) { first, _ in first }
-        await cache.setGenreImages(found, for: parentID)
-        return found
+        await cache.setGenreArt(art, for: parentID)
+        return art.images
     }
 
     private func genreImage(_ genreID: String, in parentID: String) async throws -> ItemImage? {

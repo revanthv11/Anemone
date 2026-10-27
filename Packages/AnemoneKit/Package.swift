@@ -60,6 +60,7 @@ let package = Package(
         ),
         .testTarget(name: "AnemoneCoreTests", dependencies: ["AnemoneCore"]),
         .testTarget(name: "AnemoneJellyfinTests", dependencies: ["AnemoneJellyfin"]),
+        .testTarget(name: "AnemoneUIModelTests", dependencies: ["AnemoneUI"]),
         .testTarget(
             name: "AnemonePlaybackTests",
             dependencies: [

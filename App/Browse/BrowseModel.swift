@@ -29,6 +29,10 @@ final class BrowseModel {
     @ObservationIgnored let homeWriter: HomePreferencesWriter
     @ObservationIgnored private let homeCache = HomeCache()
     @ObservationIgnored private var didPlaceInitialFocus = false
+    /// The last save of Home's rows, which the next one waits for.
+    @ObservationIgnored private var homeSave: Task<Void, Never>?
+    /// Goes up with each change to the saved rows, so a save that a newer change overtook is dropped.
+    @ObservationIgnored private var homeSaveGeneration = 0
 
     init(session: JellyfinSession, server: SavedServer) {
         self.session = session
@@ -41,9 +45,10 @@ final class BrowseModel {
     func load() async {
         home = .loading
         do {
-            let resolution = try await session.resolveHomeSettings()
+            let resolution = try await session.resolveHomeSettings(cache: homeCache)
             let content = try await session.home(
                 rows: resolution.settings?.rows,
+                removedFromNextUp: resolution.removedFromNextUp,
                 options: homeOptions(isRefresh: false),
             )
             homeRows = content.configs
@@ -62,10 +67,18 @@ final class BrowseModel {
     /// Settings show. Only once Home has loaded; a failed refresh keeps the rows already showing.
     func refresh() async {
         guard case .loaded = home else { return }
+        // The default rows follow the libraries, so they're built again: a library added since
+        // gets its row.
+        let rows = homeRowsSource == .default ? nil : homeRows
         do {
-            let content = try await session.home(rows: homeRows, options: homeOptions(isRefresh: true))
+            let content = try await session.home(rows: rows, options: homeOptions(isRefresh: true))
             // Skipped when Home was left meanwhile, or stopped showing rows (reloading, signed out).
-            guard !Task.isCancelled, case let .loaded(current) = home, current != content else { return }
+            guard !Task.isCancelled, case let .loaded(current) = home else { return }
+            if rows == nil, homeRowsSource == .default, homeRows != content.configs {
+                // Settings › Home lists them, unless the user saved rows meanwhile.
+                homeRows = content.configs
+            }
+            guard current != content else { return }
             if libraries != content.libraries {
                 libraries = content.libraries
             }
@@ -94,7 +107,7 @@ final class BrowseModel {
             itemsPerRow: Preferences.maxItemsPerRow.value(),
             enableRewatchingNextUp: Preferences.enableRewatchingNextUp.value(),
             maxDaysNextUp: Preferences.maxDaysNextUp.value(),
-            liveTV: Self.liveTVSource,
+            liveTV: liveTVSource,
             cache: homeCache,
             isRefresh: isRefresh,
         )
@@ -111,7 +124,14 @@ extension BrowseModel {
         homeRows = rows
         homeRowsSource = .server
         let settings = HomePageSettings(rows: rows)
-        Task {
+        homeSaveGeneration += 1
+        let generation = homeSaveGeneration
+        let previous = homeSave
+        // One save at a time, in the order the edits came. A save still waiting when a newer edit
+        // comes is dropped, so the server keeps the last edit however quickly they came.
+        homeSave = Task {
+            await previous?.value
+            guard generation == homeSaveGeneration else { return }
             do {
                 try await homeWriter.save(settings)
                 homeSaveProblem = nil
@@ -124,9 +144,13 @@ extension BrowseModel {
     /// Wholphin's "Reset": forgets the rows saved for the user, so Home shows the server plugin's
     /// rows when it has some, and the default rows otherwise.
     func resetHomeRows() async throws {
-        try await homeWriter.update { $0["home_settings"] = nil }
+        // Saves still waiting are dropped, and one under way finishes first, so none can bring
+        // the rows back afterwards.
+        homeSaveGeneration += 1
+        await homeSave?.value
+        try await homeWriter.forgetHomePageSettings()
         homeSaveProblem = nil
-        let resolution = try await session.resolveHomeSettings()
+        let resolution = try await session.resolveHomeSettings(cache: homeCache)
         homeRows = resolution.settings?.rows ?? HomePageSettings.defaultRows(for: libraries)
         homeRowsSource = resolution.source
     }
@@ -162,15 +186,15 @@ extension BrowseModel {
         }
     }
 
-    /// Where Home's Live TV rows come from: nothing until Live TV lands, or made-up rows in DEBUG
-    /// builds launched with `-homeMockLiveTV YES`.
-    static var liveTVSource: any HomeLiveTVSource {
+    /// Where Home's Live TV rows come from: the server's Live TV, or made-up rows in DEBUG builds
+    /// launched with `-homeMockLiveTV YES`.
+    var liveTVSource: any HomeLiveTVSource {
         #if DEBUG
             if UserDefaults.standard.bool(forKey: "homeMockLiveTV") {
                 return HomeDebugData.MockLiveTV()
             }
         #endif
-        return NoLiveTV()
+        return session.liveTVHomeRows
     }
 
     #if DEBUG

@@ -189,8 +189,12 @@ public extension HomeRowConfig {
 
 public extension [HomeRowConfig] {
     /// Wholphin's "Combine" action: the first Continue Watching or Next Up row becomes the combined
-    /// row, keeping its look, and any other such rows go.
+    /// row, keeping its look, and any other such rows go. When there's a combined row already,
+    /// the separate rows just go, where Wholphin would add a second combined row.
     func combiningWatchingRows() -> [HomeRowConfig] {
+        if contains(where: { $0.kind == .continueWatchingCombined }) {
+            return filter { $0.kind != .continueWatching && $0.kind != .nextUp }
+        }
         guard let index = firstIndex(where: { $0.kind == .continueWatching || $0.kind == .nextUp }) else {
             return self
         }

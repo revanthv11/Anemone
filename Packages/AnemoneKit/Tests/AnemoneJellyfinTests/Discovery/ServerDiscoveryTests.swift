@@ -69,9 +69,12 @@ struct ServerDiscoveryTests {
 
         let servers = try await search(responder, for: .milliseconds(300))
 
+        let elapsed = clock.now - started
         #expect(servers.isEmpty)
-        #expect(clock.now - started < .seconds(3))
-        #expect(responder.probes == ["who is JellyfinServer?"])
+        #expect(elapsed >= .milliseconds(300))
+        #expect(elapsed < .seconds(3))
+        // Nobody answered, so nothing says the responder has read the probe yet.
+        #expect(try await responder.probes(count: 1) == ["who is JellyfinServer?"])
     }
 
     @Test func `stopping early closes the search's socket`() async throws {
