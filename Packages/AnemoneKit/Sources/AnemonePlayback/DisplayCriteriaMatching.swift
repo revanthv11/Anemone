@@ -116,32 +116,43 @@ extension DisplayCriteriaMatching {
         }
 
         /// Back to the usual mode after `delay`, unless another player asks for a mode first.
+        /// Without a window, as when the app has gone to the background meanwhile, the display
+        /// can't be asked, so the reset waits as long again and tries again, until it gets there
+        /// or a player asks for a mode: nothing else would put the display back, and the mode
+        /// stays recorded until then, so the reset stays owed.
         func reset(after delay: Duration, by feature: DisplayCriteriaMatching) {
             guard owner === feature, criteria != nil else { return }
             pendingReset?.cancel()
             let sleep = sleep
             pendingReset = Task { [weak self] in
-                try? await sleep(delay)
-                guard !Task.isCancelled, let self else { return }
-                pendingReset = nil
-                owner = nil
-                change(to: nil)
+                while true {
+                    try? await sleep(delay)
+                    guard !Task.isCancelled, let self else { return }
+                    if change(to: nil) {
+                        pendingReset = nil
+                        owner = nil
+                        return
+                    }
+                }
             }
         }
 
         /// Only when it's a change, so the next entry of a series doesn't blank the screen again.
         /// What the display wasn't asked for isn't kept, so the same mode asked for again, by
-        /// the next entry once there's a window, still reaches it.
-        private func change(to criteria: DisplayCriteria?) {
-            guard criteria != self.criteria else { return }
+        /// the next entry once there's a window, still reaches it. Returns whether the display
+        /// has `criteria` now.
+        @discardableResult
+        private func change(to criteria: DisplayCriteria?) -> Bool {
+            guard criteria != self.criteria else { return true }
             let summary = criteria.map { "\($0.frameRate) fps, \($0.dynamicRange), \($0.codecName)" } ?? "usual mode"
             guard apply(criteria) else {
                 // No window yet, or Match Content is off.
                 Self.log.notice("Display criteria not taken: \(summary, privacy: .public)")
-                return
+                return false
             }
             self.criteria = criteria
             Self.log.notice("Display criteria: \(summary, privacy: .public)")
+            return true
         }
     }
 }
