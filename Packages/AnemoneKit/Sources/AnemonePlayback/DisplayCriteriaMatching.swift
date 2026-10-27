@@ -133,12 +133,15 @@ extension DisplayCriteriaMatching {
         /// What the display wasn't asked for isn't kept, so the same mode asked for again, by
         /// the next entry once there's a window, still reaches it.
         private func change(to criteria: DisplayCriteria?) {
-            guard criteria != self.criteria, apply(criteria) else { return }
-            self.criteria = criteria
-            if let criteria {
-                let summary = "\(criteria.frameRate) fps, \(criteria.dynamicRange), \(criteria.codecName)"
-                Self.log.notice("Display criteria: \(summary, privacy: .public)")
+            guard criteria != self.criteria else { return }
+            let summary = criteria.map { "\($0.frameRate) fps, \($0.dynamicRange), \($0.codecName)" } ?? "usual mode"
+            guard apply(criteria) else {
+                // No window yet, or Match Content is off.
+                Self.log.notice("Display criteria not taken: \(summary, privacy: .public)")
+                return
             }
+            self.criteria = criteria
+            Self.log.notice("Display criteria: \(summary, privacy: .public)")
         }
     }
 }
