@@ -15,15 +15,11 @@ private let log = Logger(subsystem: "com.revanthv11.anemone.topshelf", category:
 /// changes nothing on the server. It shows nothing when nobody is signed in, the profile is
 /// locked, or the server can't be reached; the app asks tvOS to load it again when that changes.
 final class ContentProvider: TVTopShelfContentProvider {
-    /// The completion-handler form: the content isn't `Sendable`, so the async override can't
-    /// return it under strict concurrency. The task only carries `Sendable` rows; the content is
-    /// built from them where the handler is called.
-    override func loadTopShelfContent(completionHandler: @escaping ((any TVTopShelfContent)?) -> Void) {
-        let reply = Reply(completionHandler)
-        Task {
-            let rows = await Self.loadRows()
-            reply.send(rows)
-        }
+    /// Runs on the caller's executor (`nonisolated(nonsending)`), as the system's method does,
+    /// since the content it returns isn't `Sendable`. The rows load elsewhere and come back as
+    /// `Sendable` values; the content is built from them here.
+    override nonisolated(nonsending) func loadTopShelfContent() async -> (any TVTopShelfContent)? {
+        await Self.loadRows()?.content
     }
 
     /// The rows for the profile the app opens on, or `nil` when there's nothing to show.
@@ -67,20 +63,6 @@ private struct LoadedRows: Sendable {
         shelfItem.displayAction = TVTopShelfAction(url: profile.link(.item(id: media.id)))
         shelfItem.playAction = TVTopShelfAction(url: profile.link(.play(id: media.id, position: nil)))
         return shelfItem
-    }
-}
-
-/// The system's completion handler, which may be called from any thread once, carried into the
-/// task that loads the rows.
-private final class Reply: @unchecked Sendable {
-    private let handler: ((any TVTopShelfContent)?) -> Void
-
-    init(_ handler: @escaping ((any TVTopShelfContent)?) -> Void) {
-        self.handler = handler
-    }
-
-    func send(_ rows: LoadedRows?) {
-        handler(rows?.content)
     }
 }
 
