@@ -1,12 +1,15 @@
 import SwiftUI
 
-/// Routes between setup, sign-in and the signed-in app.
+/// Routes between setup, sign-in and the signed-in app. It also opens `anemone://` links, keeps
+/// the Top Shelf current and runs the in-app screensaver.
 ///
 /// Passing `-homeSpike <variant>` opens one of the Phase 0 home-screen prototypes instead, and
 /// `-libraryGridSpike <count>` the Phase 2b grid on a synthetic library (see
 /// docs/spikes/home-focus.md).
 struct RootView: View {
     @State private var model = AppModel()
+    @State private var deepLinks = DeepLinkRouter()
+    @State private var screensaver = Screensaver()
     private let spike = UserDefaults.standard.string(forKey: "homeSpike")
     private let gridSpikeCount = UserDefaults.standard.integer(forKey: "libraryGridSpike")
 
@@ -34,9 +37,22 @@ struct RootView: View {
                 }
             }
             .environment(model)
+            .environment(deepLinks)
+            .environment(screensaver)
             .task {
                 await model.start()
             }
+            // anemone:// links from the Top Shelf and elsewhere (App/DeepLinks).
+            .onOpenURL { url in
+                guard deepLinks.open(url) else { return }
+                screensaver.stop()
+                Task { await deepLinks.resolve(with: model) }
+            }
+            .onChange(of: model.screen) {
+                Task { await deepLinks.resolve(with: model) }
+            }
+            .topShelfSync(screen: model.screen)
+            .screensaver(screensaver, session: model.session)
         }
     }
 
