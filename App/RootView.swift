@@ -1,3 +1,4 @@
+import AnemoneUI
 import SwiftUI
 
 /// Routes between setup, sign-in and the signed-in app. It also opens `anemone://` links, keeps
@@ -39,6 +40,7 @@ struct RootView: View {
             .environment(model)
             .environment(deepLinks)
             .environment(screensaver)
+            .themeBackground()
             .task {
                 await model.start()
             }
@@ -53,6 +55,7 @@ struct RootView: View {
             }
             .topShelfSync(screen: model.screen)
             .screensaver(screensaver, session: model.session)
+            .appTheme()
         }
     }
 
