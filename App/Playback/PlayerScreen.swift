@@ -30,12 +30,16 @@ struct PlayerScreen: View {
                     .overlay(alignment: .bottomTrailing) {
                         if let card = playback.accessories.card {
                             PlayerCardView(card: card)
+                                // A new card is a new view, so it takes focus too.
+                                .id(card.id)
                                 .padding(80)
                         }
                     }
             }
         }
         .background(.black)
+        // Any press is someone awake, for Up Next's pass-out protection.
+        .background(RemoteInputObserver { playback.feature(UpNext.self)?.noteRemoteInput() })
         .ignoresSafeArea()
         .task {
             try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
