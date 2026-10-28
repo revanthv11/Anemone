@@ -103,24 +103,44 @@ private struct HomeRows: View {
     @SceneStorage("home.cardLeft.item") private var savedItem = ""
     @State private var headerItem: MediaItem?
     @State private var backdropItem: MediaItem?
+    /// The rows' scroll view and last row, so the last row can be scrolled to the top too.
+    @State private var viewportHeight: CGFloat = 0
+    @State private var lastRowHeight: CGFloat = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HomeHeader(item: headerItem ?? firstItem)
                 .padding(.horizontal, HomeLayout.horizontalInset)
                 .padding(.bottom, HomeLayout.headerSpacing)
-            ScrollView(.vertical) {
-                VStack(alignment: .leading, spacing: HomeLayout.rowSpacing) {
-                    ForEach(content.rows) { row in
-                        HomeRowView(row: row, focusedCard: $focusedCard, scrollTarget: scrollTarget)
-                            .defaultFocus($focusedCard, rememberedCard(in: row), priority: .userInitiated)
+            ScrollViewReader { scroller in
+                ScrollView(.vertical) {
+                    VStack(alignment: .leading, spacing: HomeLayout.rowSpacing) {
+                        ForEach(content.rows) { row in
+                            HomeRowView(row: row, focusedCard: $focusedCard, scrollTarget: scrollTarget)
+                                .defaultFocus($focusedCard, rememberedCard(in: row), priority: .userInitiated)
+                                .id(row.id)
+                                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                                    if row.id == content.rows.last?.id {
+                                        lastRowHeight = height
+                                    }
+                                }
+                        }
+                        if !content.failedRows.isEmpty {
+                            NoticeText(String(localized: "Some rows couldn't be loaded."))
+                        }
                     }
-                    if !content.failedRows.isEmpty {
-                        NoticeText(String(localized: "Some rows couldn't be loaded."))
-                    }
+                    .padding(.horizontal, HomeLayout.horizontalInset)
+                    // Enough below the last row for it to reach the top of the view too.
+                    .padding(.bottom, max(HomeLayout.focusPadding, viewportHeight - lastRowHeight))
                 }
-                .padding(.horizontal, HomeLayout.horizontalInset)
-                .padding(.bottom, HomeLayout.focusPadding)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { viewportHeight = $0 }
+                .onChange(of: focusedCard) { _, card in
+                    // The focused row's title goes to the top, under the header. Left to tvOS,
+                    // the row lands anywhere that shows the card, and the bottom of the row
+                    // above it then shows cut off under the header's overview.
+                    guard let card else { return }
+                    withAnimation { scroller.scrollTo(card.rowID, anchor: .top) }
+                }
             }
         }
         .background {
