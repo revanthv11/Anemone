@@ -59,11 +59,11 @@ The baseline in `NOTICE.md` and PLAN.md is now `5f2f9a8`. Of the four commits:
 - `StreamRequest` now carries `maxBitrate`, the Streaming setting by default, in place of the controller reading the setting itself when it asked the server. The reload path already re-asks PlaybackInfo, which is Wholphin's "no direct-play shortcut when the bitrate changed".
 - The menu sits with the other transport-bar menus, in Anemone's overlay and in the system player's bar; Wholphin's lives in its settings dialog. A live stream gets no menu: a reload of a live stream reopens it, which `TrackSelection` avoids too, and Wholphin's change doesn't claim to work for Live TV.
 - `Int.bitrateText` (Wholphin's `formatMaxBitrate`) moved from the app into `AnemonePlayback`, as Wholphin moved its formatter into `Formatting.kt`, so the feature and the settings page share it.
-- The scroll-to-current fix doesn't apply: tvOS menus scroll to the marked option themselves.
+- The scroll-to-current fix applied after all: the overlay's menu panel was a plain stack, so the 23 limits ran off the screen and focus couldn't reach the top ones. It's now a scroll view sized to its content, up to about eight rows, which keeps the focused option in view, as `BottomDialog` does with its `BringIntoViewRequester`.
 
 **Tests.** `MaxBitrateMenuTests`: the menu marks the setting's limit and a pick asks the server again under the new one from the same position; picking the marked limit asks for nothing; the next entry keeps the pick and another player starts from the setting; a live stream has no menu; the bitrate text.
 
-**Not verified live.** The menu in the simulator against a server, and the system player's rendering of a 23-item menu. The reload path it uses is the one the Audio and Subtitles menus were tested through.
+**Tested live** in the simulator against the review server, as PLAN.md 3f records: the button reads the current limit, the list opens on it, picking 500 kbps reloads as a transcode in a new play session from the same position, and the button then reads 500 kbps. Not verified: the system player's rendering of the 23-item menu, which XCUITest can't read.
 
 ## Browsing
 
@@ -85,7 +85,7 @@ Four fixes and some focus work in one commit. Each in turn:
 
 **How Anemone has it.** Anemone has no Settings debug page; the player overlay's debug panel (3e) is the counterpart. tvOS lists neither display modes nor the display's HDR formats, so the panel gained what it can answer: the video as the server read it (codec, size, frame rate, range type), the display mode `DisplayCriteria` asks for (frame rate and dynamic range), the hardware decoders VideoToolbox reports (`VideoDecoders.current`: HEVC, AV1, Dolby Vision) and `AVPlayer.eligibleForHDRPlayback`, which is the one system answer to "will this output HDR".
 
-**Not verified live:** the new rows in the simulator (the panel is read by a UI test in 6b's VoiceOver pass; its rows' labels are combined per line, so new rows need no accessibility work).
+**Tested live** in the simulator against the review server, on Sintel: "Video: h264 2048×872 24 fps SDR", "Display asked: 24 fps, SDR", "Decodes: none" (the simulator has no hardware decoders) and "HDR output: no". Not verified: an HDR title, which the review server doesn't have.
 
 ## Platform
 

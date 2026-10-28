@@ -51,7 +51,7 @@ public final class MaxBitrateMenu: PlaybackFeature {
         controller.accessories.show(PlayerMenu(
             id: Self.menuID,
             title: String(localized: "Max bitrate", bundle: .module),
-            systemImage: "gauge.with.dots.needle.33percent",
+            systemImage: "cellularbars",
             options: choices.map { bitrate in
                 PlayerMenu.Option(
                     id: "\(Self.menuID).\(bitrate)",
