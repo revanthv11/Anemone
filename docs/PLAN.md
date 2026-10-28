@@ -12,6 +12,7 @@ Anemone is a Swift/tvOS port of [Wholphin](https://github.com/damontecres/Wholph
 | Platforms | tvOS 26+ now (runs on every Apple TV, including HD and 4K 1st gen). iOS/iPadOS later (Phase 7). |
 | Server | Jellyfin 12.0+ only. Jellyfin 12 removed `GET /QuickConnect/Initiate`, legacy route prefixes, and legacy auth by default. Wholphin is already warning users on older servers. |
 | Bundle ID | `com.revanthv11.anemone`, shared later by the iOS app for universal purchase. Confirm before registering in App Store Connect. |
+| Seerr | Not in 1.0. Release builds leave `ANEMONE_SEERR` unset (Phase 5d), so nothing of Seerr is built; it waits for a later release. |
 
 ### GPL and the App Store
 
@@ -631,7 +632,7 @@ The release work and its reasons are in `docs/release/`, starting with `checklis
 - [x] A custom GPL EULA draft, following Apple's minimum terms, and an App Review notes template (`docs/release/eula.md`, `app-review-notes.md`)
 - [x] `scripts/tag-build.sh` tags the commit each TestFlight build is archived from as `build/<version>-<build>`, the tag Settings › About names, after checking the commit is on GitHub and the build number isn't tagged yet
 - [ ] Demo Jellyfin server and reviewer login, with legally free media (the developer's to set up)
-- [ ] Decide whether Seerr ships in 1.0: 5d builds it only with `ANEMONE_SEERR`, so a release without the flag leaves it out
+- [x] Decide whether Seerr ships in 1.0: it doesn't. Release builds are made without `ANEMONE_SEERR` (5d), which leaves out the Discover tab, Settings › Seerr, the item pages' Seerr rows and the Seerr credits in About. Seerr waits for a later release (decided 28 October 2026)
 
 Tested live in the simulator: Settings › About showed the version, the GPL, Wholphin, Swiftfin and all eight packages, and focus scrolled it to the last package and back; the GPL's page scrolled a paragraph at a time; Wholphin's page reached its license, and Nuke's showed its MIT text. In the add-server flow, `http://localhost:8196` (the local fixture server, plain HTTP) connected and showed that server's profiles, and the demo server's saved profile then went back to Home. The built app's `Info.plist` has the export compliance and ATS keys, and both bundles carry their privacy manifest. Not verified: a plain-HTTP server on another host (the simulator only reached localhost), an archive's privacy report, and anything in App Store Connect.
 

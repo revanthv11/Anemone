@@ -30,7 +30,7 @@ How Anemone goes to TestFlight and the App Store. Most of it is App Store Connec
 1. **Start clean** on `main`, with CI green on the commit you'll archive.
 2. **Bump the build number** (`CURRENT_PROJECT_VERSION`, and `MARKETING_VERSION` for a new version) in the project, commit and push. Every target shares them.
 3. **Licenses.** Run `scripts/update-licenses.sh` after any dependency change. It warns about a package that NOTICE.md doesn't credit or that has no license text. Commit what it changes.
-4. **Archive** in Xcode: scheme Anemone, destination Any tvOS Device, Product › Archive.
+4. **Archive** in Xcode: scheme Anemone, destination Any tvOS Device, Product › Archive. Leave `ANEMONE_SEERR` unset: Seerr isn't in 1.0 (`docs/PLAN.md`, Decisions).
 5. **Check privacy.** In the Organizer, right-click the archive › Generate Privacy Report, and check it against `privacy.md`.
 6. **Upload.** Distribute App › App Store Connect. Untick "Manage Version and Build Number", so the uploaded build number is the committed one; otherwise pass the uploaded number to the next step with `--build`.
 7. **Tag the source:** `scripts/tag-build.sh --archive <path to the .xcarchive> --push`. It refuses a commit that isn't on GitHub yet or a build number that's already tagged. Settings › About names the same tag.
