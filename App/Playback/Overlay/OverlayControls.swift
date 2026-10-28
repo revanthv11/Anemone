@@ -236,7 +236,7 @@ private struct MenuPanel: View {
                 // Room for the focused button's lift, which the scroll view would clip.
                 .padding(.vertical, 12)
                 .padding(.horizontal, 20)
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
+                .onGeometryChange(for: CGFloat.self, of: { $0.size.height }, action: { listHeight = $0 })
             }
             .frame(height: listHeight.map { min($0, Self.maxListHeight) })
             .fixedSize(horizontal: true, vertical: false)
