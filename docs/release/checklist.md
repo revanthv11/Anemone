@@ -22,7 +22,7 @@ How Anemone goes to TestFlight and the App Store. Most of it is App Store Connec
 - [ ] **App Privacy.** Answer "Data Not Collected" (`privacy.md`).
 - [ ] **License agreement.** Review `eula.md`, fill it in and paste it as the custom EULA in App Information.
 - [ ] **Age rating.** Answer the questionnaire. Anemone has no content of its own and shows only what's on the user's server.
-- [ ] **Artwork.** The asset catalog has no app icon yet. tvOS needs a layered App Icon (small and large), the App Store icon (1280×768) and a Top Shelf image (wide, and wide 2x).
+- [x] **Artwork.** The Monogram app icon (layered, small and large), the App Store icon (1280×768) and the Top Shelf image (wide, and wide 2x) are in `App Icon & Top Shelf Image.brandassets`, rendered from `docs/brand/monogram` by `scripts/render-brand-assets.mjs` (Phase 0).
 - [ ] **Review server.** Set up a Jellyfin server reachable from the internet with only public-domain or Creative Commons media, and a reviewer account on it. Keep it up for every review.
 
 ## Every build
