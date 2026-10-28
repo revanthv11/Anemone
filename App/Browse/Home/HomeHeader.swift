@@ -15,9 +15,13 @@ struct HomeHeader: View {
                 .font(.title2.bold())
                 .lineLimit(1)
                 .accessibilityIdentifier("home.header.title")
-            Text(item?.subtitle ?? " ")
-                .font(.title3)
-                .lineLimit(1)
+            // An episode's series and number; a movie has none, and no blank line for it, as
+            // the library pages' headers have none.
+            if let subtitle = item?.subtitle {
+                Text(subtitle)
+                    .font(.title3)
+                    .lineLimit(1)
+            }
             Text(item?.details ?? " ")
                 .font(.callout)
                 .foregroundStyle(theme.secondaryText)

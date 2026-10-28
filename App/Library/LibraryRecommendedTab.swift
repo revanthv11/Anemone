@@ -21,6 +21,9 @@ struct LibraryRecommendedTab: View {
     @State private var focus = FocusedTitle()
     @FocusState private var focusedCard: CardID?
     @State private var lastFocusedByRow: [RecommendedRow.Kind: CardID] = [:]
+    /// The rows' scroll view and last row, so the last row can be scrolled to the top too.
+    @State private var viewportHeight: CGFloat = 0
+    @State private var lastRowHeight: CGFloat = 0
 
     private enum Content {
         case loading
@@ -70,22 +73,40 @@ struct LibraryRecommendedTab: View {
         VStack(alignment: .leading, spacing: 0) {
             LibraryDetailsHeader(focus: focus)
                 .padding(.horizontal, GridLayout.horizontalInset)
-            ScrollView(.vertical) {
-                VStack(alignment: .leading, spacing: RecommendedLayout.rowSpacing) {
-                    ForEach(recommended.rows) { row in
-                        RecommendedRowView(row: row, focusedCard: $focusedCard, onSelect: { path.append($0) })
-                            .defaultFocus(
-                                $focusedCard,
-                                lastFocusedByRow[row.kind] ?? row.firstCard,
-                                priority: .userInitiated,
-                            )
+                .padding(.bottom, LibraryDetailsLayout.spacingBelowHeader)
+            ScrollViewReader { scroller in
+                ScrollView(.vertical) {
+                    VStack(alignment: .leading, spacing: RecommendedLayout.rowSpacing) {
+                        ForEach(recommended.rows) { row in
+                            RecommendedRowView(row: row, focusedCard: $focusedCard, onSelect: { path.append($0) })
+                                .defaultFocus(
+                                    $focusedCard,
+                                    lastFocusedByRow[row.kind] ?? row.firstCard,
+                                    priority: .userInitiated,
+                                )
+                                .id(row.kind)
+                                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                                    if row.kind == recommended.rows.last?.kind {
+                                        lastRowHeight = height
+                                    }
+                                }
+                        }
+                        if !recommended.failedRows.isEmpty {
+                            NoticeText(String(localized: "Some rows couldn't be loaded."))
+                        }
                     }
-                    if !recommended.failedRows.isEmpty {
-                        NoticeText(String(localized: "Some rows couldn't be loaded."))
-                    }
+                    .padding(.horizontal, GridLayout.horizontalInset)
+                    // Enough below the last row for it to reach the top of the view too.
+                    .padding(.bottom, max(GridLayout.focusPadding, viewportHeight - lastRowHeight))
                 }
-                .padding(.horizontal, GridLayout.horizontalInset)
-                .padding(.bottom, GridLayout.focusPadding)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { viewportHeight = $0 }
+                .onChange(of: focusedCard) { _, card in
+                    // The focused row's title goes to the top, under the header, as on an item
+                    // page. Left to tvOS, the row lands anywhere that shows the card, and the
+                    // bottom of the row above it then shows cut off under the header's overview.
+                    guard let card else { return }
+                    withAnimation { scroller.scrollTo(card.row, anchor: .top) }
+                }
             }
         }
         .background {
