@@ -66,18 +66,18 @@ struct MaxBitrateMenuTests {
         )
         await start(playback, engine, log)
         #expect(streams.requested == [Self.setting])
-        let menu = try? #require(menu(of: playback))
-        #expect(menu?.options.first { $0.isSelected }?.id == "maxBitrate.\(Self.setting)")
-        #expect(menu?.options.map(\.id).contains("maxBitrate.8000000") == true)
+        let bitrateMenu = menu(of: playback)
+        #expect(bitrateMenu?.options.first { $0.isSelected }?.id == "maxBitrate.\(Self.setting)")
+        #expect(bitrateMenu?.options.map(\.id).contains("maxBitrate.8000000") == true)
         engine.currentTime = .seconds(30)
 
-        menu?.options.first { $0.id == "maxBitrate.8000000" }?.select()
+        bitrateMenu?.options.first { $0.id == "maxBitrate.8000000" }?.select()
 
         #expect(await eventually { log.events.contains { $0.hasPrefix("reloaded") } })
         #expect(streams.requested == [Self.setting, 8_000_000])
         #expect(engine.loads.last?.position == .seconds(30))
         #expect(feature.pickedBitrate == 8_000_000)
-        #expect(self.menu(of: playback)?.options.first { $0.isSelected }?.id == "maxBitrate.8000000")
+        #expect(menu(of: playback)?.options.first { $0.isSelected }?.id == "maxBitrate.8000000")
     }
 
     @Test func `picking the limit already marked asks for nothing`() async {
