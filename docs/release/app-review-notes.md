@@ -1,6 +1,6 @@
 # App Review notes (template)
 
-*Copy everything below the line into App Store Connect › the version › App Review Information › Notes, and fill in the sign-in fields there. Replace each `[…]`. The demo server and the reviewer's account are the developer's to set up: the server must be reachable from the internet for the whole review and hold only media that's legally free to stream (public domain or Creative Commons).*
+*Copy everything below the line into App Store Connect › the version › App Review Information › Notes, and fill in the sign-in fields there. Replace each `[…]`. The demo server and the reviewer's account come from `scripts/review-server/` ([`review-server.md`](review-server.md)): the server must be reachable from the internet for the whole review and holds only media that's legally free to stream (public domain or Creative Commons Attribution). `scripts/review-server/check.sh` checks it the day you submit.*
 
 ---
 
@@ -12,23 +12,24 @@ Anemone is a client for Jellyfin, a free, open-source media server that people i
 
 We've set up a Jellyfin server with public-domain and Creative Commons media for review:
 
-- Server address: `[https://demo-server.example.com]`
-- User name: `[reviewer user name]`
-- Password: `[reviewer password]` (also in the Sign-in Information fields)
+- Server address: `https://anemone-review.revanth.us`
+- User name: `reviewer`
+- Password: `[REVIEWER_PASSWORD from ~/.anemone-agents/review-server/.env]` (also in the Sign-in Information fields)
 
 1. Open Anemone. On "Add a server", type the server address above and choose Connect.
-2. Choose the user `[reviewer user name]`, or "Other user", and sign in with the user name and password.
+2. Choose the user `reviewer`, or "Other user", and sign in with the user name and password.
 3. Home shows rows such as Continue Watching and Recently Added. Select any title, then Play.
 
 **Things to try**
 
-- Movies: `[a title on the demo server, e.g. "Night of the Living Dead" (1968, public domain)]`.
-- Shows: `[a series, e.g. "Pioneer One" (CC BY-NC-SA)]`; its episodes play one after another.
+- Movies: "Big Buck Bunny" and "Sintel" (Blender's open movies), "Night of the Living Dead" (1968) and "The General" (1926).
+- Shows: "Caminandes", three short episodes; they play one after another.
+- Music: Kevin MacLeod's "Classical Sampler" and "Jazz Sampler".
 - Settings › About shows the version, the GPL and the licenses of the software Anemone includes.
 
 **About the content**
 
-All media on the review server is `[public domain or Creative Commons; list each title and its license]`. In normal use, people only see what's on their own server.
+All media on the review server is in the public domain or under a Creative Commons Attribution license: Blender Foundation's open movies and Caminandes shorts (CC BY), Night of the Living Dead (1968), The General (1926), His Girl Friday (1940) and Plan 9 from Outer Space (1957) (public domain in the United States), and Kevin MacLeod's music (CC BY). `[Paste media/LICENSES.md, which fetch-media.sh writes, with each title's source and license.]` In normal use, people only see what's on their own server.
 
 **Network security (App Transport Security)**
 

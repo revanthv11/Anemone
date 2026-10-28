@@ -9,3 +9,9 @@ build/
 # Swift Package Manager
 .build/
 .swiftpm/
+
+# The App Review demo server's state, media and secrets (scripts/review-server)
+scripts/review-server/.env
+scripts/review-server/config/
+scripts/review-server/cache/
+scripts/review-server/media/
