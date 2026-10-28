@@ -2,12 +2,14 @@
 # Downloads the App Review demo server's media from the Internet Archive, as media.txt lists it,
 # into media/ next to this script, laid out the way Jellyfin's naming rules expect (one folder per
 # movie, Season folders for the show, artist/album folders for the music), and writes
-# media/LICENSES.md, the list of titles and licenses for the App Review notes. For the show, whose
-# shorts no metadata provider knows as a series, it writes .nfo files with the titles and overviews
-# and, with ffmpeg installed, a poster cut from a frame of its first episode.
+# media/LICENSES.md, the list of titles and licenses for the App Review notes. For each show it writes
+# .nfo files with the titles and overviews, and for a show marked "frame" in media.txt (one no metadata
+# provider knows, like Blender's Caminandes shorts), with ffmpeg installed, a poster cut from a frame
+# of its first episode. For an album none of whose MP3s carries a picture (ffprobe tells) it also
+# fetches the item's cover image, if it has one.
 #
 # A file whose size already matches the archive's is left alone and a partial one resumes, so the
-# script can be rerun after a dropped connection or a new line in media.txt. About 2.6 GB in all.
+# script can be rerun after a dropped connection or a new line in media.txt. About 4.6 GB in all.
 #
 # usage: scripts/review-server/fetch-media.sh [options]
 #   --only <regex>   only the titles matching the regex, case-insensitively, e.g. --only 'bunny|caminandes'
@@ -19,7 +21,7 @@
 set -euo pipefail
 
 usage() {
-    sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 fail() {
@@ -70,6 +72,25 @@ remote_size() {
 # The original MP3s in an item, one name per line.
 album_files() {
     item_metadata "$1" | jq -r '.files[] | select(.source == "original" and (.name | test("\\.mp3$"))) | .name'
+}
+
+# The first original JPEG or PNG in an item, the album's cover, or nothing.
+album_cover() {
+    item_metadata "$1" | jq -r 'first(.files[] | select(.source == "original" and (.format == "JPEG" or .format == "PNG")) | .name) // empty'
+}
+
+# Whether any of the audio files carries a picture, which Jellyfin uses as the album's cover (a
+# cover file would replace it, often with a smaller copy). Without ffprobe, assume none does.
+has_embedded_art() {
+    local file
+    command -v ffprobe >/dev/null || return 1
+    for file in "$@"; do
+        [[ -f "$file" ]] || continue
+        if [[ -n "$(ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of csv=p=0 "$file" 2>/dev/null)" ]]; then
+            return 0
+        fi
+    done
+    return 1
 }
 
 local_size() {
@@ -170,7 +191,11 @@ while IFS='|' read -r kind id name dest title year license license_url credit ov
         ;;
     show)
         write_show_nfo "$path" "$title" "$year" "$overview" "$credit" "$license"
-        show_dirs+=("$path")
+        if [[ "$name" == "frame" ]]; then
+            show_dirs+=("$path")
+        elif [[ -n "$name" ]]; then
+            fail "a show's file field must be empty or \"frame\" (got \"$name\")"
+        fi
         shows_md+="- **$title** ($year). $credit. $license, $license_url."$'\n'
         ;;
     episode)
@@ -181,11 +206,18 @@ while IFS='|' read -r kind id name dest title year license license_url credit ov
     album)
         [[ "$name" == "*.mp3" ]] || fail "an album's file field must be *.mp3 (got \"$name\")"
         tracks=0
+        track_paths=()
         while IFS= read -r track; do
             fetch "$id" "$track" "$path/$track"
             tracks=$((tracks + 1))
+            track_paths+=("$path/$track")
         done < <(album_files "$id")
         (( tracks > 0 )) || fail "$id has no MP3s"
+        cover="$(album_cover "$id")"
+        if [[ -n "$cover" ]] && ! has_embedded_art "${track_paths[@]}"; then
+            extension="$(tr '[:upper:]' '[:lower:]' <<<"${cover##*.}")"
+            fetch "$id" "$cover" "$path/cover.$extension"
+        fi
         music_md+="- **$title** ($year), $tracks tracks. $credit. $license, $license_url. Source: $archive/details/$id"$'\n'
         ;;
     *)
@@ -199,7 +231,7 @@ shopt -u nocasematch
 (( fetched > 0 )) || fail "nothing in media.txt matches --only $only"
 $list && exit 0
 
-# A poster for each show from a frame of its first episode, since no provider has one.
+# A poster for each show marked "frame", cut from its first episode, since no provider has one.
 for dir in "${show_dirs[@]+"${show_dirs[@]}"}"; do
     [[ -f "$dir/poster.jpg" ]] && continue
     first="$(find "$dir" -name '*.mp4' | sort | head -n 1)"

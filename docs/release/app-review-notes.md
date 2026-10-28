@@ -23,13 +23,13 @@ We've set up a Jellyfin server with public-domain and Creative Commons media for
 **Things to try**
 
 - Movies: "Big Buck Bunny" and "Sintel" (Blender's open movies), "Night of the Living Dead" (1968) and "The General" (1926).
-- Shows: "Caminandes", three short episodes; they play one after another.
-- Music: Kevin MacLeod's "Classical Sampler" and "Jazz Sampler".
+- Shows: "Caminandes", three short episodes that play one after another; Max Fleischer's "Superman" shorts; the first episodes of "The Beverly Hillbillies".
+- Music: Kevin MacLeod's "Classical Sampler" and "Jazz Sampler", Josh Woodward's "Ashes" and "The Shade From Our Trees", and Kimiko Ishizaka's "The Open Goldberg Variations".
 - Settings › About shows the version, the GPL and the licenses of the software Anemone includes.
 
 **About the content**
 
-All media on the review server is in the public domain or under a Creative Commons Attribution license: Blender Foundation's open movies and Caminandes shorts (CC BY), Night of the Living Dead (1968), The General (1926), His Girl Friday (1940) and Plan 9 from Outer Space (1957) (public domain in the United States), and Kevin MacLeod's music (CC BY). `[Paste media/LICENSES.md, which fetch-media.sh writes, with each title's source and license.]` In normal use, people only see what's on their own server.
+All media on the review server is in the public domain or under a Creative Commons Attribution license: Blender Foundation's open movies and Caminandes shorts (CC BY), Night of the Living Dead (1968), The General (1926), His Girl Friday (1940), Plan 9 from Outer Space (1957), the Fleischer Superman shorts (1941) and the first season of The Beverly Hillbillies (1962) (public domain in the United States), Kevin MacLeod's and Josh Woodward's music (CC BY), and Kimiko Ishizaka's Open Goldberg Variations (CC0). `[Paste media/LICENSES.md, which fetch-media.sh writes, with each title's source and license.]` In normal use, people only see what's on their own server.
 
 **Network security (App Transport Security)**
 

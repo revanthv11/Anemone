@@ -2,9 +2,10 @@
 #
 #   kind|archive item|file in the item|path under media/|title|year|license|license URL|credit|overview
 #
-# kind is movie, show (the series itself: no file, just its folder), episode or album (every original
-# MP3 in the item, into the folder). fetch-media.sh downloads each file from
-# https://archive.org/download/<item>/<file> and writes media/LICENSES.md from these lines.
+# kind is movie, show (the series itself: no file, just its folder; "frame" in the file field cuts a
+# poster from its first episode, for a series no metadata provider knows), episode or album (every
+# original MP3 in the item, and its cover image, into the folder). fetch-media.sh downloads each file
+# from https://archive.org/download/<item>/<file> and writes media/LICENSES.md from these lines.
 # docs/release/review-server.md says why each title is legally free to stream. Keep it that way:
 # only public domain or Creative Commons Attribution, nothing with a NonCommercial or
 # NoDerivatives clause of doubtful provenance, and nothing whose copyright status you'd have to argue.
@@ -23,7 +24,7 @@ movie|his_girl_friday|his_girl_friday.mp4|movies/His Girl Friday (1940)/His Girl
 movie|plan-9-from-outer-space|plan-9-from-outer-space.mp4|movies/Plan 9 from Outer Space (1957)/Plan 9 from Outer Space (1957).mp4|Plan 9 from Outer Space|1957|Public domain|https://creativecommons.org/publicdomain/mark/1.0/|Reynolds Pictures, 1957. Its copyright was not renewed|
 
 # Blender's Caminandes shorts as a three-episode series, Creative Commons Attribution
-show|||shows/Caminandes (2013)|Caminandes|2013|CC BY 3.0|https://creativecommons.org/licenses/by/3.0/|(CC) Blender Foundation / caminandes.com|Koro the llama's small adventures in Patagonia, three open-movie shorts by Pablo Vazquez and the Blender Institute.
+show||frame|shows/Caminandes (2013)|Caminandes|2013|CC BY 3.0|https://creativecommons.org/licenses/by/3.0/|(CC) Blender Foundation / caminandes.com|Koro the llama's small adventures in Patagonia, three open-movie shorts by Pablo Vazquez and the Blender Institute.
 episode|Caminandes1LlamaDrama|01_llama_drama_1080p.mp4|shows/Caminandes (2013)/Season 01/Caminandes S01E01 Llama Drama.mp4|Llama Drama|2013|CC BY 3.0|https://creativecommons.org/licenses/by/3.0/|(CC) Pablo Vazquez / Blender Foundation|Koro wants the grass on the other side of the road, and the road has a truck on it.
 episode|Caminandes2GranDillama|02_gran_dillama_1080p.mp4|shows/Caminandes (2013)/Season 01/Caminandes S01E02 Gran Dillama.mp4|Gran Dillama|2013|CC BY 3.0|https://creativecommons.org/licenses/by/3.0/|(CC) Pablo Vazquez / Blender Foundation|An electric fence stands between Koro and the greener grass.
 episode|CaminandesLlamigos|Caminandes_ Llamigos-1080p.mp4|shows/Caminandes (2013)/Season 01/Caminandes S01E03 Llamigos.mp4|Llamigos|2016|CC BY 3.0|https://creativecommons.org/licenses/by/3.0/|(CC) Blender Foundation|Winter has come, and Koro and a penguin want the same berries.
@@ -31,3 +32,24 @@ episode|CaminandesLlamigos|Caminandes_ Llamigos-1080p.mp4|shows/Caminandes (2013
 # Kevin MacLeod's samplers, Creative Commons Attribution
 album|Classical_Sampler-9615|*.mp3|music/Kevin MacLeod/Classical Sampler|Classical Sampler|2011|CC BY 3.0|https://creativecommons.org/licenses/by/3.0/|Kevin MacLeod (incompetech.com)|
 album|Jazz_Sampler-9619|*.mp3|music/Kevin MacLeod/Jazz Sampler|Jazz Sampler|2011|CC BY 3.0|https://creativecommons.org/licenses/by/3.0/|Kevin MacLeod (incompetech.com)|
+
+# Max Fleischer's Superman shorts as a series, public domain in the United States
+show||frame|shows/Superman (1941)|Superman|1941|Public domain|https://creativecommons.org/publicdomain/mark/1.0/|Fleischer Studios for Paramount Pictures, 1941 to 1942. The shorts' copyrights were not renewed|The first Superman on screen: Max Fleischer's shorts for Paramount, with the Man of Steel against mad scientists, robots and a dinosaur loose in Metropolis.
+episode|Superman_cartoons|superman_(1941).mp4|shows/Superman (1941)/Season 01/Superman S01E01 The Mad Scientist.mp4|The Mad Scientist|1941|Public domain|https://creativecommons.org/publicdomain/mark/1.0/|Fleischer Studios / Paramount Pictures, 1941. Copyright not renewed|A mad scientist aims his ray at Metropolis, and Lois Lane flies to his mountain lair for the story.
+episode|Superman_cartoons|Superman_Mechanical-Monsters.mp4|shows/Superman (1941)/Season 01/Superman S01E02 The Mechanical Monsters.mp4|The Mechanical Monsters|1941|Public domain|https://creativecommons.org/publicdomain/mark/1.0/|Fleischer Studios / Paramount Pictures, 1941. Copyright not renewed|Giant flying robots loot the city's banks and jewels for their inventor, and carry Lois off with the haul.
+episode|Superman_cartoons|superman-billion_dollar_limited.mp4|shows/Superman (1941)/Season 01/Superman S01E03 Billion Dollar Limited.mp4|Billion Dollar Limited|1942|Public domain|https://creativecommons.org/publicdomain/mark/1.0/|Fleischer Studios / Paramount Pictures, 1942. Copyright not renewed|Robbers go after a train carrying a billion dollars in gold to the mint, with Lois aboard.
+episode|Superman_cartoons|The_Arctic_Giant_(1942).mp4|shows/Superman (1941)/Season 01/Superman S01E04 The Arctic Giant.mp4|The Arctic Giant|1942|Public domain|https://creativecommons.org/publicdomain/mark/1.0/|Fleischer Studios / Paramount Pictures, 1942. Copyright not renewed|A dinosaur frozen in the Arctic thaws out at the Metropolis museum and goes on a rampage.
+episode|Superman_cartoons|The_Bulleteers_(1942).mp4|shows/Superman (1941)/Season 01/Superman S01E05 The Bulleteers.mp4|The Bulleteers|1942|Public domain|https://creativecommons.org/publicdomain/mark/1.0/|Fleischer Studios / Paramount Pictures, 1942. Copyright not renewed|A gang in a rocket-shaped bullet car bombards City Hall and demands the city's treasury.
+
+# The Beverly Hillbillies, whose first two seasons are in the public domain in the United States
+show|||shows/The Beverly Hillbillies (1962)|The Beverly Hillbillies|1962|Public domain|https://creativecommons.org/publicdomain/mark/1.0/|Filmways, 1962. The first two seasons' copyrights were not renewed|Jed Clampett strikes oil in the hills and moves Granny, Elly May and Jethro to a Beverly Hills mansion, where none of them quite fit.
+episode|bevhill-s01e01-36|s01e01-The-Clampetts-Strike-Oil.mp4|shows/The Beverly Hillbillies (1962)/Season 01/The Beverly Hillbillies S01E01 The Clampetts Strike Oil.mp4|The Clampetts Strike Oil|1962|Public domain|https://creativecommons.org/publicdomain/mark/1.0/|Filmways, 1962. Copyright not renewed|Jed shoots at a rabbit and hits oil; the oil company pays him millions, and his cousin Pearl talks him into moving to California.
+episode|bevhill-s01e01-36|s01e02-Getting-Settled.mp4|shows/The Beverly Hillbillies (1962)/Season 01/The Beverly Hillbillies S01E02 Getting Settled.mp4|Getting Settled|1962|Public domain|https://creativecommons.org/publicdomain/mark/1.0/|Filmways, 1962. Copyright not renewed|The Clampetts arrive at their mansion and make sense of its rooms, its staff and their banker, Mr. Drysdale.
+episode|bevhill-s01e01-36|s01e03_Meanwhile_Back_At_The_Cabin.mp4|shows/The Beverly Hillbillies (1962)/Season 01/The Beverly Hillbillies S01E03 Meanwhile, Back at the Cabin.mp4|Meanwhile, Back at the Cabin|1962|Public domain|https://creativecommons.org/publicdomain/mark/1.0/|Filmways, 1962. Copyright not renewed|Back in the hills, Pearl and Jethrine wonder whether to follow the family west; in Beverly Hills, the Clampetts miss home.
+
+# Josh Woodward's albums, Creative Commons Attribution
+album|JoshWoodward-Ashes|*.mp3|music/Josh Woodward/Ashes|Ashes|2010|CC BY 4.0|https://creativecommons.org/licenses/by/4.0/|Josh Woodward (joshwoodward.com)|
+album|JoshWoodward-TheShadeFromOurTrees|*.mp3|music/Josh Woodward/The Shade From Our Trees|The Shade From Our Trees|2019|CC BY 4.0|https://creativecommons.org/licenses/by/4.0/|Josh Woodward (joshwoodward.com)|
+
+# Kimiko Ishizaka's Open Goldberg Variations, released into the public domain with CC0
+album|The_Open_Goldberg_Variations-11823|*.mp3|music/Kimiko Ishizaka/The Open Goldberg Variations|The Open Goldberg Variations|2012|CC0 1.0|https://creativecommons.org/publicdomain/zero/1.0/|Kimiko Ishizaka, piano (opengoldbergvariations.org)|

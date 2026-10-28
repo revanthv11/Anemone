@@ -7,7 +7,7 @@ App Review needs to sign in to something. Anemone has no content of its own, so 
 | File | What it does |
 |---|---|
 | `media.txt` | The titles, where each comes from on the Internet Archive, and its license. The only place to add or drop a title. |
-| `fetch-media.sh` | Downloads them into `media/` in Jellyfin's folder layout, writes `.nfo` files for the show, and writes `media/LICENSES.md`, the attribution to paste into the notes. Resumable. |
+| `fetch-media.sh` | Downloads them into `media/` in Jellyfin's folder layout, writes `.nfo` files for the shows, and writes `media/LICENSES.md`, the attribution to paste into the notes. Resumable. |
 | `docker-compose.yml`, `Caddyfile` | Jellyfin 12.4 with `media/` mounted read-only; with `--profile https`, Caddy in front with a Let's Encrypt certificate. |
 | `setup.sh` | Finishes Jellyfin's startup wizard, names the server, adds the three libraries, creates the reviewer account with a browse-and-play policy, hides the administrator from the sign-in screen, scans, and signs in as the reviewer to check. Rerunnable. |
 | `check.sh` | The day-of-submission check from anywhere: reachable, reviewer signs in, isn't an admin, sees the media, a movie streams. |
@@ -21,13 +21,17 @@ Everything in `media.txt` is either in the public domain in the United States or
 | Title | Why it's free |
 |---|---|
 | Big Buck Bunny (2008), Elephants Dream (2006), Sintel (2010), Tears of Steel (2012), Cosmos Laundromat (2015) | Blender Foundation's open movies, released by their maker under CC BY 3.0 (Cosmos Laundromat 4.0). |
-| Caminandes: Llama Drama, Gran Dillama, Llamigos | Blender's shorts, CC BY 3.0, kept as a three-episode series so the Shows library and episode playback have something to show. No metadata provider knows them as a series, so `fetch-media.sh` writes their titles and overviews as `.nfo` files and cuts a poster from a frame of the first episode, which CC BY allows. |
+| Caminandes: Llama Drama, Gran Dillama, Llamigos | Blender's shorts, CC BY 3.0, kept as a three-episode series so the Shows library and episode playback have something to show. No metadata provider knows them as a series, so `fetch-media.sh` writes their titles and overviews as `.nfo` files and, as the `frame` mark on their line in `media.txt` asks, cuts a poster from a frame of the first episode, which CC BY allows. |
+| Superman (1941), five of Max Fleischer's shorts | Made by Fleischer Studios for Paramount in 1941 and 1942; their copyrights were not renewed, as US law then required after 28 years, so they are in the public domain. TMDB doesn't know the shorts as a series either, so the poster is a frame of the title card. |
+| The Beverly Hillbillies (1962), the first three episodes | The first two seasons' copyrights were not renewed, so those 55 episodes are in the public domain. Later seasons are not, so take episodes only from seasons 1 and 2. TMDB knows the series, so Jellyfin fetches its poster and logo. |
 | Night of the Living Dead (1968) | Released without a copyright notice, which under the law of the time put it in the public domain on release. |
 | The General (1926) | Published before 1930; its copyright has expired. |
 | His Girl Friday (1940), Plan 9 from Outer Space (1957) | Their copyrights were not renewed, as US law then required after 28 years. |
 | Kevin MacLeod's Classical Sampler and Jazz Sampler | Released by the composer under CC BY 3.0 (incompetech.com). |
+| Josh Woodward's Ashes and The Shade From Our Trees | Released by the songwriter under CC BY 4.0 (joshwoodward.com). |
+| Kimiko Ishizaka's Open Goldberg Variations | The pianist released the recording into the public domain with CC0 (opengoldbergvariations.org), and Bach's score is long out of copyright. |
 
-The video files are H.264 in MP4, so the Apple TV plays them directly and the server never has to transcode. The lot is about 2.6 GB.
+The video files are H.264 in MP4, so the Apple TV plays them directly and the server never has to transcode; the 1940s and 1960s television is standard definition. The lot is about 4.6 GB.
 
 What's missing from it: Live TV and photos, which the app supports but the demo server doesn't have. If App Review asks about them, the notes can say so; the local fixture server covers them in testing.
 
