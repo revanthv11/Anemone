@@ -1,0 +1,33 @@
+# What the App Review demo server holds, one line per title, fields separated by | (no spaces round them):
+#
+#   kind|archive item|file in the item|path under media/|title|year|license|license URL|credit|overview
+#
+# kind is movie, show (the series itself: no file, just its folder), episode or album (every original
+# MP3 in the item, into the folder). fetch-media.sh downloads each file from
+# https://archive.org/download/<item>/<file> and writes media/LICENSES.md from these lines.
+# docs/release/review-server.md says why each title is legally free to stream. Keep it that way:
+# only public domain or Creative Commons Attribution, nothing with a NonCommercial or
+# NoDerivatives clause of doubtful provenance, and nothing whose copyright status you'd have to argue.
+
+# Blender Foundation's open movies, Creative Commons Attribution
+movie|BigBuckBunny_124|Content/big_buck_bunny_720p_surround.mp4|movies/Big Buck Bunny (2008)/Big Buck Bunny (2008).mp4|Big Buck Bunny|2008|CC BY 3.0|https://creativecommons.org/licenses/by/3.0/|(c) copyright 2008, Blender Foundation / www.bigbuckbunny.org|
+movie|ElephantsDream|ed_hd.mp4|movies/Elephants Dream (2006)/Elephants Dream (2006).mp4|Elephants Dream|2006|CC BY 3.0 US|https://creativecommons.org/licenses/by/3.0/us/|(c) copyright 2006, Blender Foundation / Netherlands Media Art Institute / www.elephantsdream.org|
+movie|Sintel|sintel-2048-stereo.mp4|movies/Sintel (2010)/Sintel (2010).mp4|Sintel|2010|CC BY 3.0|https://creativecommons.org/licenses/by/3.0/|(c) copyright Blender Foundation / www.sintel.org|
+movie|Tears-of-Steel|tears_of_steel_1080p.mp4|movies/Tears of Steel (2012)/Tears of Steel (2012).mp4|Tears of Steel|2012|CC BY 3.0|https://creativecommons.org/licenses/by/3.0/|(CC) Blender Foundation / mango.blender.org|
+movie|CosmosLaundromatFirstCycle|Cosmos Laundromat - First Cycle (1080p).mp4|movies/Cosmos Laundromat (2015)/Cosmos Laundromat (2015).mp4|Cosmos Laundromat|2015|CC BY 4.0|https://creativecommons.org/licenses/by/4.0/|(CC) Blender Foundation / gooseberry.blender.org|
+
+# Feature films in the public domain in the United States
+movie|Night.Of.The.Living.Dead_1080p|NightOfTheLivingDead_1080p.mp4|movies/Night of the Living Dead (1968)/Night of the Living Dead (1968).mp4|Night of the Living Dead|1968|Public domain|https://creativecommons.org/publicdomain/mark/1.0/|Image Ten, 1968. Published without a copyright notice, so it entered the public domain on release|
+movie|The_General_Buster_Keaton|The_General.mp4|movies/The General (1926)/The General (1926).mp4|The General|1926|Public domain|https://creativecommons.org/publicdomain/mark/1.0/|Buster Keaton Productions, 1926. Published before 1930, so its copyright has expired|
+movie|his_girl_friday|his_girl_friday.mp4|movies/His Girl Friday (1940)/His Girl Friday (1940).mp4|His Girl Friday|1940|Public domain|https://creativecommons.org/publicdomain/mark/1.0/|Columbia Pictures, 1940. Its copyright was not renewed|
+movie|plan-9-from-outer-space|plan-9-from-outer-space.mp4|movies/Plan 9 from Outer Space (1957)/Plan 9 from Outer Space (1957).mp4|Plan 9 from Outer Space|1957|Public domain|https://creativecommons.org/publicdomain/mark/1.0/|Reynolds Pictures, 1957. Its copyright was not renewed|
+
+# Blender's Caminandes shorts as a three-episode series, Creative Commons Attribution
+show|||shows/Caminandes (2013)|Caminandes|2013|CC BY 3.0|https://creativecommons.org/licenses/by/3.0/|(CC) Blender Foundation / caminandes.com|Koro the llama's small adventures in Patagonia, three open-movie shorts by Pablo Vazquez and the Blender Institute.
+episode|Caminandes1LlamaDrama|01_llama_drama_1080p.mp4|shows/Caminandes (2013)/Season 01/Caminandes S01E01 Llama Drama.mp4|Llama Drama|2013|CC BY 3.0|https://creativecommons.org/licenses/by/3.0/|(CC) Pablo Vazquez / Blender Foundation|Koro wants the grass on the other side of the road, and the road has a truck on it.
+episode|Caminandes2GranDillama|02_gran_dillama_1080p.mp4|shows/Caminandes (2013)/Season 01/Caminandes S01E02 Gran Dillama.mp4|Gran Dillama|2013|CC BY 3.0|https://creativecommons.org/licenses/by/3.0/|(CC) Pablo Vazquez / Blender Foundation|An electric fence stands between Koro and the greener grass.
+episode|CaminandesLlamigos|Caminandes_ Llamigos-1080p.mp4|shows/Caminandes (2013)/Season 01/Caminandes S01E03 Llamigos.mp4|Llamigos|2016|CC BY 3.0|https://creativecommons.org/licenses/by/3.0/|(CC) Blender Foundation|Winter has come, and Koro and a penguin want the same berries.
+
+# Kevin MacLeod's samplers, Creative Commons Attribution
+album|Classical_Sampler-9615|*.mp3|music/Kevin MacLeod/Classical Sampler|Classical Sampler|2011|CC BY 3.0|https://creativecommons.org/licenses/by/3.0/|Kevin MacLeod (incompetech.com)|
+album|Jazz_Sampler-9619|*.mp3|music/Kevin MacLeod/Jazz Sampler|Jazz Sampler|2011|CC BY 3.0|https://creativecommons.org/licenses/by/3.0/|Kevin MacLeod (incompetech.com)|

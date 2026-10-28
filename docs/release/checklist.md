@@ -8,6 +8,7 @@ How Anemone goes to TestFlight and the App Store. Most of it is App Store Connec
 - [`privacy-policy.md`](privacy-policy.md): a privacy policy to publish.
 - [`eula.md`](eula.md): the custom GPL EULA, a draft.
 - [`app-review-notes.md`](app-review-notes.md): the App Review notes, a template.
+- [`review-server.md`](review-server.md): the demo Jellyfin server App Review signs in to, and `scripts/review-server/`, which builds it.
 - [`../../scripts/tag-build.sh`](../../scripts/tag-build.sh): tags the source of each build.
 - [`../../scripts/update-licenses.sh`](../../scripts/update-licenses.sh): refreshes the license texts in Settings › About.
 
@@ -23,7 +24,7 @@ How Anemone goes to TestFlight and the App Store. Most of it is App Store Connec
 - [ ] **License agreement.** Review `eula.md`, fill it in and paste it as the custom EULA in App Information.
 - [ ] **Age rating.** Answer the questionnaire. Anemone has no content of its own and shows only what's on the user's server.
 - [ ] **Artwork.** The asset catalog has no app icon yet. tvOS needs a layered App Icon (small and large), the App Store icon (1280×768) and a Top Shelf image (wide, and wide 2x).
-- [ ] **Review server.** Set up a Jellyfin server reachable from the internet with only public-domain or Creative Commons media, and a reviewer account on it. Keep it up for every review.
+- [x] **Review server.** https://anemone-review.revanth.us, built with `scripts/review-server/` (`review-server.md`): legally free media, a reviewer account that can only browse and play, behind a Cloudflare Tunnel. Keep it up for every review.
 
 ## Every build
 
@@ -40,6 +41,6 @@ How Anemone goes to TestFlight and the App Store. Most of it is App Store Connec
 
 - [ ] **Screenshots** of the current UI (Apple TV: 1920×1080 or 3840×2160).
 - [ ] **Description, keywords and promotional text.** The app's name is Anemone; "Jellyfin" names the server it works with.
-- [ ] **App Review notes** from `app-review-notes.md`, with the review server and the reviewer's sign-in filled in. Check the server is up and the sign-in works the day you submit.
+- [ ] **App Review notes** from `app-review-notes.md`, with the review server's address, the reviewer's sign-in and `media/LICENSES.md` filled in. Run `scripts/review-server/check.sh` against the public address the day you submit: it checks the server is up, the sign-in works and the media is there.
 - [ ] **Look at Settings › About** in the build: the version, the GPL, Wholphin and Swiftfin, and every package.
 - [ ] **Check export compliance** again if the MPV engine or another library with its own TLS has landed (`export-compliance.md`).

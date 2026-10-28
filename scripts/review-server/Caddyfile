@@ -1,0 +1,6 @@
+# HTTPS in front of Jellyfin for the https profile in docker-compose.yml. Caddy gets and renews
+# the certificate itself, as long as REVIEW_SERVER_HOST resolves to this machine and ports 80
+# and 443 reach it.
+{$REVIEW_SERVER_HOST} {
+	reverse_proxy jellyfin:8096
+}
