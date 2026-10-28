@@ -55,20 +55,19 @@ public enum SearchKind: String, CaseIterable, Codable, Hashable, Sendable {
 public extension Library {
     /// The kinds of item this library can hold, from Wholphin's `CollectionType.baseItemKinds`.
     ///
-    /// Two changes from Wholphin: a home-videos library holds videos, photos and photo albums
-    /// (Wholphin's list keeps only photo albums, because each `listOf` replaces the one before),
-    /// and a library of mixed content or folders can hold movies, series, episodes and videos
-    /// (Wholphin searches none of them there).
+    /// One change from Wholphin: a library of mixed content or folders can hold movies, series,
+    /// episodes and videos (Wholphin searches none of them there). Photo and home-video
+    /// libraries both hold videos, photos and photo albums, as Wholphin's list has since
+    /// `5f2f9a8` fixed it.
     var searchKinds: [SearchKind] {
         switch kind {
         case .movies: [.movie]
         case .shows: [.series, .episode]
-        case .homeVideos: [.video, .photo, .photoAlbum]
+        case .homeVideos, .photos: [.video, .photo, .photoAlbum]
         case .music: [.audio, .musicArtist, .musicAlbum]
         case .musicVideos: [.musicVideo]
         case .collections: [.collection]
         case .playlists: [.playlist]
-        case .photos: [.photo, .photoAlbum]
         case .mixed, .folders: [.movie, .series, .episode, .video]
         case .liveTV, .books, .trailers, .other: []
         }

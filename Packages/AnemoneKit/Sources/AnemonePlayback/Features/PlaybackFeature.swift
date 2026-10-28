@@ -40,6 +40,9 @@ public struct StreamRequest: Hashable, Sendable {
     public var audioStreamIndex: Int?
     /// The subtitles to send, -1 for none; the server's choice when `nil`.
     public var subtitleStreamIndex: Int?
+    /// The most the stream may use, in bits per second: the server transcodes what's above it.
+    /// The Streaming setting, unless a feature asks for another (`MaxBitrateMenu`).
+    public var maxBitrate: Int
 
     public init(
         itemID: MediaItem.ID,
@@ -48,6 +51,7 @@ public struct StreamRequest: Hashable, Sendable {
         profile: DeviceProfile,
         audioStreamIndex: Int? = nil,
         subtitleStreamIndex: Int? = nil,
+        maxBitrate: Int = AVPlayerProfile.maxBitrate,
     ) {
         self.itemID = itemID
         self.allowsDirect = allowsDirect
@@ -55,26 +59,27 @@ public struct StreamRequest: Hashable, Sendable {
         self.profile = profile
         self.audioStreamIndex = audioStreamIndex
         self.subtitleStreamIndex = subtitleStreamIndex
+        self.maxBitrate = maxBitrate
     }
 }
 
 extension JellyfinSession {
-    /// The stream `request` asks for, at up to `maxBitrate`: the version it names, as a retry, a
-    /// reload or chosen tracks do, else the version picked on the item's page while the server
-    /// still has it. The server ignores track indices sent without a version.
-    func playbackStream(for request: StreamRequest, maxBitrate: Int) async throws -> PlaybackStream {
+    /// The stream `request` asks for, at up to its `maxBitrate`: the version it names, as a
+    /// retry, a reload or chosen tracks do, else the version picked on the item's page while the
+    /// server still has it. The server ignores track indices sent without a version.
+    func playbackStream(for request: StreamRequest) async throws -> PlaybackStream {
         guard let mediaSourceID = request.mediaSourceID else {
             return try await playbackStream(
                 forPickedVersionOf: request.itemID,
                 profile: request.profile,
-                maxBitrate: maxBitrate,
+                maxBitrate: request.maxBitrate,
                 allowsDirect: request.allowsDirect,
             )
         }
         return try await playbackStream(
             for: request.itemID,
             profile: request.profile,
-            maxBitrate: maxBitrate,
+            maxBitrate: request.maxBitrate,
             allowsDirect: request.allowsDirect,
             mediaSourceID: mediaSourceID,
             audioStreamIndex: request.audioStreamIndex,

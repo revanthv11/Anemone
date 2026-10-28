@@ -150,10 +150,10 @@ private extension Library.Kind {
         case .shows: [.series, .season, .episode]
         case .music: [.audio, .musicAlbum]
         case .musicVideos: [.musicVideo]
-        // Wholphin means videos and photos here, but its `when` branch returns only its last
-        // list, photo albums.
-        case .homeVideos: [.video, .photo]
-        case .photos: [.photo]
+        // Videos too in a photo library, as Jellyfin's "Home Videos and Photos" libraries hold
+        // them whichever type they're given (Wholphin's fix in `5f2f9a8`). Photo albums are
+        // left out: they're folders here, with no row of their own.
+        case .homeVideos, .photos: [.video, .photo]
         case .collections: [.collection]
         case .playlists: [.playlist]
         // Wholphin offers no favourites for these; libraries without a type can hold anything.
