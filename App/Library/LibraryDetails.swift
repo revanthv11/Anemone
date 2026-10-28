@@ -133,9 +133,11 @@ extension FocusedTitle {
 }
 
 enum LibraryDetailsLayout {
-    static let headerHeight: CGFloat = 250
-    /// Between the header and a grid scrolled up under it.
-    static let spacingBelowHeader: CGFloat = 16
+    /// Room for the logo, an episode's name, the quick details and two lines of overview, or
+    /// three lines without the name. Any less and the header grows up into the tabs above it.
+    static let headerHeight: CGFloat = 280
+    /// Between the header and the grid or rows scrolled up under it, as on Home.
+    static let spacingBelowHeader: CGFloat = 24
     static let logoWidth: CGFloat = 520
     static let logoHeight: CGFloat = 80
     static let overviewWidth: CGFloat = 1100

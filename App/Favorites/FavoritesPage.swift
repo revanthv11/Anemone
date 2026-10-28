@@ -53,6 +53,7 @@ private struct FavoritesContentView: View {
                 .frame(height: Self.headerHeight, alignment: .bottomLeading)
                 .padding(.horizontal, ItemLayout.horizontalInset)
                 .padding(.top, ItemLayout.topInset)
+                .padding(.bottom, HomeLayout.headerSpacing)
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: ItemLayout.sectionSpacing) {
                     rows

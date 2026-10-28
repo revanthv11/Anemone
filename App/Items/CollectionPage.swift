@@ -42,6 +42,8 @@ struct CollectionPage: View {
             .frame(height: Self.headerHeight, alignment: .bottomLeading)
             .padding(.horizontal, ItemLayout.horizontalInset)
             .padding(.top, ItemLayout.topInset)
+            // The same gap as between an item page's header and its buttons.
+            .padding(.bottom, ItemLayout.sectionSpacing)
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: ItemLayout.sectionSpacing) {
                     buttons

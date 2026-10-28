@@ -70,6 +70,7 @@ struct LibraryRecommendedTab: View {
         VStack(alignment: .leading, spacing: 0) {
             LibraryDetailsHeader(focus: focus)
                 .padding(.horizontal, GridLayout.horizontalInset)
+                .padding(.bottom, LibraryDetailsLayout.spacingBelowHeader)
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: RecommendedLayout.rowSpacing) {
                     ForEach(recommended.rows) { row in
