@@ -107,13 +107,18 @@ ext="$app/PlugIns/$ext_name.appex"
 [ -d "$app" ] || fail "no app in the archive at $app"
 [ -d "$ext" ] || fail "no Top Shelf extension in the archive at $ext"
 
+# plutil reads a dot in a key as a key path, so escape them in entitlement keys.
+plkey() {
+    printf '%s' "$1" | sed 's/\./\\./g'
+}
+
 # 2. Entitlements for the ad-hoc signatures: the project's files with the team prefix filled in,
 #    plus the identifiers a signed app always carries.
 make_entitlements() {
     local source="$1" bundle="$2" target="$3"
     sed "s/\$(AppIdentifierPrefix)/$team./g" "$source" >"$target"
     plutil -insert application-identifier -string "$team.$bundle" "$target"
-    plutil -insert com.apple.developer.team-identifier -string "$team" "$target"
+    plutil -insert "$(plkey com.apple.developer.team-identifier)" -string "$team" "$target"
     plutil -lint "$target" >/dev/null
 }
 app_bundle="$(plutil -extract CFBundleIdentifier raw "$app/Info.plist")"
@@ -178,8 +183,8 @@ expect_entitlements() {
         || fail "$(basename "$bundle") is not signed with an Apple Distribution certificate"
     codesign -d --entitlements :- "$bundle" 2>/dev/null >"$out/verify-$(basename "$bundle").entitlements"
     for key in com.apple.security.application-groups keychain-access-groups application-identifier; do
-        wanted="$(plutil -extract "$key" json -o - "$expected")"
-        actual="$(plutil -extract "$key" json -o - "$out/verify-$(basename "$bundle").entitlements" 2>/dev/null || echo missing)"
+        wanted="$(plutil -extract "$(plkey "$key")" json -o - "$expected")"
+        actual="$(plutil -extract "$(plkey "$key")" json -o - "$out/verify-$(basename "$bundle").entitlements" 2>/dev/null || echo missing)"
         [ "$actual" = "$wanted" ] || fail "$(basename "$bundle"): $key is $actual, expected $wanted"
     done
 }
