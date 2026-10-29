@@ -185,8 +185,9 @@ expect_entitlements() {
         || fail "$(basename "$bundle") is not signed with an Apple Distribution certificate"
     codesign -d --entitlements :- "$bundle" 2>/dev/null >"$out/verify-$(basename "$bundle").entitlements"
     for key in com.apple.security.application-groups keychain-access-groups application-identifier; do
-        wanted="$(plutil -extract "$(plkey "$key")" json -o - "$expected")"
-        actual="$(plutil -extract "$(plkey "$key")" json -o - "$out/verify-$(basename "$bundle").entitlements" 2>/dev/null || echo missing)"
+        # xml1, not json: plutil won't print a bare string (application-identifier) as JSON.
+        wanted="$(plutil -extract "$(plkey "$key")" xml1 -o - "$expected")"
+        actual="$(plutil -extract "$(plkey "$key")" xml1 -o - "$out/verify-$(basename "$bundle").entitlements" 2>/dev/null || echo missing)"
         [ "$actual" = "$wanted" ] || fail "$(basename "$bundle"): $key is $actual, expected $wanted"
     done
 }
