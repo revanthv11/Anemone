@@ -178,8 +178,10 @@ codesign -vv --deep --strict "$ipa_app" 2>"$out/verify-codesign.txt" \
     || fail "the exported app fails codesign verification; see $out/verify-codesign.txt"
 
 expect_entitlements() {
-    local bundle="$1" expected="$2" key actual wanted
-    codesign -dv --verbose=2 "$bundle" 2>&1 | grep -q '^Authority=Apple Distribution' \
+    local bundle="$1" expected="$2" key actual wanted signature
+    # Capture first: grep -q closing the pipe early would fail the pipeline under pipefail.
+    signature="$(codesign -dv --verbose=2 "$bundle" 2>&1)"
+    grep -q '^Authority=Apple Distribution' <<<"$signature" \
         || fail "$(basename "$bundle") is not signed with an Apple Distribution certificate"
     codesign -d --entitlements :- "$bundle" 2>/dev/null >"$out/verify-$(basename "$bundle").entitlements"
     for key in com.apple.security.application-groups keychain-access-groups application-identifier; do
@@ -192,7 +194,7 @@ expect_entitlements "$ipa_app" "$out/app.entitlements"
 expect_entitlements "$ipa_ext" "$out/extension.entitlements"
 [ "$(plutil -extract AnemoneKeychainAccessGroup raw "$ipa_app/Info.plist")" = "$team.com.revanthv11.anemone.shared" ] \
     || fail "AnemoneKeychainAccessGroup in the app's Info.plist did not get the team prefix"
-plutil -extract UIRequiredDeviceCapabilities json -o - "$ipa_ext/Info.plist" | grep -q arm64 \
+grep -q arm64 <<<"$(plutil -extract UIRequiredDeviceCapabilities json -o - "$ipa_ext/Info.plist" 2>/dev/null)" \
     || fail "the Top Shelf extension's Info.plist lacks UIRequiredDeviceCapabilities arm64, which App Store Connect rejects"
 
 version="$(plutil -extract CFBundleShortVersionString raw "$ipa_app/Info.plist")"
