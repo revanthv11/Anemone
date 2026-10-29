@@ -642,7 +642,9 @@ Tested live in the simulator: Settings › About showed the version, the GPL, Wh
 
 Tested the review server kit live on this Mac against Jellyfin 12.4 in Docker, with `fetch-media.sh --only` for Big Buck Bunny, Caminandes and the Jazz Sampler: the wizard, naming, the three libraries, the reviewer, the policy, the scan and the reviewer's sign-in all went through `setup.sh`; a second run changed only the password; `check.sh` passed every check but the movie count, which it rightly failed for the subset, and failed sign-in with a wrong password; the sign-in screen listed only the reviewer; the show's episodes had the `.nfo` titles and overviews and extracted thumbnails, the movie and the album their provider artwork, and Big Buck Bunny streamed (HTTP 206). shellcheck passes on the five scripts. Then for real: all 3.1 GB fetched, `setup.sh` passed with the reviewer seeing 9 movies, 3 episodes and 31 songs, every movie with its TMDB poster and overview and the show with the poster cut from its first episode, and `check.sh` passed against https://anemone-review.revanth.us through the tunnel, Big Buck Bunny streaming with HTTP 206.
 
-Not yet: screenshots; the EULA's final wording; the App Store Connect record. The release checklist lists them.
+Screenshots: eleven 1920×1080 captures of the main screens, listed in `docs/release/screenshots/README.md` and kept out of git (28 October 2026), taken in the simulator against the review server with a throwaway UI test that walks Home, the libraries, a movie page, the player, a series, an album, Now Playing, Search and Settings › Appearance, attaching `app.screenshot()` at each; the simulator's own "No Network Detected" banner can land in one, so take two a few seconds apart.
+
+Not yet: the EULA's final wording; the App Store Connect record. The release checklist lists them.
 
 #### 6b: colour themes, VoiceOver pass, localization import
 

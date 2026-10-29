@@ -15,3 +15,6 @@ scripts/review-server/.env
 scripts/review-server/config/
 scripts/review-server/cache/
 scripts/review-server/media/
+
+# App Store screenshots are kept out of git (docs/release/screenshots/README.md); retake them with a throwaway UI test.
+docs/release/screenshots/*.png

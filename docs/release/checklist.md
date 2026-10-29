@@ -39,7 +39,7 @@ How Anemone goes to TestFlight and the App Store. Most of it is App Store Connec
 
 ## Every App Store submission
 
-- [ ] **Screenshots** of the current UI (Apple TV: 1920×1080 or 3840×2160).
+- [ ] **Screenshots** of the current UI (Apple TV: 1920×1080 or 3840×2160). A set from 28 October 2026 is listed in [`screenshots/README.md`](screenshots/README.md), the PNGs kept out of git; retake after visible changes.
 - [ ] **Description, keywords and promotional text.** The app's name is Anemone; "Jellyfin" names the server it works with.
 - [ ] **App Review notes** from `app-review-notes.md`, with the review server's address, the reviewer's sign-in and `media/LICENSES.md` filled in. Run `scripts/review-server/check.sh` against the public address the day you submit: it checks the server is up, the sign-in works and the media is there.
 - [ ] **Look at Settings › About** in the build: the version, the GPL, Wholphin and Swiftfin, and every package.
