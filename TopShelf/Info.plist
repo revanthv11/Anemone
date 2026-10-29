@@ -19,5 +19,11 @@
 		<key>NSExtensionPrincipalClass</key>
 		<string>$(PRODUCT_MODULE_NAME).ContentProvider</string>
 	</dict>
+	<!-- App Store Connect requires this of every 64-bit binary; Xcode adds it to the app's Info.plist
+	     on its own but not to an extension's. -->
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>arm64</string>
+	</array>
 </dict>
 </plist>
