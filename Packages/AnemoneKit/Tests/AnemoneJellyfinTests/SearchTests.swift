@@ -177,6 +177,7 @@ struct SearchTests {
 
     @Test func `home videos hold videos and photos, and mixed libraries hold films and shows`() {
         #expect(Library(id: "h", name: "Home", kind: .homeVideos).searchKinds == [.video, .photo, .photoAlbum])
+        #expect(Library(id: "p", name: "Photos", kind: .photos).searchKinds == [.video, .photo, .photoAlbum])
         #expect(Library(id: "m", name: "Mixed", kind: .mixed).searchKinds == [.movie, .series, .episode, .video])
         #expect(Library(id: "t", name: "Live", kind: .liveTV).searchKinds.isEmpty)
     }

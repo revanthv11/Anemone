@@ -105,14 +105,3 @@ private struct ChoiceList<Value: Hashable>: View {
         .navigationTitle(title)
     }
 }
-
-extension Int {
-    /// A bitrate as Wholphin shows one: "750 kbps", "8 Mbps", "8.5 Mbps".
-    var bitrateText: String {
-        if self < 1_000_000 {
-            return String(localized: "\(self / 1000) kbps")
-        }
-        let megabits = (Double(self) / 1_000_000).formatted(.number.precision(.fractionLength(0 ... 1)))
-        return String(localized: "\(megabits) Mbps")
-    }
-}

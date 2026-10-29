@@ -19,6 +19,7 @@ public extension PlaybackController {
             PlaybackLifecycle(),
             DisplayCriteriaMatching(),
             PlaybackSpeedMenu(),
+            MaxBitrateMenu(),
             MPVSubtitleMenus(session: session),
             MPVExternalSubtitles(session: session),
             MPVRuntime(),

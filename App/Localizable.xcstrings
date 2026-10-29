@@ -67,9 +67,6 @@
         }
       }
     },
-    "%@ Mbps" : {
-
-    },
     "%@ and %lld more" : {
       "localizations" : {
         "en" : {
@@ -1047,9 +1044,6 @@
           }
         }
       }
-    },
-    "%lld kbps" : {
-
     },
     "%lld min" : {
 

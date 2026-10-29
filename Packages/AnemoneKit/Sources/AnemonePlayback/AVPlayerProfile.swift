@@ -221,3 +221,14 @@ public extension AVPlayerProfile {
     static let bitrateChoices: [Int] = [500_000, 750_000]
         + [1, 2, 3, 5, 8, 10, 15, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200].map { $0 * 1_000_000 }
 }
+
+public extension Int {
+    /// A bitrate as Wholphin shows one (`formatMaxBitrate`): "750 kbps", "8 Mbps", "8.5 Mbps".
+    var bitrateText: String {
+        if self < 1_000_000 {
+            return String(localized: "\(self / 1000) kbps", bundle: .module)
+        }
+        let megabits = (Double(self) / 1_000_000).formatted(.number.precision(.fractionLength(0 ... 1)))
+        return String(localized: "\(megabits) Mbps", bundle: .module)
+    }
+}

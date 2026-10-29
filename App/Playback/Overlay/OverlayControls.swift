@@ -189,46 +189,6 @@ struct OverlayControls: View {
     }
 }
 
-/// A feature's menu, such as Audio or Subtitles, as a list over the controls. Wholphin shows these
-/// as a dialog at the bottom of the screen; a list of our own, rather than SwiftUI's `Menu`, keeps
-/// the controls up while it's open.
-private struct MenuPanel: View {
-    let menu: PlayerMenu
-    var focus: FocusState<OverlayFocus?>.Binding
-    let close: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(menu.title)
-                .font(.headline)
-                .padding(.horizontal, 20)
-                .accessibilityAddTraits(.isHeader)
-            ForEach(menu.options) { option in
-                Button {
-                    option.select()
-                    close()
-                } label: {
-                    HStack(spacing: 16) {
-                        Image(systemName: "checkmark")
-                            .opacity(option.isSelected ? 1 : 0)
-                            .accessibilityHidden(true)
-                        Text(option.title)
-                        Spacer(minLength: 0)
-                    }
-                    .frame(width: 520, alignment: .leading)
-                }
-                .focused(focus, equals: .option(menu: menu.id, option: option.id))
-                // The check, for VoiceOver.
-                .accessibilityAddTraits(option.isSelected ? .isSelected : [])
-                .accessibilityIdentifier("player.option.\(menu.id).\(option.id)")
-            }
-        }
-        .padding(24)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
-        .focusSection()
-    }
-}
-
 /// Wholphin's round transport buttons: a quiet platter at rest and a light one when focused, in
 /// the theme's colours.
 struct OverlayButtonStyle: ButtonStyle {
