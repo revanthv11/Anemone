@@ -358,11 +358,12 @@ private struct SortMenu: View {
                 }
             }
         } label: {
+            // tvOS focuses a wrapper of the menu's label that takes no label of its own and reads
+            // its children, so the label is one element that says what the menu does.
             Label(sort.field.title, systemImage: sort.direction.systemImage)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(sort.direction.spokenSort(sort.field.title))
         }
-        .accessibilityLabel(sort.direction == .ascending
-            ? Text("Sort by \(sort.field.title), ascending")
-            : Text("Sort by \(sort.field.title), descending"))
         .accessibilityIdentifier("library.sort")
     }
 }
@@ -393,6 +394,15 @@ extension LibrarySort.Direction {
         switch self {
         case .ascending: "arrow.up"
         case .descending: "arrow.down"
+        }
+    }
+
+    /// What VoiceOver reads on a sort menu showing `field`, as the library grid's sort button is
+    /// read: "Sort by Name, ascending".
+    func spokenSort(_ field: String) -> Text {
+        switch self {
+        case .ascending: Text("Sort by \(field), ascending")
+        case .descending: Text("Sort by \(field), descending")
         }
     }
 }

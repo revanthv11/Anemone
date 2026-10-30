@@ -220,9 +220,11 @@ private struct MusicSortMenu: View {
                 }
             }
         } label: {
+            // As the library's sort menu: tvOS focuses a wrapper that reads its children.
             Label(sort.field.title, systemImage: sort.direction.systemImage)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(sort.direction.spokenSort(sort.field.title))
         }
-        .accessibilityLabel("Sort by \(sort.field.title)")
         .accessibilityIdentifier("music.sort")
     }
 }
