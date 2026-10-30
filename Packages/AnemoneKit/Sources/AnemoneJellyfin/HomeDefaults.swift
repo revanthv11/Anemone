@@ -43,10 +43,13 @@ public enum HomeLibraryRowType: String, Hashable, Sendable, CaseIterable {
     case studios
     case tvChannels
     case tvPrograms
+    /// Beyond Wholphin's list for a Live TV library: Wholphin's own add-row screen never offers its
+    /// `Recordings` row, which only an import of the web client's home sections brings in.
+    case recordings
 
     public static func available(for library: Library) -> [Self] {
         switch library.kind {
-        case .liveTV: [.tvChannels, .tvPrograms]
+        case .liveTV: [.tvChannels, .tvPrograms, .recordings]
         case .shows: [.recentlyAdded, .recentlyReleased, .suggestions, .genres, .studios]
         case .movies: [.recentlyAdded, .recentlyReleased, .suggestions, .genres]
         default: [.recentlyAdded, .recentlyReleased, .genres]
@@ -62,6 +65,7 @@ public enum HomeLibraryRowType: String, Hashable, Sendable, CaseIterable {
         case .studios: String(localized: "Studios", bundle: .module)
         case .tvChannels: String(localized: "Channels", bundle: .module)
         case .tvPrograms: String(localized: "Watch Live", bundle: .module)
+        case .recordings: String(localized: "Active Recordings", bundle: .module)
         }
     }
 
@@ -76,6 +80,7 @@ public enum HomeLibraryRowType: String, Hashable, Sendable, CaseIterable {
         case .studios: HomeRowConfig(.studios(parentID: library.id))
         case .tvChannels: HomeRowConfig(.tvChannels)
         case .tvPrograms: HomeRowConfig(.tvPrograms)
+        case .recordings: HomeRowConfig(.recordings)
         }
     }
 }
