@@ -110,7 +110,7 @@ struct CombinedResults: View {
                     ForEach(items) { details in
                         card(details)
                             .focused(focus, equals: .card(row: SearchKind.combinedRowID, item: details.id))
-                        .accessibilityIdentifier("card.\(SearchKind.combinedRowID).\(details.id)")
+                            .accessibilityIdentifier("card.\(SearchKind.combinedRowID).\(details.id)")
                     }
                 }
                 .padding(.vertical, ItemLayout.focusPadding)
