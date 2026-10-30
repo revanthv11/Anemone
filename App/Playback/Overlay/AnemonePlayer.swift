@@ -1,6 +1,8 @@
+import AnemoneJellyfin
 import AnemonePlayback
 import AnemoneUI
 import AVFoundation
+import Combine
 import SwiftUI
 import UIKit
 
@@ -121,6 +123,7 @@ final class OverlayViewController: UIViewController, UIGestureRecognizerDelegate
         view.addGestureRecognizer(menuTap)
 
         followOverlay()
+        followVideoScale()
     }
 
     override var preferredFocusEnvironments: [any UIFocusEnvironment] {
@@ -145,6 +148,27 @@ final class OverlayViewController: UIViewController, UIGestureRecognizerDelegate
         guard accessories.card == nil else { return }
         setNeedsFocusUpdate()
         updateFocusIfNeeded()
+    }
+
+    /// The video view follows the overlay's Video scale choice. For an engine that draws its
+    /// own layer, which doesn't say how big the video is, the server's size for the stream
+    /// stands in.
+    private func followVideoScale() {
+        let details = playback.feature(PlaybackDetails.self)
+        let (scale, size) = withObservationTracking {
+            (overlay.videoScale, details?.stream?.video.flatMap(Self.size))
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                self?.followVideoScale()
+            }
+        }
+        videoView.scale = scale
+        videoView.fallbackVideoSize = size
+    }
+
+    private static func size(_ video: MediaVersion.Video) -> CGSize? {
+        guard let width = video.width, let height = video.height, width > 0, height > 0 else { return nil }
+        return CGSize(width: width, height: height)
     }
 
     // MARK: - Presses
@@ -261,43 +285,106 @@ private final class FocusCatcherView: UIView {
 }
 
 /// Where the engine's video shows: AVPlayer's through an `AVPlayerLayer`, or a layer the engine
-/// draws itself, such as MPV's.
+/// draws itself, such as MPV's, placed on the screen as the overlay's Video scale says
+/// (`VideoScale.frame`). AVPlayer says how big its video is; an engine's own layer doesn't, so
+/// `fallbackVideoSize` stands in for it (the overlay offers such a layer only the choices that
+/// need the picture's proportions). The screensaver counts a view with an `output` as a video
+/// playing (`ScreensaverPresenter`).
 final class PlayerVideoView: UIView {
-    override static var layerClass: AnyClass {
-        AVPlayerLayer.self
-    }
-
     var output: PlayerVideoOutput? {
         didSet {
             show()
         }
     }
 
-    private var hostedLayer: CALayer?
+    /// How the video fills the screen.
+    var scale = VideoScale.fit {
+        didSet {
+            setNeedsLayout()
+        }
+    }
 
-    private var playerLayer: AVPlayerLayer? {
-        layer as? AVPlayerLayer
+    /// The video's size in pixels for an output that doesn't say, such as the server's.
+    var fallbackVideoSize: CGSize? {
+        didSet {
+            setNeedsLayout()
+        }
+    }
+
+    private var hostedLayer: CALayer?
+    private var playerLayer: AVPlayerLayer?
+    private var sizeWatcher: Task<Void, Never>?
+    /// The loaded item's size, once AVPlayer knows it.
+    private var presentedSize = CGSize.zero {
+        didSet {
+            setNeedsLayout()
+        }
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        // A cropped picture runs past the edges.
+        layer.masksToBounds = true
+    }
+
+    @available(*, unavailable)
+    required init?(coder _: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    isolated deinit {
+        // The publisher never ends on its own, and the task holds the player.
+        sizeWatcher?.cancel()
+    }
+
+    private var videoSize: CGSize {
+        playerLayer != nil ? presentedSize : fallbackVideoSize ?? .zero
     }
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        hostedLayer?.frame = bounds
+        // Fill stretches; the rest keep the picture in proportion within a frame of the
+        // video's own, and Crop fills the screen while the size is still unknown.
+        playerLayer?.videoGravity = switch scale {
+        case .fill: .resize
+        case .crop where videoSize == .zero: .resizeAspectFill
+        default: .resizeAspect
+        }
+        // As a view's frame moves without animating.
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        // None counts the video's pixels against the screen's: 2 a point on a 4K Apple TV.
+        let pixelsPerPoint = max(window?.screen.nativeScale ?? 1, 1)
+        hostedLayer?.frame = scale.frame(video: videoSize, in: bounds.size, pixelsPerPoint: pixelsPerPoint)
+        CATransaction.commit()
     }
 
     private func show() {
         hostedLayer?.removeFromSuperlayer()
         hostedLayer = nil
-        playerLayer?.player = nil
+        playerLayer = nil
+        sizeWatcher?.cancel()
+        sizeWatcher = nil
+        presentedSize = .zero
         switch output {
         case let .avPlayer(player):
-            playerLayer?.videoGravity = .resizeAspect
-            playerLayer?.player = player
+            let playerLayer = AVPlayerLayer(player: player)
+            self.playerLayer = playerLayer
+            hostedLayer = playerLayer
+            sizeWatcher = Task { [weak self] in
+                for await size in player.publisher(for: \.currentItem?.presentationSize).values {
+                    self?.presentedSize = size ?? .zero
+                }
+            }
         case let .layer(engineLayer):
-            engineLayer.frame = bounds
-            layer.addSublayer(engineLayer)
             hostedLayer = engineLayer
         case nil:
             break
         }
+        if let hostedLayer {
+            hostedLayer.frame = bounds
+            layer.addSublayer(hostedLayer)
+        }
+        setNeedsLayout()
     }
 }

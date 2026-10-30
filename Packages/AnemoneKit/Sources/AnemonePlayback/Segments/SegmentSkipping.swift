@@ -95,6 +95,15 @@ public final class SegmentSkipping: PlaybackFeature {
         skip(offered)
     }
 
+    /// Takes the button down without skipping, as Back does on Wholphin's: the segment counts
+    /// as handled, so the button doesn't come back for it, and the overlay's controls still
+    /// offer to skip the rest of it.
+    public func dismissOffer() {
+        guard let offered else { return }
+        handled.insert(offered.id)
+        withdrawOffer()
+    }
+
     /// Wholphin starts afresh with each item, but a retry as a transcode is the same entry. Told
     /// by the entry's number, not its place and item: a later entry that failed before it loaded,
     /// then a return to this one, isn't a retry.

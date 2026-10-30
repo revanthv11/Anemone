@@ -91,16 +91,13 @@ struct ScreensaverView: View {
     }
 
     private var clock: some View {
-        TimelineView(.everyMinute) { context in
-            Text(context.date, format: .dateTime.hour().minute())
-                .font(.title3)
-                .monospacedDigit()
-                .foregroundStyle(theme.onBackground)
-                .accessibilityIdentifier("screensaver.clock")
-        }
-        .padding(.top, ScreensaverLayout.verticalInset)
-        .padding(.trailing, ScreensaverLayout.horizontalInset)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+        ClockText()
+            .font(.title3)
+            .foregroundStyle(theme.onBackground)
+            .accessibilityIdentifier("screensaver.clock")
+            .padding(.top, ScreensaverLayout.verticalInset)
+            .padding(.trailing, ScreensaverLayout.horizontalInset)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
     }
 
     /// Wholphin's item flow: a random set of items, each shown for the chosen duration once its

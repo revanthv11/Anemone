@@ -5,7 +5,7 @@ import SwiftUI
 
 /// The transport, as Wholphin's `PlaybackController` and `PlaybackControls` lay it out: the title
 /// and when it ends, the seek bar, then Previous, skip back, Play/Pause, skip forward and Next,
-/// with features' menus and actions on the right.
+/// with features' menus, the overlay's Video scale menu and features' actions on the right.
 struct OverlayControls: View {
     let playback: PlaybackController
     let overlay: PlayerOverlay
@@ -56,7 +56,7 @@ struct OverlayControls: View {
                     if let segment = overlay.skippableSegment {
                         skipSegmentButton(segment)
                     }
-                    ForEach(playback.accessories.menus) { menu in
+                    ForEach(overlay.menus) { menu in
                         menuButton(menu)
                     }
                     ForEach(playback.accessories.actions) { action in
@@ -68,7 +68,7 @@ struct OverlayControls: View {
             .disabled(overlay.openMenuID != nil)
         }
         .overlay(alignment: .bottomTrailing) {
-            if let id = overlay.openMenuID, let menu = playback.accessories.menus.first(where: { $0.id == id }) {
+            if let id = overlay.openMenuID, let menu = overlay.menus.first(where: { $0.id == id }) {
                 MenuPanel(menu: menu, focus: focus) {
                     overlay.closeMenu()
                 }

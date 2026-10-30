@@ -97,8 +97,8 @@ private struct ScreensaverPresenter: ViewModifier {
     }
 
     /// Whether a video is on screen, like Wholphin's `keepScreenOn` during playback: a player
-    /// presented over the app, either the system one or Anemone's overlay (whose video view is an
-    /// `AVPlayerLayer`, MPV's included), or anything that turned off the system's idle timer.
+    /// presented over the app, either the system one or Anemone's overlay (its `PlayerVideoView`
+    /// with a picture in it, MPV's included), or anything that turned off the system's idle timer.
     private static func keepsScreenOn(in window: UIWindow?) -> Bool {
         if UIApplication.shared.isIdleTimerDisabled {
             return true
@@ -133,8 +133,10 @@ private extension UIViewController {
 }
 
 private extension UIView {
+    /// The player's video view with an engine's picture in it (its `AVPlayerLayer` or MPV's layer
+    /// is a sublayer of its own), an `AVPlayerLayer` anywhere else, or a view holding either.
     var containsVideo: Bool {
-        layer is AVPlayerLayer || subviews.contains { $0.containsVideo }
+        (self as? PlayerVideoView)?.output != nil || layer is AVPlayerLayer || subviews.contains { $0.containsVideo }
     }
 }
 

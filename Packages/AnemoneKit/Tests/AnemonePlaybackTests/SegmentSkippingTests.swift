@@ -98,6 +98,34 @@ struct SegmentSkippingTests {
         await playback.stop()
     }
 
+    @Test func `dismissing the button leaves the segment playing, and it isn't offered again`() async throws {
+        settings.behaviors[.intro] = .ask
+        let (playback, skipping) = try controller()
+        await play(playback, skipping)
+        engine.currentTime = .seconds(12)
+        #expect(await eventually { skipping.offered == Self.intro })
+
+        skipping.dismissOffer()
+
+        #expect(skipping.offered == nil)
+        #expect(playback.accessories.actions.isEmpty)
+        #expect(skipping.current == Self.intro)
+        #expect(engine.currentTime == .seconds(12))
+        // Neither on, nor back in after leaving it.
+        engine.currentTime = .seconds(20)
+        await settle()
+        engine.currentTime = .seconds(50)
+        await settle()
+        engine.currentTime = .seconds(15)
+        await settle()
+        #expect(skipping.offered == nil)
+        #expect(playback.accessories.actions.isEmpty)
+        // Nothing to dismiss is nothing done.
+        skipping.dismissOffer()
+        #expect(skipping.current == Self.intro)
+        await playback.stop()
+    }
+
     @Test func `auto-skip jumps past the segment once, and plays it after seeking back`() async throws {
         settings.behaviors[.intro] = .autoSkip
         let (playback, skipping) = try controller()

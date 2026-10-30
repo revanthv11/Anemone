@@ -84,6 +84,65 @@ extension PlayerOverlayTests {
         #expect(overlay.controlsVisible)
     }
 
+    private nonisolated static let intro = MediaSegment(
+        id: "intro",
+        kind: .intro,
+        start: .seconds(10),
+        end: .seconds(40),
+    )
+
+    /// Playing with `intro` under way and its button up over the video.
+    private func offeredIntro() async throws -> (PlaybackController, SegmentSkipping) {
+        let intro = Self.intro
+        let skipping = SegmentSkipping(load: { _ in [intro] }, offerDuration: .seconds(60), behavior: { _ in .ask })
+        let playback = try controller(features: [skipping])
+        try await play(playback)
+        #expect(await eventually { !skipping.segments.isEmpty })
+        engine.currentTime = .seconds(12)
+        #expect(await eventually { skipping.offered == intro })
+        return (playback, skipping)
+    }
+
+    @Test func `pressing Menu takes down the skip button, and the controls still offer the rest`() async throws {
+        let (playback, skipping) = try await offeredIntro()
+        let intro = Self.intro
+        let overlay = overlay(playback)
+        // The button has focus, as the overlay's view tells it.
+        overlay.focus = .action
+
+        #expect(tap(.menu, on: overlay) == .handled)
+
+        #expect(skipping.offered == nil)
+        #expect(!playback.accessories.actions.contains { $0.id == SegmentSkipping.skipActionID })
+        #expect(!overlay.controlsVisible)
+        // Not offered again for this segment, as Wholphin's isn't, but the controls' button is there.
+        engine.currentTime = .seconds(20)
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(skipping.offered == nil)
+        #expect(skipping.current == intro)
+        #expect(overlay.skippableSegment == intro)
+        // With nothing left to back out of, Menu closes the player.
+        overlay.focus = .video
+        #expect(tap(.menu, on: overlay) == .close)
+        await playback.stop()
+    }
+
+    @Test func `with the controls up, Menu hides them before taking down the skip button`() async throws {
+        let (playback, skipping) = try await offeredIntro()
+        let overlay = overlay(playback)
+        overlay.showControls()
+
+        #expect(tap(.menu, on: overlay) == .handled)
+        #expect(!overlay.controlsVisible)
+        #expect(skipping.offered == Self.intro)
+
+        #expect(tap(.menu, on: overlay) == .handled)
+        #expect(skipping.offered == nil)
+
+        #expect(tap(.menu, on: overlay) == .close)
+        await playback.stop()
+    }
+
     @Test func `skipping a segment that runs past the end goes to the end`() async throws {
         let credits = MediaSegment(id: "credits", kind: .outro, start: .seconds(80), end: .seconds(500))
         let playback = try controller()

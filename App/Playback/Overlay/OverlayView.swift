@@ -36,14 +36,15 @@ enum TransportButton: Hashable {
 
 /// Wholphin's `PlaybackOverlay` in SwiftUI: the controls, the chapter and queue rows, the compact
 /// seek bar while seeking with the controls hidden, a pause indicator, features' actions and
-/// menus, and the debug panel. `PlayerOverlay` decides what shows; this draws it and tells it
-/// where focus is.
+/// menus, the clock and the debug panel. `PlayerOverlay` decides what shows; this draws it and
+/// tells it where focus is.
 struct OverlayView: View {
     let playback: PlaybackController
     let overlay: PlayerOverlay
     let session: JellyfinSession
 
     @AppStorage(Preferences.showDebugInfo) private var showsDebugInfo
+    @AppStorage(Preferences.showClock) private var showsClock
     @Environment(\.theme) private var theme
     @FocusState private var focus: OverlayFocus?
     @State private var sheets: TrickplaySheets?
@@ -113,6 +114,14 @@ struct OverlayView: View {
             if showsDebugInfo, overlay.controlsVisible {
                 OverlayDebugPanel(playback: playback, overlay: overlay, details: details)
                     .padding(60)
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            if showsClock, overlay.controlsVisible {
+                OverlayClock()
+                    .padding(.top, 60)
+                    .padding(.trailing, 80)
+                    .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
         .animation(.easeInOut(duration: 0.25), value: overlay.controlsVisible)
@@ -285,6 +294,21 @@ struct PlayerActionButton: View {
             }
         }
         .accessibilityIdentifier("player.action.\(action.id)")
+    }
+}
+
+/// The time of day in the top right corner while the controls show, as Wholphin's `TimeDisplay`,
+/// behind Settings › Playback › Player Controls › Show clock.
+private struct OverlayClock: View {
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        ClockText()
+            .font(.title3)
+            .foregroundStyle(theme.onBackground)
+            // Readable over bright video, where the controls' gradient doesn't reach.
+            .shadow(color: theme.scrim.withAlpha(0.6).color, radius: 6)
+            .accessibilityIdentifier("player.clock")
     }
 }
 

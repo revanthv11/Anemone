@@ -11,9 +11,10 @@ import Observation
 /// from it. Everything it does to playback goes through the controller and its engine.
 ///
 /// With the controls hidden, left and right seek (faster while held, with a compact seek bar and
-/// thumbnails), Select or up and down show the controls, and Menu closes the player. With them
-/// showing, the focus engine moves between buttons, left and right seek on the focused seek bar,
-/// and Menu hides them. They hide on their own after `hideDelay` without a press.
+/// thumbnails), Select or up and down show the controls, and Menu takes down a skip button over
+/// the video, as Wholphin's Back does, or closes the player. With them showing, the focus engine
+/// moves between buttons, left and right seek on the focused seek bar, and Menu hides them. They
+/// hide on their own after `hideDelay` without a press.
 @MainActor
 @Observable
 public final class PlayerOverlay {
@@ -22,39 +23,6 @@ public final class PlayerOverlay {
         case controls
         case chapters
         case queue
-    }
-
-    /// The Siri Remote's buttons, as the overlay hears them.
-    public enum Button: Hashable, Sendable {
-        case upArrow
-        case downArrow
-        case leftArrow
-        case rightArrow
-        case select
-        case menu
-        case playPause
-    }
-
-    /// Where focus is, as far as presses are concerned.
-    public enum Focus: Sendable {
-        /// On the video: the controls are hidden.
-        case video
-        case seekBar
-        /// On a feature's action over the video, such as Skip Intro.
-        case action
-        /// On the controls' button that skips the rest of the segment playing.
-        case skipButton
-        /// On any other button.
-        case control
-    }
-
-    /// What the view controller does with a press.
-    public enum Outcome: Sendable {
-        case handled
-        /// Left to the focus engine, which moves focus or presses the focused button.
-        case passedOn
-        /// Close the player.
-        case close
     }
 
     /// Wholphin's Previous restarts the entry unless it's within this of the start.
@@ -72,6 +40,16 @@ public final class PlayerOverlay {
     public let seeker: Seeker
     public let controller: PlaybackController
     public var hideDelay: Duration
+    /// How the video fills the screen: the setting when the player opens, then what the Video
+    /// scale menu picks, for this player, as Wholphin's `contentScale` lasts for its page.
+    public var videoScale: VideoScale {
+        didSet {
+            videoScaleMenu = makeVideoScaleMenu()
+        }
+    }
+
+    /// The Video scale menu, made again when the choice changes rather than at every draw.
+    public private(set) var videoScaleMenu: PlayerMenu
 
     @ObservationIgnored private let details: PlaybackDetails?
     @ObservationIgnored private let segments: SegmentSkipping?
@@ -92,14 +70,20 @@ public final class PlayerOverlay {
         skipBehavior: @escaping @MainActor (MediaSegment.Kind) -> SkipSegmentBehavior = {
             Preferences.skipBehavior(for: $0).value()
         },
+        videoScale: VideoScale = Preferences.videoScale.value(),
     ) {
         self.controller = controller
         self.seeker = seeker ?? Seeker(engine: controller.engine)
         self.hideDelay = hideDelay
         self.skipBehavior = skipBehavior
+        // A choice the engine's output can't take, such as Fill saved for MPV, starts from Fit.
+        let choices = VideoScale.choices(for: controller.engine.videoOutput)
+        self.videoScale = choices.contains(videoScale) ? videoScale : .fit
+        videoScaleMenu = PlayerMenu(id: Self.videoScaleMenuID, title: "", options: [])
         lingerDelay = seekBarLinger
         details = controller.feature(PlaybackDetails.self)
         segments = controller.feature(SegmentSkipping.self)
+        videoScaleMenu = makeVideoScaleMenu()
     }
 
     /// Paused, or not yet under way.
@@ -198,7 +182,8 @@ public final class PlayerOverlay {
         }
     }
 
-    /// Menu backs out one step at a time: the open menu, a seek, the controls, then the player.
+    /// Menu backs out one step at a time: the open menu, a seek, the controls, the skip button
+    /// over the video, then the player.
     private func back() -> Outcome {
         if openMenuID != nil {
             closeMenu()
@@ -207,6 +192,10 @@ public final class PlayerOverlay {
             showsSeekBar = false
         } else if controlsVisible {
             hideControls()
+        } else if let segments, segments.offered != nil {
+            // Wholphin's Back on its skip button takes the button down for good; the controls
+            // still offer to skip the rest of the segment.
+            segments.dismissOffer()
         } else {
             return .close
         }
