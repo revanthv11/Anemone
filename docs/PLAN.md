@@ -11,7 +11,7 @@ Anemone is a Swift/tvOS port of [Wholphin](https://github.com/damontecres/Wholph
 | Distribution | App Store is the goal; TestFlight along the way. |
 | Platforms | tvOS 26+ now (runs on every Apple TV, including HD and 4K 1st gen). iOS/iPadOS later (Phase 7). |
 | Server | Jellyfin 12.0+ only. Jellyfin 12 removed `GET /QuickConnect/Initiate`, legacy route prefixes, and legacy auth by default. Wholphin is already warning users on older servers. |
-| Bundle ID | `com.revanthv11.anemone`, shared later by the iOS app for universal purchase. Confirm before registering in App Store Connect. |
+| Bundle ID | `com.devant.anemone` for the app and `com.devant.anemone.topshelf` for the Top Shelf extension, under the Devant Studios LLC team (moved from `com.revanthv11.anemone` in PR #66), shared later by the iOS app for universal purchase. The App Group and Keychain group keep their `revanthv11` names on purpose (`docs/release/checklist.md`). |
 | Seerr | Not in 1.0. Release builds leave `ANEMONE_SEERR` unset (Phase 5d), so nothing of Seerr is built; it waits for a later release. |
 
 ### GPL and the App Store
