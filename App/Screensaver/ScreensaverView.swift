@@ -3,17 +3,24 @@ import AnemoneJellyfin
 import AnemoneUI
 import SwiftUI
 
-/// Wholphin's `AppScreensaver`: the backdrops of random movies and shows, one at a time, each
-/// with its logo or title, slowly zooming, under a vignette and the clock. When the server has
-/// nothing to show or can't be reached, a message moves around the screen instead, so nothing
-/// stays in one place.
+/// Wholphin's `AppScreensaver`: the backdrops of random movies and shows, and photos when they're
+/// included, one at a time, each with its logo or title, slowly zooming, under a vignette and the
+/// clock. When the server has nothing to show or can't be reached, a message moves around the
+/// screen instead, so nothing stays in one place. With "Dim screen after delay", a black layer at
+/// the chosen darkness lies over the pictures, or over the app alone when the screensaver is off
+/// (`showsSlides`), as Wholphin's `MainContent` draws it over everything.
 struct ScreensaverView: View {
     let session: JellyfinSession
+    /// Whether the pictures show, or only the dimming.
+    var showsSlides = true
 
     @AppStorage(Preferences.screensaverDuration) private var duration
     @AppStorage(Preferences.screensaverShowClock) private var showsClock
     @AppStorage(Preferences.screensaverAnimate) private var animates
     @AppStorage(Preferences.screensaverMaxAge) private var maxAge
+    @AppStorage(Preferences.screensaverItemTypes) private var itemTypes
+    @AppStorage(Preferences.screensaverDimEnabled) private var dims
+    @AppStorage(Preferences.screensaverDimPercent) private var dimPercent
     @State private var slide: ScreensaverSlide?
     @State private var message: String?
     @State private var messagePlace = Alignment.bottomLeading
@@ -21,6 +28,29 @@ struct ScreensaverView: View {
     @AppStorage(Preferences.appThemeColors) private var themeColors
 
     var body: some View {
+        ZStack {
+            if showsSlides {
+                slides
+            }
+            if dims {
+                Color.black
+                    .opacity(Double(min(max(dimPercent, 0), 95)) / 100)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+                    .accessibilityIdentifier("screensaver.dim")
+            }
+        }
+        .ignoresSafeArea()
+        .task {
+            if showsSlides {
+                await showSlides()
+            }
+        }
+        // ScreensaverPresenter hosts it on its own, outside the app's environment.
+        .appTheme()
+    }
+
+    private var slides: some View {
         ZStack {
             // Behind the pictures, like the black around a photo, so it's not the theme's.
             Color.black
@@ -48,14 +78,8 @@ struct ScreensaverView: View {
                 clock
             }
         }
-        .ignoresSafeArea()
         .animation(.easeInOut(duration: 2), value: slide)
         .animation(.easeInOut(duration: 0.5), value: messagePlace)
-        .task {
-            await showSlides()
-        }
-        // ScreensaverPresenter hosts it on its own, outside the app's environment.
-        .appTheme()
     }
 
     /// Darker towards the edges, and at the top behind the clock, as in Wholphin.
@@ -106,7 +130,7 @@ struct ScreensaverView: View {
         while !Task.isCancelled {
             let slides: [ScreensaverSlide]
             do {
-                slides = try await session.screensaverSlides(maxAgeRating: maxAge >= 0 ? maxAge : nil)
+                slides = try await session.screensaverSlides(maxAgeRating: maxAge >= 0 ? maxAge : nil, types: itemTypes)
             } catch {
                 await showMessage(String(localized: "Couldn't reach the server."))
                 continue

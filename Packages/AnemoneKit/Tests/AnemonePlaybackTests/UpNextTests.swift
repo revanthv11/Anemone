@@ -81,6 +81,44 @@ struct UpNextTests: UpNextHarness {
         #expect(log.events.suffix(2) == ["stopped 100.0 seconds", "loaded e2 directPlay"])
     }
 
+    @Test func `with Never and autoplay, the next entry plays at once with no card`() async throws {
+        let (playback, upNext) = try player(countdown: .seconds(100), timing: .never)
+        await play(playback)
+        engine.currentTime = .seconds(100)
+
+        engine.send(.ended)
+
+        #expect(await eventually { engine.loads.count == 2 })
+        #expect(playback.queue.current.itemID == "e2")
+        #expect(playback.accessories.card == nil)
+        #expect(upNext.autoplaysWithoutInput == 1)
+        // Straight on, with no card to count down.
+        #expect(log.events.suffix(2) == ["stopped 100.0 seconds", "loaded e2 directPlay"])
+    }
+
+    @Test func `with Never and no autoplay, the player closes at the end`() async throws {
+        let (playback, _) = try player(countdown: .seconds(1), autoplays: false, timing: .never)
+        await play(playback)
+
+        engine.send(.ended)
+
+        #expect(await eventually { playback.hasEnded })
+        #expect(playback.accessories.card == nil)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(engine.loads.count == 1)
+    }
+
+    @Test func `with Never, Still watching is still asked after enough autoplays`() async throws {
+        let (playback, _) = try player(timing: .never, passOutCount: 1)
+        await play(playback)
+        engine.send(.ended)
+        await getUnderWay(loads: 2)
+
+        engine.send(.ended)
+
+        #expect(await eventually { playback.accessories.card?.id == UpNext.stillWatchingCard })
+    }
+
     @Test func `the last entry closes the player as before`() async throws {
         let (playback, _) = try player(["e1"])
         await play(playback)

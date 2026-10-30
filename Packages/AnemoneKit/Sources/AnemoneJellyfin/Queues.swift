@@ -346,7 +346,8 @@ private extension BaseItemDto {
     }
 }
 
-private extension [BaseItemDto]? {
+extension [BaseItemDto]? {
+    /// The items that are on the server, not only listed, as queues take them.
     var available: [ItemDetails] {
         (self ?? []).filter(\.isAvailable).compactMap(ItemDetails.init)
     }

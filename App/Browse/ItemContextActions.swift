@@ -1,3 +1,4 @@
+import AnemoneCore
 import AnemoneJellyfin
 import AnemonePlayback
 import AnemoneUI
@@ -29,8 +30,15 @@ final class ItemContextActions {
     var alert: ItemAlert?
     /// The item whose playlist choice is showing.
     var playlistItem: MediaItem?
+    /// The item a menu's Delete is asking about.
+    var deleting: ItemDetails?
+    /// Whether Now Playing shows, for a playlist of songs played from its card.
+    var showsNowPlaying = false
     /// The card whose item is playing, to update and focus again once the player closes.
     @ObservationIgnored private var playing: Playing?
+    /// The card whose menu asked to delete its item, to focus again if the user cancels: the
+    /// confirmation shows over the whole app, so tvOS doesn't know the card when it goes.
+    @ObservationIgnored private var deletingCard: CardFocusToken?
 
     private struct Playing {
         let id: MediaItem.ID
@@ -88,6 +96,65 @@ final class ItemContextActions {
         }
         playing = Playing(id: target.id, given: given, card: card)
         playback = browse.playback(of: details, from: resuming ? details.userState.resumePosition : nil)
+    }
+
+    /// Play or Shuffle on a series, season, collection or playlist: what's in it, queued as the
+    /// page's own buttons queue it (3b). Series Play resumes the episode next up. A playlist of
+    /// songs plays as music, as its page plays it (5b); its entries are asked for first, so a
+    /// playlist of videos doesn't stop the music on its way to the video player.
+    func playQueue(
+        _ target: MenuTarget,
+        shuffled: Bool,
+        given: CardMarks,
+        browse: BrowseModel,
+        music: MusicPlayer,
+    ) async {
+        let card = menu.focusReturn.menuCard
+        if target.item.kind == .playlist {
+            let session = browse.session
+            let id = target.id
+            // When the entries can't be read, the video player's request says why.
+            if let entries = await browse.optional(attempt { try await session.playlistItems(id: id) }),
+               await music.playPlaylist(target.details, entries: entries, shuffled: shuffled, browse: browse, failed: {
+                   self.alert = .failed($0)
+               })
+            {
+                showsNowPlaying = true
+                return
+            }
+        }
+        await browse.playQueue(of: target.details, shuffled: shuffled) { request in
+            playing = Playing(id: target.id, given: given, card: card)
+            playback = request
+        } failed: { alert = $0 }
+    }
+
+    /// Asks whether to delete the item, from its card's menu.
+    func askToDelete(_ item: ItemDetails) {
+        deletingCard = menu.focusReturn.menuCard
+        deleting = item
+    }
+
+    /// The user backed out of Delete: focus goes back to the card.
+    func deleteCancelled() {
+        if let card = deletingCard {
+            menu.focusReturn.returnFocus(to: card)
+        }
+        deletingCard = nil
+    }
+
+    /// Deletes the item, once Delete was confirmed, as the item page's button does: the pages
+    /// showing it drop its cards, and Home loads again.
+    func delete(_ item: ItemDetails, browse: BrowseModel) async {
+        deletingCard = nil
+        do {
+            try await browse.delete(item)
+            await browse.refresh()
+        } catch {
+            if let message = browse.problem(with: error, failure: "Couldn't delete \(item.item.name).") {
+                alert = .failed(message)
+            }
+        }
     }
 
     /// Once the player closes, focus goes back to the card, which shows the new progress, and
@@ -162,6 +229,10 @@ private struct ItemContextActionsHost: ViewModifier {
             .sheet(item: $actions.playlistItem) { item in
                 PlaylistPicker(item: item)
             }
+            .nowPlaying(isPresented: $actions.showsNowPlaying)
+            .deleteConfirmation(for: $actions.deleting, cancelled: actions.deleteCancelled) { item in
+                Task { await actions.delete(item, browse: browse) }
+            }
     }
 }
 
@@ -192,6 +263,8 @@ private struct ItemContextMenu: View {
     @Environment(ItemContextActions.self) private var actions
     @Environment(\.pageStack) private var stack
     @Environment(\.cardMenuSource) private var source
+    @Environment(MusicPlayer.self) private var music
+    @AppStorage(Preferences.enableMediaManagement) private var showsManagement
 
     var body: some View {
         if let target = MenuTarget(item) {
@@ -218,7 +291,13 @@ private struct ItemContextMenu: View {
         } else {
             ItemMenuState(isResumable: (given.progress ?? 0) > 0)
         }
-        return target.item.menuEntries(state: state, source: source, canGoTo: stack != nil)
+        return target.item.menuEntries(
+            state: state,
+            source: source,
+            canGoTo: stack != nil,
+            // Known for item page rows and library grids; Home's cards don't ask.
+            canDelete: showsManagement && target.details.canDelete == true,
+        )
     }
 
     private func perform(_ entry: ItemMenuEntry, on target: MenuTarget) {
@@ -227,12 +306,26 @@ private struct ItemContextMenu: View {
             stack?.path.append(target.item)
         case let .goToSeries(series):
             stack?.path.append(series)
+        case .play where target.item.playsAsQueue:
+            Task { await actions.playQueue(target, shuffled: false, given: given, browse: browse, music: music) }
+        case .shuffle:
+            Task { await actions.playQueue(target, shuffled: true, given: given, browse: browse, music: music) }
         case .play, .restart:
             Task { await actions.play(target, resuming: false, given: given, browse: browse) }
         case .resume:
             Task { await actions.play(target, resuming: true, given: given, browse: browse) }
         case .addToPlaylist:
             actions.playlistItem = target.item
+        case .delete:
+            actions.askToDelete(target.details)
+        case .removeFromContinueWatching, .removeFromNextUp, .setPlayed, .setFavorite:
+            change(entry, on: target)
+        }
+    }
+
+    /// The entries that change the user's state with the item.
+    private func change(_ entry: ItemMenuEntry, on target: MenuTarget) {
+        switch entry {
         case .removeFromContinueWatching:
             Task {
                 if await actions.save(.played(false), for: target, given: given, browse: browse) {
@@ -246,64 +339,8 @@ private struct ItemContextMenu: View {
             Task { await actions.save(.played(isPlayed), for: target, given: given, browse: browse) }
         case let .setFavorite(isFavorite):
             Task { await actions.save(.favorite(isFavorite), for: target, given: given, browse: browse) }
-        }
-    }
-}
-
-private extension ItemMenuEntry {
-    /// Wholphin's wording, as on the item pages' buttons.
-    var title: String {
-        switch self {
-        case .goTo: String(localized: "Go to")
-        case .play: String(localized: "Play")
-        case .resume: String(localized: "Resume")
-        case .restart: String(localized: "Restart")
-        case .addToPlaylist: String(localized: "Add to playlist")
-        case .removeFromContinueWatching: String(localized: "Remove from Continue Watching")
-        case .removeFromNextUp: String(localized: "Remove from Next Up")
-        case let .setPlayed(isPlayed):
-            if isPlayed {
-                String(localized: "Mark as watched")
-            } else {
-                String(localized: "Mark as unwatched")
-            }
-        case let .setFavorite(isFavorite):
-            if isFavorite {
-                String(localized: "Add to favorites")
-            } else {
-                String(localized: "Remove from favorites")
-            }
-        case .goToSeries: String(localized: "Go to series")
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .goTo: "arrow.forward"
-        case .play, .resume: "play.fill"
-        case .restart: "arrow.counterclockwise"
-        case .addToPlaylist: "text.badge.plus"
-        case .removeFromContinueWatching: "eye"
-        case .removeFromNextUp: "minus.circle"
-        case let .setPlayed(isPlayed): isPlayed ? "eye.slash" : "eye"
-        case let .setFavorite(isFavorite): isFavorite ? "heart" : "heart.slash"
-        case .goToSeries: "tv"
-        }
-    }
-
-    /// For UI tests: `menu.<identifier>`.
-    var identifier: String {
-        switch self {
-        case .goTo: "goTo"
-        case .play: "play"
-        case .resume: "resume"
-        case .restart: "restart"
-        case .addToPlaylist: "addToPlaylist"
-        case .removeFromContinueWatching: "removeFromContinueWatching"
-        case .removeFromNextUp: "removeFromNextUp"
-        case let .setPlayed(isPlayed): isPlayed ? "markWatched" : "markUnwatched"
-        case let .setFavorite(isFavorite): isFavorite ? "addFavorite" : "removeFavorite"
-        case .goToSeries: "goToSeries"
+        default:
+            break
         }
     }
 }

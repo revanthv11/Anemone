@@ -68,6 +68,8 @@ struct SeasonPage: View {
         }
         .itemExtras($episodeExtras, of: selectedEpisodeID)
         .itemExtras($seasonExtras, of: currentSeasonID)
+        // An episode deleted from its card's menu goes at once, as the page's own Delete takes it out.
+        .onItemsDeleted(removeDeleted)
         .onChange(of: focus) { _, focus in
             memory.note(focus)
             if case let .card(row, item) = focus, row == Self.episodeRow {
@@ -378,4 +380,13 @@ private extension ItemDetails {
 extension ItemLayout {
     /// A thumb card with its caption and focus room, held while episodes load.
     static let episodeRowHeight: CGFloat = CardShape.thumb.cardWidth / CardShape.thumb.aspectRatio + 120
+}
+
+private extension SeasonPage {
+    /// Takes out the episodes deleted elsewhere, such as from an episode card's menu.
+    func removeDeleted(_ deleted: Set<MediaItem.ID>) {
+        for episode in episodes ?? [] where episode.item.wasDeleted(in: deleted) {
+            remove(episode)
+        }
+    }
 }

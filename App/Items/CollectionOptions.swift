@@ -10,6 +10,10 @@ struct CollectionDisplay: Codable, Hashable {
     var filter = LibraryFilter()
     /// Wholphin's "Separate types": a row for each type of item, or every item in one grid.
     var separateTypes = true
+    /// Wholphin's "Show details" for collections (`CollectionViewOptions.cardViewOptions`): while
+    /// a card has focus, the header describes that card rather than the collection. On, as in
+    /// Wholphin.
+    var showsDetails = true
     /// The grid's options when types aren't separated; `nil` until changed, for the defaults.
     var grid: GridViewOptions?
 
@@ -37,6 +41,7 @@ extension CollectionDisplay {
         sort = (try? values.decodeIfPresent(LibrarySort.self, forKey: .sort)) ?? LibrarySort(.default)
         filter = (try? values.decodeIfPresent(LibraryFilter.self, forKey: .filter)) ?? LibraryFilter()
         separateTypes = (try? values.decodeIfPresent(Bool.self, forKey: .separateTypes)) ?? true
+        showsDetails = (try? values.decodeIfPresent(Bool.self, forKey: .showsDetails)) ?? true
         grid = try? values.decodeIfPresent(GridViewOptions.self, forKey: .grid)
     }
 }
@@ -148,6 +153,7 @@ struct CollectionOptionsButtons: View {
     private func viewMenu(_ display: Binding<CollectionDisplay>) -> some View {
         Menu {
             Toggle("Separate types", isOn: display.separateTypes)
+            Toggle("Show details", isOn: display.showsDetails)
             if !display.wrappedValue.separateTypes {
                 Button("Grid options", systemImage: "square.grid.3x3") {
                     showsGridOptions = true

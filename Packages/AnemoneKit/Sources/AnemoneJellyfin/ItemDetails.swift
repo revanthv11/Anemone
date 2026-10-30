@@ -82,6 +82,9 @@ public struct ItemDetails: Hashable, Identifiable, Sendable {
     /// The item's versions (media sources) in the server's order, for the Version button.
     /// `itemDetails(id:)` and episode lists come with them; other rows don't.
     public var versions: [MediaVersion]
+    /// Whether the server lets this user delete the item, its `CanDelete`. `itemDetails(id:)`,
+    /// item page rows and library grids come with it; `nil` where the request didn't ask.
+    public var canDelete: Bool?
 
     public init(
         item: MediaItem,
@@ -103,6 +106,7 @@ public struct ItemDetails: Hashable, Identifiable, Sendable {
         primaryImageAspectRatio: Double? = nil,
         providerIDs: [String: String] = [:],
         versions: [MediaVersion] = [],
+        canDelete: Bool? = nil,
     ) {
         self.item = item
         self.tagline = tagline
@@ -123,6 +127,7 @@ public struct ItemDetails: Hashable, Identifiable, Sendable {
         self.primaryImageAspectRatio = primaryImageAspectRatio
         self.providerIDs = providerIDs
         self.versions = versions
+        self.canDelete = canDelete
     }
 
     public var id: MediaItem.ID {
@@ -271,6 +276,7 @@ extension ItemDetails {
             primaryImageAspectRatio: dto.primaryImageAspectRatio,
             providerIDs: dto.providerIDs ?? [:],
             versions: (dto.mediaSources ?? []).compactMap(MediaVersion.init),
+            canDelete: dto.canDelete,
         )
     }
 }

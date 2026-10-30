@@ -1,13 +1,17 @@
 import AnemoneCore
 import Foundation
 
-/// When Up Next appears, Wholphin's `ShowNextUpWhen` without "Never".
+/// When Up Next appears, Wholphin's `ShowNextUpWhen`.
 public enum UpNextTiming: String, CaseIterable, Sendable, PreferenceValue {
     /// When the entry has played to the end, Wholphin's default.
     case endOfPlayback
     /// When the credits start, as the media segments feature finds them; at the end when an
     /// entry has none.
     case duringCredits
+    /// Not at all: with autoplay, the next entry plays as soon as one ends; without it, the player
+    /// closes at the end, as Wholphin's does. Wholphin with autoplay only shows its controls, so
+    /// its queue never moves on; here autoplay still means what it says.
+    case never
 }
 
 /// Settings › Playback › Autoplay, with Wholphin's names and defaults where Wholphin has them.

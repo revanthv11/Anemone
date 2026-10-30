@@ -5,7 +5,8 @@ import SwiftUI
 
 /// Wholphin's collection page (`CollectionDetails`), with its default view options: the
 /// collection's header and actions, then a row for each type of item in it. While a card has
-/// focus, the header and backdrop describe that card instead, as in Wholphin.
+/// focus, the header and backdrop describe that card instead, as in Wholphin, unless View's
+/// "Show details" is off.
 struct CollectionPage: View {
     @Binding var collection: ItemDetails
 
@@ -68,7 +69,7 @@ struct CollectionPage: View {
         .onChange(of: focus) { _, focus in
             memory.note(focus)
             switch focus {
-            case let .card(_, item)?:
+            case let .card(_, item)? where display?.showsDetails ?? true:
                 focusedEntry = entry(item)
             case .some:
                 focusedEntry = nil
@@ -76,13 +77,23 @@ struct CollectionPage: View {
                 break
             }
         }
+        .onChange(of: display?.showsDetails) { _, showsDetails in
+            if showsDetails == false {
+                focusedEntry = nil
+            }
+        }
         .task(id: focusedEntry?.id) {
             try? await Task.sleep(for: .milliseconds(150))
             guard !Task.isCancelled else { return }
             backdropEntry = focusedEntry
         }
-        // Of the extras other pages load, this one shows only Delete.
+        // Of the extras other pages load, this one shows only Delete. `/Items/{id}` brings
+        // `CanDelete` with the collection; it's asked for only when the collection came without.
         .task(id: collection.id) {
+            if let known = collection.canDelete {
+                canDelete = known
+                return
+            }
             let session = browse.session
             let id = collection.id
             canDelete = await browse.optional(attempt { try await session.canDelete(id: id) }) ?? false

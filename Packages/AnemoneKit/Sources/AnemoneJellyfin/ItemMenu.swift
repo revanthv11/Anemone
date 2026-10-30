@@ -9,7 +9,11 @@ public enum ItemMenuEntry: Hashable, Sendable {
     case resume
     /// Plays from the beginning, for an item that could be resumed.
     case restart
+    /// Plays a series, season, collection or playlist in a random order.
+    case shuffle
     case addToPlaylist
+    /// Deletes the item from the server, after asking.
+    case delete
     /// Marks the item unwatched, which takes it out of Continue Watching.
     case removeFromContinueWatching
     case removeFromNextUp
@@ -52,14 +56,17 @@ public extension MediaItem {
     ///
     /// Where the state is unknown, both ways are offered ("Mark as watched" and "Mark as
     /// unwatched"), since the menu can't ask the server before it opens. Left out until Anemone
-    /// has them: shuffle, track and version choice, media information, "play with", music
-    /// entries, and delete, which comes with item page extras.
+    /// has them: track and version choice, media information, "play with" and music entries.
     ///
-    /// - Parameter canGoTo: whether the card's page can open other pages.
+    /// - Parameters:
+    ///   - canGoTo: whether the card's page can open other pages.
+    ///   - canDelete: whether Delete is offered: the server lets the user delete the item and
+    ///     "Show media management options" is on, as Wholphin's `MediaManagementService` decides.
     func menuEntries(
         state: ItemMenuState,
         source: ItemMenuSource = .other,
         canGoTo: Bool = true,
+        canDelete: Bool = false,
     ) -> [ItemMenuEntry] {
         if kind == .person {
             return (canGoTo ? [.goTo] : []) + Self.toggles(state.isFavorite, ItemMenuEntry.setFavorite)
@@ -70,9 +77,17 @@ public extension MediaItem {
             entries.append(.goTo)
         }
         if Self.playableKinds.contains(kind) {
-            entries += state.isResumable ? [.resume, .restart] : [.play]
+            // What's in a series or collection plays from its own resume positions, so a card
+            // whose progress counts its watched episodes still offers Play, not Resume.
+            entries += state.isResumable && !playsAsQueue ? [.resume, .restart] : [.play]
+        }
+        if Self.shufflableKinds.contains(kind) {
+            entries.append(.shuffle)
         }
         entries.append(.addToPlaylist)
+        if canDelete {
+            entries.append(.delete)
+        }
         let inContinueWatching = source == .continueWatching || source == .continueWatchingAndNextUp
         if inContinueWatching, state.isPlayed != true, state.isResumable {
             entries.append(.removeFromContinueWatching)
@@ -94,9 +109,19 @@ public extension MediaItem {
         current.map { [entry(!$0)] } ?? [entry(true), entry(false)]
     }
 
-    /// Wholphin's `supportedPlayableTypes` that Anemone plays. Music plays in Phase 5, and Live
-    /// TV with the guide.
-    private static let playableKinds: Set<Kind> = [.movie, .episode, .video, .musicVideo]
+    /// Wholphin's `supportedPlayableTypes` that Anemone plays from a menu: videos, and the
+    /// series, seasons, collections and playlists whose Play queues them up (3b). Music plays
+    /// in Phase 5, and Live TV with the guide.
+    private static let playableKinds: Set<Kind> = [
+        .movie, .episode, .video, .musicVideo, .series, .season, .collection, .playlist,
+    ]
+    /// Wholphin's `supportedShufflableTypes`.
+    private static let shufflableKinds: Set<Kind> = [.series, .season, .collection, .playlist]
+
+    /// Whether Play on this item queues up what's in it, rather than playing the item itself.
+    var playsAsQueue: Bool {
+        Self.shufflableKinds.contains(kind)
+    }
 }
 
 public extension ItemDetails {

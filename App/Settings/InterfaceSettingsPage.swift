@@ -3,13 +3,14 @@ import AnemonePlayback
 import AnemoneUI
 import SwiftUI
 
-/// Settings › Interface: Wholphin's theme music and photo slideshow settings, with its names
-/// and defaults. The slideshow's time offers Wholphin's 1 to 30 seconds as a few steps, since
-/// tvOS has no slider.
+/// Settings › Interface: Wholphin's theme music, photo slideshow and media management settings,
+/// with its names and defaults. The slideshow's time offers Wholphin's 1 to 30 seconds as a few
+/// steps, since tvOS has no slider.
 struct InterfaceSettingsPage: View {
     @AppStorage(Preferences.playThemeSongs) private var themeVolume
     @AppStorage(Preferences.slideshowDuration) private var slideshowDuration
     @AppStorage(Preferences.slideshowPlayVideos) private var slideshowPlaysVideos
+    @AppStorage(Preferences.enableMediaManagement) private var showsMediaManagement
 
     private static let durations = [1, 2, 3, 5, 8, 10, 15, 20, 30]
 
@@ -40,6 +41,14 @@ struct InterfaceSettingsPage: View {
                 .accessibilityIdentifier("settings.slideshowDuration")
                 Toggle("Play videos during slideshow", isOn: $slideshowPlaysVideos)
                     .accessibilityIdentifier("settings.slideshowPlayVideos")
+            }
+            Section {
+                Toggle("Show media management options", isOn: $showsMediaManagement)
+                    .accessibilityIdentifier("settings.mediaManagement")
+            } header: {
+                Text("Media management")
+            } footer: {
+                Text("Shows Delete on item pages and in card menus, where the server lets you delete the item.")
             }
         }
         .pickerStyle(.navigationLink)

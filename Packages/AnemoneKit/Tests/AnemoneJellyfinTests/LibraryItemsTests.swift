@@ -26,7 +26,7 @@ struct LibraryItemsTests {
         #expect(queries.map { $0["startIndex"] } == [["0"], ["300"]])
         #expect(queries.map { $0["limit"] } == [["100"], ["100"]])
         #expect(queries.map { $0["enableTotalRecordCount"] } == [["true"], ["false"]])
-        #expect(queries[0]["fields"] == ["SortName", "Overview"])
+        #expect(queries[0]["fields"] == ["SortName", "Overview", "CanDelete"])
         #expect(queries[0]["parentId"] == ["lib-movies"])
         #expect(queries[0]["excludeItemIds"] == ["lib-movies"])
     }

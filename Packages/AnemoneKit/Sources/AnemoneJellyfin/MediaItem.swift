@@ -84,6 +84,9 @@ public struct MediaItem: Hashable, Identifiable, Sendable {
     public var runtime: Duration?
     /// The age rating, such as "PG-13".
     public var officialRating: String?
+    /// For movies and other videos split across files: how many parts, when more than one. The
+    /// server's `PartCount`; `nil` for one file, or when the server didn't say.
+    public var partCount: Int?
     /// How much has been watched, from 0 to 1. `nil` when nothing has.
     public var progress: Double?
     public var artwork: Artwork
@@ -97,6 +100,7 @@ public struct MediaItem: Hashable, Identifiable, Sendable {
         overview: String? = nil,
         runtime: Duration? = nil,
         officialRating: String? = nil,
+        partCount: Int? = nil,
         progress: Double? = nil,
         artwork: Artwork = Artwork(),
     ) {
@@ -108,6 +112,7 @@ public struct MediaItem: Hashable, Identifiable, Sendable {
         self.overview = overview
         self.runtime = runtime
         self.officialRating = officialRating
+        self.partCount = partCount
         self.progress = progress
         self.artwork = artwork
     }
@@ -185,6 +190,7 @@ extension MediaItem {
             overview: dto.overview,
             runtime: dto.runTimeTicks.map(Duration.init(ticks:)),
             officialRating: dto.officialRating,
+            partCount: dto.partCount.flatMap { $0 > 1 ? $0 : nil },
             progress: dto.userData?.playedPercentage.flatMap { $0 > 0 ? min($0 / 100, 1) : nil },
             artwork: Artwork(
                 primaryTag: dto.imageTags?[ImageType.primary.rawValue],

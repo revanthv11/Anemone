@@ -60,6 +60,41 @@ struct ScreensaverTimerTests {
         #expect(timer.isShowing)
     }
 
+    @Test func `with the screensaver off and dimming on, it starts without the pictures`() async {
+        let timer = ScreensaverTimer(pollInterval: .seconds(60)) {
+            .init(isEnabled: false, startDelay: .milliseconds(200), dimsScreen: true)
+        }
+        let running = Task { await timer.run() }
+        defer { running.cancel() }
+
+        #expect(await showing(timer, is: true, within: .seconds(5)))
+        #expect(!timer.showsSlides)
+    }
+
+    @Test func `with both on, the pictures show`() async {
+        let timer = ScreensaverTimer(pollInterval: .seconds(60)) {
+            .init(isEnabled: true, startDelay: .milliseconds(200), dimsScreen: true)
+        }
+        let running = Task { await timer.run() }
+        defer { running.cancel() }
+
+        #expect(await showing(timer, is: true, within: .seconds(5)))
+        #expect(timer.showsSlides)
+    }
+
+    @Test func `the Start button shows the pictures even with the screensaver off`() {
+        let timer = ScreensaverTimer(pollInterval: .seconds(60)) {
+            .init(isEnabled: false, startDelay: .seconds(60), dimsScreen: true)
+        }
+        let running = Task { await timer.run() }
+        defer { running.cancel() }
+
+        timer.start()
+
+        #expect(timer.isShowing)
+        #expect(timer.showsSlides)
+    }
+
     @Test func `turned off, it doesn't start`() async throws {
         let timer = ScreensaverTimer(pollInterval: .milliseconds(100)) {
             .init(isEnabled: false, startDelay: .milliseconds(50))

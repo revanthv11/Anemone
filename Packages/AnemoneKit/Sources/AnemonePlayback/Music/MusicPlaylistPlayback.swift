@@ -12,16 +12,20 @@ public extension MusicPlayer {
     /// entries, and a later page that fails ends the queue there, as with `play(_:shuffled:)`.
     /// Shuffled, the whole queue is fetched before it starts.
     ///
+    /// - Parameter startIndex: the entry to start at, for Wholphin's play from an entry; the
+    ///   entries before it are left out, as its `startIndex` leaves them out. Shuffled, the whole
+    ///   playlist plays.
     /// - Returns: `false` when the first page holds anything but songs, or nothing: the playlist
     ///   is the video player's, and the player has stopped. `true` once the songs are queued, or
     ///   when another queue took over meanwhile.
     /// - Throws: when the first page couldn't be fetched, after stopping the player.
-    func play(playlist id: MediaItem.ID, shuffled: Bool = false) async throws -> Bool {
+    func play(playlist id: MediaItem.ID, shuffled: Bool = false, from startIndex: Int = 0) async throws -> Bool {
         let source = MusicSource.playlist(id)
         let request = clearForNewQueue()
+        let begin = shuffled ? 0 : max(0, startIndex)
         let first: MusicPage
         do {
-            first = try await loadSongs(source, shuffled, 0, Self.pageSize)
+            first = try await loadSongs(source, shuffled, begin, Self.pageSize)
         } catch {
             if request == requests {
                 stop()
@@ -36,7 +40,7 @@ public extension MusicPlayer {
         guard shuffled else {
             start(MusicQueue(first.items), paused: status == .paused)
             if request == requests {
-                Task { await addPages(of: source, after: first, request: request) }
+                Task { await addPages(of: source, after: first, request: request, from: begin) }
             }
             return true
         }

@@ -54,10 +54,29 @@ struct ItemMenuTests {
         #expect(!entries.contains(.goToSeries(series)))
     }
 
-    @Test func `series, collections and songs aren't played from the menu`() {
-        for kind: MediaItem.Kind in [.series, .season, .collection, .playlist, .musicAlbum, .audio] {
+    @Test func `series, seasons, collections and playlists offer Play and Shuffle, as queues`() {
+        for kind: MediaItem.Kind in [.series, .season, .collection, .playlist] {
+            let item = MediaItem(id: "x", name: "X", kind: kind)
+            let entries = item.menuEntries(state: ItemMenuState(isPlayed: false, isFavorite: false))
+            #expect(entries.prefix(4) == [.goTo, .play, .shuffle, .addToPlaylist], "\(kind)")
+            #expect(item.playsAsQueue, "\(kind)")
+        }
+        #expect(!movie.playsAsQueue)
+        #expect(!movie.menuEntries(state: ItemMenuState()).contains(.shuffle))
+    }
+
+    @Test func `a partly watched series still offers Play, not Resume`() {
+        for kind: MediaItem.Kind in [.series, .season, .collection, .playlist] {
             let entries = MediaItem(id: "x", name: "X", kind: kind).menuEntries(state: ItemMenuState(isResumable: true))
-            #expect(!entries.contains(.play) && !entries.contains(.resume), "\(kind)")
+            #expect(entries.contains(.play), "\(kind)")
+            #expect(!entries.contains(.resume) && !entries.contains(.restart), "\(kind)")
+        }
+    }
+
+    @Test func `music isn't played from the menu`() {
+        for kind: MediaItem.Kind in [.musicAlbum, .audio] {
+            let entries = MediaItem(id: "x", name: "X", kind: kind).menuEntries(state: ItemMenuState(isResumable: true))
+            #expect(!entries.contains(.play) && !entries.contains(.resume) && !entries.contains(.shuffle), "\(kind)")
             #expect(entries.contains(.addToPlaylist), "\(kind)")
         }
     }
@@ -101,6 +120,17 @@ struct ItemMenuTests {
         #expect(!movie.menuEntries(state: state, source: .nextUp).contains(.removeFromNextUp))
         #expect(!loose.menuEntries(state: state, source: .nextUp).contains(.removeFromNextUp))
         #expect(!episode.menuEntries(state: state, source: .continueWatching).contains(.removeFromNextUp))
+    }
+
+    @Test func `delete comes after Add to playlist, only when allowed`() {
+        let state = ItemMenuState(isPlayed: false, isFavorite: false)
+
+        let entries = movie.menuEntries(state: state, canDelete: true)
+
+        #expect(entries == [.goTo, .play, .addToPlaylist, .delete, .setPlayed(true), .setFavorite(true)])
+        #expect(!movie.menuEntries(state: state).contains(.delete))
+        #expect(!MediaItem(id: "p1", name: "Actor", kind: .person).menuEntries(state: state, canDelete: true)
+            .contains(.delete))
     }
 
     @Test func `details know the user's state`() {
