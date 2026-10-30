@@ -516,7 +516,9 @@ Home's Live TV rows, tested live in the simulator against the fixture server (29
 
 Not verified live: Padding: the fixture records with none, so a timer's padding is covered by unit tests only. A Record or Cancel on Home that lands after Menu closed the details: the fixture answers too quickly to close them first, so unit tests cover it. A live stream arriving after the player closed: the fixture opens M3U streams too fast to close the player while one is on its way, so a unit test covers it. A channel playing past a direct play attempt (Jellyfin offered live channels as transcodes only).
 
-Not yet: Live TV channels and programmes in Search. Settings › Home › Add row offers a Live TV library only Watch Live and Channels; Active Recordings is offered only for the made-up Live TV of DEBUG builds, so a user can't add that row (compare Wholphin's add dialog). The page of a recording under way, opened from Home's Active Recordings row, has no Play: the server sends it as a recording, a kind `isPlayable` doesn't count, where the schedule plays it through PlaybackInfo.
+Fixed after that check: Settings › Home › Add row offers Active Recordings for a Live TV library, beside Watch Live and Channels. That goes beyond Wholphin, whose add-row screen never offers its `Recordings` row (only an import of the web client's home sections brings it in, which 2e lists as not yet), and without it the row couldn't be added at all. And a recording keeps its own kind, `recording`, where the server's `Recording` type fell to `other`: its page offers Play and Resume like a video's, where it showed only Watched and Favorite, as Wholphin counts `RECORDING` among its playable types.
+
+Not yet: Live TV channels and programmes in Search.
 
 #### 5b: music, music Now Playing, synced lyrics
 

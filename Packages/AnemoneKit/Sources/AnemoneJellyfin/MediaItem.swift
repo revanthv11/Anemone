@@ -12,6 +12,9 @@ public struct MediaItem: Hashable, Identifiable, Sendable {
         case playlist
         case person
         case video
+        /// A Live TV recording, under way or finished, as the server's recordings and Home's Active
+        /// Recordings row send it. It plays like a video.
+        case recording
         case musicVideo
         case musicAlbum
         case musicArtist
@@ -209,6 +212,7 @@ private extension MediaItem.Kind {
         .playlist: .playlist,
         .person: .person,
         .video: .video,
+        .recording: .recording,
         .musicVideo: .musicVideo,
         .musicAlbum: .musicAlbum,
         .musicArtist: .musicArtist,

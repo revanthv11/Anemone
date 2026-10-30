@@ -20,7 +20,7 @@
         /// Live TV rows with `-homeMockLiveTV YES`, until the Live TV feature provides real ones.
         struct MockLiveTV: HomeLiveTVSource {
             func recordingsInProgress(limit: Int) async throws -> [MediaItem] {
-                items("Recording", count: min(limit, 2), kind: .video)
+                items("Recording", count: min(limit, 2), kind: .recording)
             }
 
             func programsOnNow(limit: Int) async throws -> [MediaItem] {

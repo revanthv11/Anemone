@@ -166,13 +166,16 @@ struct LiveTVTests: LiveTVServerTesting {
         ])
         let rows = try session(host: "home.test").liveTVHomeRows
 
-        #expect(try await rows.recordingsInProgress(limit: 5).map(\.id) == ["r1"])
+        let recordings = try await rows.recordingsInProgress(limit: 5)
+        #expect(recordings.map(\.id) == ["r1"])
+        // A recording plays from its page, so it keeps its own kind rather than falling to `other`.
+        #expect(recordings.map(\.kind) == [.recording])
         #expect(try await rows.programsOnNow(limit: 6).map(\.id) == ["p1"])
         #expect(try await rows.channels(limit: 7).map(\.id) == ["c1"])
 
-        let recordings = try #require(sent.request("GET /LiveTv/Recordings")).query
-        #expect(recordings["isInProgress"] == "true")
-        #expect(recordings["limit"] == "5")
+        let recordingsQuery = try #require(sent.request("GET /LiveTv/Recordings")).query
+        #expect(recordingsQuery["isInProgress"] == "true")
+        #expect(recordingsQuery["limit"] == "5")
         let programs = try #require(sent.request("POST /LiveTv/Programs")).json
         #expect(programs["IsAiring"] as? Bool == true)
         #expect(programs["Limit"] as? Int == 6)

@@ -277,8 +277,13 @@ struct HomeSettingsTests {
     @Test func `the add row page offers Wholphin's row types for each library`() {
         let shows = Library(id: "shows", name: "Shows", kind: .shows)
         let music = Library(id: "music", name: "Music", kind: .music)
+        let liveTV = Library(id: "livetv", name: "Live TV", kind: .liveTV)
 
         #expect(HomeLibraryRowType.available(for: shows).contains(.studios))
+        // Active Recordings too, beyond Wholphin's two, so the row can be added at all.
+        #expect(HomeLibraryRowType.available(for: liveTV) == [.tvChannels, .tvPrograms, .recordings])
+        #expect(HomeLibraryRowType.recordings.row(for: liveTV).kind == .recordings)
+        #expect(HomeLibraryRowType.recordings.title == "Active Recordings")
         #expect(!HomeLibraryRowType.available(for: music).contains(.suggestions))
         #expect(HomeLibraryRowType.recentlyAdded.row(for: music).viewOptions.aspectRatio == .square)
         #expect(HomeFavoriteKind.available(for: [shows, music]) == [
