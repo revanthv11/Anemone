@@ -81,8 +81,6 @@ struct LibraryScreen: View {
     @State private var tabsHidden = false
     /// The tab with focus, so a page can send focus up to the tabs.
     @FocusState private var focusedTab: LibrarySection?
-    /// Where tvOS put the top of the page on screen; see `tabRowPadding`.
-    @State private var pageTop: CGFloat?
 
     var body: some View {
         let sections = library.sections
@@ -91,7 +89,7 @@ struct LibraryScreen: View {
             if sections.count > 1, !tabsHidden {
                 LibraryTabRow(sections: sections, selection: selection(current), focus: $focusedTab)
                     .padding(.horizontal, GridLayout.horizontalInset)
-                    .padding(.top, tabRowPadding)
+                    .padding(.top, LibraryTabLayout.topPadding)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
             ZStack(alignment: .topLeading) {
@@ -110,7 +108,6 @@ struct LibraryScreen: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         // For the cards' menus, here and in Live TV's recordings folders, whose page leaves it out.
         .environment(\.pageStack, stack)
-        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { pageTop = $0 }
         .animation(.easeInOut(duration: 0.2), value: tabsHidden)
         .navigationDestination(for: LibraryCategoryPage.self) { page in
             LibraryItemsPage(library: page.library, scope: page.scope, title: page.title, path: $path)
@@ -179,15 +176,6 @@ struct LibraryScreen: View {
         }
     }
 
-    /// tvOS puts a page lower, below the sidebar's title, when it doesn't take the page's top for
-    /// a scroll view, and higher when it does, and that differs from tab to tab here (the grids
-    /// are higher than Recommended). Padding the tabs down to the lower place keeps them from
-    /// jumping as the user moves between tabs.
-    private var tabRowPadding: CGFloat {
-        let top = pageTop ?? LibraryTabLayout.lowerPageTop
-        return LibraryTabLayout.topPadding + max(LibraryTabLayout.lowerPageTop - top, 0)
-    }
-
     /// The library's navigation stack.
     private var stack: PageStack? {
         pageStack ?? libraryPageStack
@@ -223,6 +211,4 @@ struct LibraryScreen: View {
 
 private enum LibraryTabLayout {
     static let topPadding: CGFloat = 20
-    /// Where tvOS 26 puts the top of a page below the sidebar's title.
-    static let lowerPageTop: CGFloat = 120
 }

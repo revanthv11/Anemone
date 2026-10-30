@@ -37,6 +37,21 @@ public struct RecommendedContent: Hashable, Sendable {
         self.rows = rows
         self.failedRows = failedRows
     }
+
+    /// `fresh`'s rows, with this content's rows of the `kept` kinds after them, in the library's
+    /// order: what the tab shows after Back, when every row but Suggestions is loaded again, so
+    /// the suggestions don't reshuffle. Rows `fresh` failed on stay failed.
+    public func merging(_ fresh: RecommendedContent, keeping kept: Set<RecommendedRow.Kind>, order: [RecommendedRow.Kind])
+        -> RecommendedContent
+    {
+        let keptRows = rows.filter { kept.contains($0.kind) }
+        let merged = (fresh.rows.filter { !kept.contains($0.kind) } + keptRows)
+        let position = Dictionary(uniqueKeysWithValues: order.enumerated().map { ($1, $0) })
+        return RecommendedContent(
+            rows: merged.sorted { (position[$0.kind] ?? .max) < (position[$1.kind] ?? .max) },
+            failedRows: fresh.failedRows.filter { !kept.contains($0) },
+        )
+    }
 }
 
 public extension Library {
@@ -71,11 +86,13 @@ public extension JellyfinSession {
     /// - Throws: `SessionError.signedOut` from any row.
     func recommended(
         in library: Library,
+        rows wanted: [RecommendedRow.Kind]? = nil,
         itemsPerRow limit: Int = HomeRow.defaultLimit,
         enableRewatchingNextUp: Bool = false,
         now: Date = .now,
     ) async throws -> RecommendedContent {
-        let kinds = library.recommendedRows
+        // `rows` narrows the library's rows, as a refresh after Back leaves Suggestions out.
+        let kinds = library.recommendedRows.filter { wanted?.contains($0) ?? true }
         let results = await withTaskGroup(of: (Int, Result<[MediaItem], any Error>).self) { group in
             for (index, kind) in kinds.enumerated() {
                 group.addTask {

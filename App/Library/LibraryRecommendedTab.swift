@@ -57,7 +57,14 @@ struct LibraryRecommendedTab: View {
         .task {
             await load()
         }
-        // The rows don't load again after Back, so a title deleted from its page is dropped here.
+        // After Back from a title's page the rows load again, as Wholphin's do, so what was
+        // watched or marked there shows; Suggestions stay as they were. A deleted title is
+        // dropped at once, below, since the reload can come later.
+        .onChange(of: path.count) { old, new in
+            if old > 0, new == 0 {
+                Task { await refresh() }
+            }
+        }
         .onItemsDeleted { deleted in
             guard case let .loaded(recommended) = content else { return }
             let remaining = recommended.removing(deleted)
@@ -133,6 +140,27 @@ struct LibraryRecommendedTab: View {
         // Gives focus somewhere to rest, so the tabs and the sidebar stay in reach.
         .focusable()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// Loads every row but Suggestions again and keeps what's showing when that fails.
+    private func refresh() async {
+        guard case let .loaded(current) = content else { return }
+        let kept: Set<RecommendedRow.Kind> = [.suggestions]
+        do {
+            let fresh = try await browse.session.recommended(
+                in: library,
+                rows: library.recommendedRows.filter { !kept.contains($0) },
+                itemsPerRow: Preferences.maxItemsPerRow.value(),
+                enableRewatchingNextUp: Preferences.enableRewatchingNextUp.value(),
+            )
+            guard !Task.isCancelled, case .loaded = content else { return }
+            content = .loaded(current.merging(fresh, keeping: kept, order: library.recommendedRows))
+        } catch SessionError.signedOut {
+            browse.noteSignedOut()
+            content = .signedOut
+        } catch {
+            // What's showing stays, as a row that fails to load again would only vanish.
+        }
     }
 
     private func load() async {

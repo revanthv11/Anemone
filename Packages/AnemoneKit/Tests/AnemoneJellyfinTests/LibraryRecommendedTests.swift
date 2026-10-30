@@ -9,6 +9,32 @@ struct LibraryRecommendedTests {
 
     // MARK: Recommended
 
+    @Test func `a refresh asks only for the rows it's given, and merging keeps the others`() async throws {
+        let sent = recordRecommendedRequests(host: "rec-refresh.test")
+
+        let fresh = try await librarySession(host: "rec-refresh.test").recommended(
+            in: movies,
+            rows: [.continueWatching, .recentlyReleased, .recentlyAdded, .topUnwatched],
+            itemsPerRow: 10,
+            now: Date(timeIntervalSince1970: 1_800_000_000),
+        )
+
+        #expect(fresh.rows.map(\.kind) == [.continueWatching, .recentlyReleased, .recentlyAdded])
+        // Suggestions ask for the last played titles' genres; nothing asked for them.
+        #expect(!sent.requests.contains { $0.query["sortBy"] == "DatePlayed" })
+
+        let suggestions = RecommendedRow(kind: .suggestions, items: [MediaItem(id: "s1", name: "Kept", kind: .movie)])
+        let shown = RecommendedContent(
+            rows: [RecommendedRow(kind: .continueWatching, items: [MediaItem(id: "old", name: "Old", kind: .movie)]), suggestions],
+            failedRows: [.topUnwatched],
+        )
+        let merged = shown.merging(fresh, keeping: [.suggestions], order: movies.recommendedRows)
+        #expect(merged.rows.map(\.kind) == [.continueWatching, .recentlyReleased, .recentlyAdded, .suggestions])
+        #expect(merged.rows[0].items.map(\.id) == ["resume-1"])
+        #expect(merged.rows.last?.items.map(\.id) == ["s1"])
+        #expect(merged.failedRows.isEmpty)
+    }
+
     @Test func `a movie library recommends Wholphin's rows in order, leaving out empty ones`() async throws {
         let sent = recordRecommendedRequests(host: "rec-movies.test")
         let now = Date(timeIntervalSince1970: 1_800_000_000)

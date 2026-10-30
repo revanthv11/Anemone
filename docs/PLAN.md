@@ -228,7 +228,7 @@ Tested live in the simulator against the local fixture server, with a throwaway 
 
 After review round 1, tested live the same way, read-only, with Movies › Library at 4 columns (two rows of the fixture's 6; put back to the defaults afterwards): moving down past the first row tucked the tabs away and the letters stayed at 28 points, where before they grew to 31, and stayed 28 as the tabs came back; with the details header on, the whole bar stood beside the grid in 18-point letters. Live TV's tabs stayed at y = 130 on every tab, the Recordings tab empty. The bar too small even for 16-point letters wasn't seen live (unit-tested).
 
-Not yet: taking out `tabRowPadding`, which is now inert.
+`tabRowPadding` and the page-top tracking behind it came out on 30 October 2026; the tabs keep their plain top padding.
 
 Polish after 2f:
 
@@ -253,7 +253,9 @@ Found by Live TV's checks (5a):
 
 Tested live in the simulator against the local fixture server, read-only. Before the fix, Down from Name, Filter, View and Random over Shows' one series left focus on the button, and Down from the Genres and Studios tabs (one card each) stayed on the tab. After it, Down from each of the four reaches the series and Up goes back to the header; Down from the Genres and Studios tabs reaches the card and Up returns to the tab; on Home Videos and Photos (two albums) Down from Name, Random, Play and Shuffle reaches an album, Back from the second album goes to the first, and Right from it enters the alphabet bar and Left comes back. Movies (six movies, a full row) lands on the same card as before the fix from each button, and Fixture Album One (ten photos) reaches a card from each too. Music's albums have a grid of their own with the buttons on the left, and Down already reached them. `LibraryGridFocusUITests` checks Down and Up from the header on the spike's library of 1, 2 and 500 items, with no server; without the fix it fails for 1 and 2. The Phase 2b spike's grid test still passes. Not verified live: a Movies filter that leaves one or two titles (Shows and the photo library stood in for it), Live TV's Recordings tab, where the bug was found (the fixture has no recordings), the list layouts (their rows span the page anyway), and VoiceOver.
 
-Not yet: "View more" at the end of Recommended rows, refreshing Recommended after Back, Wholphin's on-screen jump buttons (switched off in Wholphin too), long-pressing Back to return to where a jump started, the list's spacing option, server sync of the remembered tab, and the card menu on list rows (AnemoneUI's menu reads its item from a `MediaCard`).
+Done after 1.0's gates (30 October 2026): the card menu on list rows, through `cardMenuItem` in AnemoneUI, which gives the menu an item from a view that isn't a `MediaCard`; the row passes its details, as the grid card does, so the menu knows what's watched and a favourite. And Recommended loads again after Back from a title's page, as Wholphin's does, so what was watched or marked there shows: every row but Suggestions, which stay as they were, merged by `RecommendedContent.merging`; a reload that fails leaves the rows showing. Tested live in the simulator against the fixture server: Back from a Recommended title's page left focus on its card, and in Movies › Library switched to the list layout (and back), a long press on a row opened the menu with Go to, Play, Add to playlist, Mark as watched and Add to favorites.
+
+Not yet: "View more" at the end of Recommended rows, which in Wholphin opens a grid continuing the row's own query (the Resume and Next Up endpoints included), so it needs a grid page per row; Wholphin's on-screen jump buttons (switched off in Wholphin too); long-pressing Back to return to where a jump started; the list's spacing option; and server sync of the remembered tab.
 
 #### 2g: item page extras: trailers, extras, chapters, delete, collection options
 
