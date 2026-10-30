@@ -13,6 +13,10 @@ struct VideoScaleTests {
     /// A 4:3 show.
     private let tall = CGSize(width: 1440, height: 1080)
 
+    private func frame(_ scale: VideoScale, _ video: CGSize, pixelsPerPoint: CGFloat = 1) -> CGRect {
+        scale.frame(video: video, in: screen, pixelsPerPoint: pixelsPerPoint)
+    }
+
     @Test func `fit letterboxes and crop fills the screen, each keeping the proportions`() {
         #expect(VideoScale.fit.frame(video: wide, in: screen) == CGRect(x: 0, y: 140, width: 1920, height: 800))
         #expect(VideoScale.fit.frame(video: tall, in: screen) == CGRect(x: 240, y: 0, width: 1440, height: 1080))
@@ -23,16 +27,16 @@ struct VideoScaleTests {
     @Test func `fill takes the screen, and none shows the pixels as they are`() {
         #expect(VideoScale.fill.frame(video: wide, in: screen) == CGRect(origin: .zero, size: screen))
         #expect(VideoScale.fill.stretches)
-        #expect(VideoScale.unscaled.frame(video: wide, in: screen) == CGRect(x: -960, y: -260, width: 3840, height: 1600))
+        #expect(frame(.unscaled, wide) == CGRect(x: -960, y: -260, width: 3840, height: 1600))
         #expect(!VideoScale.unscaled.stretches)
         // Pixel for pixel on a 4K screen, which has two pixels a point.
-        #expect(VideoScale.unscaled.frame(video: wide, in: screen, pixelsPerPoint: 2) == CGRect(x: 0, y: 140, width: 1920, height: 800))
+        #expect(frame(.unscaled, wide, pixelsPerPoint: 2) == CGRect(x: 0, y: 140, width: 1920, height: 800))
     }
 
     @Test func `fill width and fill height fit one side and let the other run over or short`() {
         #expect(VideoScale.fillWidth.frame(video: wide, in: screen) == CGRect(x: 0, y: 140, width: 1920, height: 800))
         #expect(VideoScale.fillWidth.frame(video: tall, in: screen) == CGRect(x: 0, y: -180, width: 1920, height: 1440))
-        #expect(VideoScale.fillHeight.frame(video: wide, in: screen) == CGRect(x: -336, y: 0, width: 2592, height: 1080))
+        #expect(frame(.fillHeight, wide) == CGRect(x: -336, y: 0, width: 2592, height: 1080))
         #expect(VideoScale.fillHeight.frame(video: tall, in: screen) == CGRect(x: 240, y: 0, width: 1440, height: 1080))
     }
 
@@ -51,7 +55,7 @@ struct VideoScaleTests {
         #expect(VideoScale.allCases.map(\.title) == ["Fit", "None", "Crop", "Fill", "Fill width", "Fill height"])
     }
 
-    @Test func `the overlay's menu lists the choices after the features' menus, and a pick lasts for the player`() async throws {
+    @Test func `the overlay's menu comes after the features' menus, and a pick lasts for the player`() async throws {
         // `FakeEngine` draws into a layer of its own, as MPV does, which the speed menu shows for.
         let playback = PlaybackController(
             request: PlaybackRequest(.item("m1")),
@@ -89,7 +93,8 @@ struct VideoScaleTests {
         }
         let avPlayer = PlayerOverlay(controller: controller(AVPlayerEngine()), videoScale: .fill)
         #expect(avPlayer.videoScale == .fill)
-        #expect(avPlayer.videoScaleMenu.options.map(\.title) == ["Fit", "None", "Crop", "Fill", "Fill width", "Fill height"])
+        let titles = ["Fit", "None", "Crop", "Fill", "Fill width", "Fill height"]
+        #expect(avPlayer.videoScaleMenu.options.map(\.title) == titles)
         #expect(avPlayer.videoScaleMenu.options.filter(\.isSelected).map(\.id) == ["fill"])
 
         // `FakeEngine` draws into a layer of its own, as MPV does.

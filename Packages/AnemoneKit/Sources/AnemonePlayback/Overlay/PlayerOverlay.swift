@@ -110,7 +110,8 @@ public final class PlayerOverlay {
         self.hideDelay = hideDelay
         self.skipBehavior = skipBehavior
         // A choice the engine's output can't take, such as Fill saved for MPV, starts from Fit.
-        self.videoScale = VideoScale.choices(for: controller.engine.videoOutput).contains(videoScale) ? videoScale : .fit
+        let choices = VideoScale.choices(for: controller.engine.videoOutput)
+        self.videoScale = choices.contains(videoScale) ? videoScale : .fit
         videoScaleMenu = PlayerMenu(id: Self.videoScaleMenuID, title: "", options: [])
         lingerDelay = seekBarLinger
         details = controller.feature(PlaybackDetails.self)
