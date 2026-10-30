@@ -56,7 +56,10 @@ struct LibraryListRow: View {
         }
         // The card menu, which a MediaCard asks for itself: the row's button opens it.
         // With its details, as the grid card gives them, so the menu knows what's watched and a favourite.
-        .cardMenuItem(entry?.details.map { CardMenuItem($0) } ?? item.map(CardMenuItem.init), marks: CardMarks(badges: shownBadges))
+        .cardMenuItem(
+            entry?.details.map { CardMenuItem($0) } ?? item.map(CardMenuItem.init),
+            marks: CardMarks(badges: shownBadges),
+        )
     }
 
     private var item: MediaItem? {

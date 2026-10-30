@@ -25,7 +25,10 @@ struct LibraryRecommendedTests {
 
         let suggestions = RecommendedRow(kind: .suggestions, items: [MediaItem(id: "s1", name: "Kept", kind: .movie)])
         let shown = RecommendedContent(
-            rows: [RecommendedRow(kind: .continueWatching, items: [MediaItem(id: "old", name: "Old", kind: .movie)]), suggestions],
+            rows: [
+                RecommendedRow(kind: .continueWatching, items: [MediaItem(id: "old", name: "Old", kind: .movie)]),
+                suggestions,
+            ],
             failedRows: [.topUnwatched],
         )
         let merged = shown.merging(fresh, keeping: [.suggestions], order: movies.recommendedRows)
