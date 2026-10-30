@@ -84,20 +84,28 @@ extension PlayerOverlayTests {
         #expect(overlay.controlsVisible)
     }
 
-    /// Playing with an intro from 10 s to 40 s whose button is up over the video.
-    private func offeredIntro() async throws -> (PlaybackController, SegmentSkipping, MediaSegment) {
-        let intro = MediaSegment(id: "intro", kind: .intro, start: .seconds(10), end: .seconds(40))
+    private nonisolated static let intro = MediaSegment(
+        id: "intro",
+        kind: .intro,
+        start: .seconds(10),
+        end: .seconds(40),
+    )
+
+    /// Playing with `intro` under way and its button up over the video.
+    private func offeredIntro() async throws -> (PlaybackController, SegmentSkipping) {
+        let intro = Self.intro
         let skipping = SegmentSkipping(load: { _ in [intro] }, offerDuration: .seconds(60), behavior: { _ in .ask })
         let playback = try controller(features: [skipping])
         try await play(playback)
         #expect(await eventually { !skipping.segments.isEmpty })
         engine.currentTime = .seconds(12)
         #expect(await eventually { skipping.offered == intro })
-        return (playback, skipping, intro)
+        return (playback, skipping)
     }
 
-    @Test func `Menu takes down the skip button over the video, and the controls still offer the rest`() async throws {
-        let (playback, skipping, intro) = try await offeredIntro()
+    @Test func `pressing Menu takes down the skip button, and the controls still offer the rest`() async throws {
+        let (playback, skipping) = try await offeredIntro()
+        let intro = Self.intro
         let overlay = overlay(playback)
         // The button has focus, as the overlay's view tells it.
         overlay.focus = .action
@@ -120,13 +128,13 @@ extension PlayerOverlayTests {
     }
 
     @Test func `with the controls up, Menu hides them before taking down the skip button`() async throws {
-        let (playback, skipping, intro) = try await offeredIntro()
+        let (playback, skipping) = try await offeredIntro()
         let overlay = overlay(playback)
         overlay.showControls()
 
         #expect(tap(.menu, on: overlay) == .handled)
         #expect(!overlay.controlsVisible)
-        #expect(skipping.offered == intro)
+        #expect(skipping.offered == Self.intro)
 
         #expect(tap(.menu, on: overlay) == .handled)
         #expect(skipping.offered == nil)
