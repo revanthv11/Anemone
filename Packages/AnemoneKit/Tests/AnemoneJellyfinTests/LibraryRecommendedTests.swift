@@ -36,6 +36,11 @@ struct LibraryRecommendedTests {
         #expect(merged.rows[0].items.map(\.id) == ["resume-1"])
         #expect(merged.rows.last?.items.map(\.id) == ["s1"])
         #expect(merged.failedRows.isEmpty)
+
+        // A kept row that had failed stays failed, so the notice about it stays.
+        let keptFailure = RecommendedContent(rows: [], failedRows: [.suggestions])
+            .merging(fresh, keeping: [.suggestions], order: movies.recommendedRows)
+        #expect(keptFailure.failedRows == [.suggestions])
     }
 
     @Test func `a movie library recommends Wholphin's rows in order, leaving out empty ones`() async throws {

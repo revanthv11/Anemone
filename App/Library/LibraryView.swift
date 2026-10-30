@@ -96,7 +96,7 @@ struct LibraryScreen: View {
                 ForEach(shownSections(current: current), id: \.self) { opened in
                     let isShowing = opened == current
                     // The others stay, hidden, and out of reach of focus and VoiceOver.
-                    tab(opened)
+                    tab(opened, isShowing: isShowing)
                         .opacity(isShowing ? 1 : 0)
                         .disabled(!isShowing)
                         .accessibilityHidden(!isShowing)
@@ -125,7 +125,7 @@ struct LibraryScreen: View {
     }
 
     @ViewBuilder
-    private func tab(_ section: LibrarySection) -> some View {
+    private func tab(_ section: LibrarySection, isShowing: Bool) -> some View {
         let onPastFirstRow = { (isPastFirstRow: Bool) in
             if tabsHidden != isPastFirstRow {
                 tabsHidden = isPastFirstRow
@@ -136,7 +136,7 @@ struct LibraryScreen: View {
         let onExitTop: (() -> Void)? = library.sections.count > 1 ? { focusTabs(on: section) } : nil
         switch section {
         case .recommended:
-            LibraryRecommendedTab(library: library, path: $path, onPastFirstRow: onPastFirstRow)
+            LibraryRecommendedTab(library: library, path: $path, isShowing: isShowing, onPastFirstRow: onPastFirstRow)
         case .library:
             LibraryItemsPage(library: library, path: $path, onPastFirstRow: onPastFirstRow, onExitTop: onExitTop)
         case .collections:

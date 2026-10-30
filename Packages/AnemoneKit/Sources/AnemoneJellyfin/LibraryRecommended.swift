@@ -40,7 +40,8 @@ public struct RecommendedContent: Hashable, Sendable {
 
     /// `fresh`'s rows, with this content's rows of the `kept` kinds after them, in the library's
     /// order: what the tab shows after Back, when every row but Suggestions is loaded again, so
-    /// the suggestions don't reshuffle. Rows `fresh` failed on stay failed.
+    /// the suggestions don't reshuffle. Rows `fresh` failed on stay failed, as do kept rows that
+    /// had failed.
     public func merging(
         _ fresh: RecommendedContent,
         keeping kept: Set<RecommendedRow.Kind>,
@@ -51,7 +52,7 @@ public struct RecommendedContent: Hashable, Sendable {
         let position = Dictionary(uniqueKeysWithValues: order.enumerated().map { ($1, $0) })
         return RecommendedContent(
             rows: merged.sorted { (position[$0.kind] ?? .max) < (position[$1.kind] ?? .max) },
-            failedRows: fresh.failedRows.filter { !kept.contains($0) },
+            failedRows: fresh.failedRows.filter { !kept.contains($0) } + failedRows.filter { kept.contains($0) },
         )
     }
 }
