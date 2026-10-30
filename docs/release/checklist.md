@@ -14,7 +14,7 @@ How Anemone goes to TestFlight and the App Store. Most of it is App Store Connec
 
 ## Once, before the first upload
 
-- [ ] **Bundle ID.** Confirm `com.revanthv11.anemone` (shared later with the iOS app), then register it, the Top Shelf extension's `com.revanthv11.anemone.topshelf`, and the App Group and Keychain group Top Shelf uses (Phase 5e) in the developer account.
+- [x] **Bundle ID.** `com.devant.anemone` (shared later with the iOS app) and the Top Shelf extension's `com.devant.anemone.topshelf`, registered by Xcode's automatic signing along with the App Group and Keychain group Top Shelf uses (Phase 5e). Those two keep their `revanthv11` names on purpose: they don't have to match the bundle ID, and renaming the Keychain group would orphan what test builds have stored.
 - [ ] **Multicast entitlement**, only if server discovery ships in the build: request `com.apple.developer.networking.multicast` from Apple, then add it to the app's entitlements (`docs/PLAN.md`, Phase 1).
 - [ ] **App record.** Create the app in App Store Connect, platform tvOS, with that bundle ID.
 - [ ] **Source.** Keep https://github.com/revanthv11/Anemone public: the GPL needs every shipped build's source to be available, and Settings › About points there.
@@ -31,9 +31,9 @@ How Anemone goes to TestFlight and the App Store. Most of it is App Store Connec
 1. **Start clean** on `main`, with CI green on the commit you'll archive.
 2. **Bump the build number** (`CURRENT_PROJECT_VERSION`, and `MARKETING_VERSION` for a new version) in the project, commit and push. Every target shares them.
 3. **Licenses.** Run `scripts/update-licenses.sh` after any dependency change. It warns about a package that NOTICE.md doesn't credit or that has no license text. Commit what it changes.
-4. **Archive** in Xcode: scheme Anemone, destination Any tvOS Device, Product › Archive. Leave `ANEMONE_SEERR` unset: Seerr isn't in 1.0 (`docs/PLAN.md`, Decisions).
+4. **Archive.** While the team has no registered Apple TV, run `scripts/archive-testflight.sh --open`: Xcode's automatic signing can't make the development profile Product › Archive needs, so the script archives unsigned, ad-hoc signs the archive with the entitlements, exports an App Store Connect .ipa, checks its signature and entitlements, and hands it to Transporter. Once an Apple TV is registered, Xcode works too: scheme Anemone, destination Any tvOS Device, Product › Archive. Either way, leave `ANEMONE_SEERR` unset: Seerr isn't in 1.0 (`docs/PLAN.md`, Decisions).
 5. **Check privacy.** In the Organizer, right-click the archive › Generate Privacy Report, and check it against `privacy.md`.
-6. **Upload.** Distribute App › App Store Connect. Untick "Manage Version and Build Number", so the uploaded build number is the committed one; otherwise pass the uploaded number to the next step with `--build`.
+6. **Upload.** From the script: Verify, then Deliver, in Transporter (the script's export keeps the committed build number). From Xcode: Distribute App › App Store Connect, and untick "Manage Version and Build Number" so the uploaded build number is the committed one; otherwise pass the uploaded number to the next step with `--build`.
 7. **Tag the source:** `scripts/tag-build.sh --archive <path to the .xcarchive> --push`. It refuses a commit that isn't on GitHub yet or a build number that's already tagged. Settings › About names the same tag.
 8. **TestFlight.** Add "What to Test" and the testers. Export compliance is answered by `ITSAppUsesNonExemptEncryption`.
 
