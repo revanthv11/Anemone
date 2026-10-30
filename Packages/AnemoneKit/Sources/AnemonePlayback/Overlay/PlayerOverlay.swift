@@ -11,9 +11,10 @@ import Observation
 /// from it. Everything it does to playback goes through the controller and its engine.
 ///
 /// With the controls hidden, left and right seek (faster while held, with a compact seek bar and
-/// thumbnails), Select or up and down show the controls, and Menu closes the player. With them
-/// showing, the focus engine moves between buttons, left and right seek on the focused seek bar,
-/// and Menu hides them. They hide on their own after `hideDelay` without a press.
+/// thumbnails), Select or up and down show the controls, and Menu takes down a skip button over
+/// the video, as Wholphin's Back does, or closes the player. With them showing, the focus engine
+/// moves between buttons, left and right seek on the focused seek bar, and Menu hides them. They
+/// hide on their own after `hideDelay` without a press.
 @MainActor
 @Observable
 public final class PlayerOverlay {
@@ -72,6 +73,9 @@ public final class PlayerOverlay {
     public let seeker: Seeker
     public let controller: PlaybackController
     public var hideDelay: Duration
+    /// How the video fills the screen: the setting when the player opens, then what the Video
+    /// scale menu picks, for this player, as Wholphin's `contentScale` lasts for its page.
+    public var videoScale: VideoScale
 
     @ObservationIgnored private let details: PlaybackDetails?
     @ObservationIgnored private let segments: SegmentSkipping?
@@ -92,11 +96,13 @@ public final class PlayerOverlay {
         skipBehavior: @escaping @MainActor (MediaSegment.Kind) -> SkipSegmentBehavior = {
             Preferences.skipBehavior(for: $0).value()
         },
+        videoScale: VideoScale = Preferences.videoScale.value(),
     ) {
         self.controller = controller
         self.seeker = seeker ?? Seeker(engine: controller.engine)
         self.hideDelay = hideDelay
         self.skipBehavior = skipBehavior
+        self.videoScale = videoScale
         lingerDelay = seekBarLinger
         details = controller.feature(PlaybackDetails.self)
         segments = controller.feature(SegmentSkipping.self)
@@ -198,7 +204,8 @@ public final class PlayerOverlay {
         }
     }
 
-    /// Menu backs out one step at a time: the open menu, a seek, the controls, then the player.
+    /// Menu backs out one step at a time: the open menu, a seek, the controls, the skip button
+    /// over the video, then the player.
     private func back() -> Outcome {
         if openMenuID != nil {
             closeMenu()
@@ -207,6 +214,10 @@ public final class PlayerOverlay {
             showsSeekBar = false
         } else if controlsVisible {
             hideControls()
+        } else if let segments, segments.offered != nil {
+            // Wholphin's Back on its skip button takes the button down for good; the controls
+            // still offer to skip the rest of the segment.
+            segments.dismissOffer()
         } else {
             return .close
         }

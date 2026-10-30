@@ -4,7 +4,8 @@ import AnemoneUI
 import SwiftUI
 
 /// Settings › Playback › Player Controls: the system player or Anemone's own overlay, and how the
-/// overlay seeks, hides and what it shows. Skip amounts and the hiding delay offer Wholphin's
+/// overlay seeks, hides and what it shows, with Wholphin's clock and Video Scale (its
+/// `showClock` and `globalContentScale`). Skip amounts and the hiding delay offer Wholphin's
 /// ranges as a few steps, since tvOS has no slider.
 struct PlayerControlsSettingsPage: View {
     @AppStorage(Preferences.playerControls) private var controls
@@ -12,6 +13,8 @@ struct PlayerControlsSettingsPage: View {
     @AppStorage(Preferences.skipBackMs) private var skipBackMs
     @AppStorage(Preferences.controllerTimeoutMs) private var controllerTimeoutMs
     @AppStorage(Preferences.showDebugInfo) private var showsDebugInfo
+    @AppStorage(Preferences.showClock) private var showsClock
+    @AppStorage(Preferences.videoScale) private var videoScale
 
     private static let skips = [5, 10, 15, 20, 30, 45, 60, 90, 120, 300]
     private static let timeouts = [2, 3, 5, 8, 10, 15]
@@ -46,6 +49,15 @@ struct PlayerControlsSettingsPage: View {
                         Text(Self.label(seconds)).tag(seconds * 1000)
                     }
                 }
+                Toggle("Show clock", isOn: $showsClock)
+                    .accessibilityIdentifier("settings.showClock")
+                // Where a player starts; its Video scale menu changes it for that player.
+                Picker("Video scale", selection: $videoScale) {
+                    ForEach(VideoScale.allCases, id: \.self) { scale in
+                        Text(scale.title).tag(scale)
+                    }
+                }
+                .accessibilityIdentifier("settings.videoScale")
                 Toggle("Show playback debug info", isOn: $showsDebugInfo)
                     .accessibilityIdentifier("settings.showDebugInfo")
             }

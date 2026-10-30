@@ -19,4 +19,9 @@ public extension Preferences {
     /// Shows how the stream is played, and its tracks, over the video. Wholphin's
     /// `showDebugInfo`.
     static let showDebugInfo = Preference("showDebugInfo", default: false)
+    /// The time of day over the overlay's controls. Wholphin's `showClock`.
+    static let showClock = Preference("showClock", default: true)
+    /// How the video fills the screen when a player opens, until its Video scale menu says
+    /// otherwise. Wholphin's `globalContentScale`.
+    static let videoScale = Preference("globalContentScale", default: VideoScale.fit)
 }
