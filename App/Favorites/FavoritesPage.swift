@@ -227,7 +227,7 @@ private extension FavoritesSection {
         case .playlist: String(localized: "Playlists")
         case .video: String(localized: "Videos")
         case .photo: String(localized: "Photos")
-        case .season, .folder, .other: String(localized: "Other")
+        case .season, .recording, .folder, .other: String(localized: "Other")
         }
     }
 }

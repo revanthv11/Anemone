@@ -136,7 +136,7 @@ extension ItemDetails {
 
     /// Whether Wholphin offers Play for this kind of item.
     var isPlayable: Bool {
-        [.movie, .episode, .video, .musicVideo, .audio].contains(item.kind)
+        [.movie, .episode, .video, .recording, .musicVideo, .audio].contains(item.kind)
     }
 
     /// The parts of Wholphin's quick-details line (`BaseItem.ui.quickDetails` and
