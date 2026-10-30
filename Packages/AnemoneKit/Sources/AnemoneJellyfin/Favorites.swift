@@ -185,6 +185,8 @@ private extension MediaItem.Kind {
         case .person: .person
         case .video: .video
         case .recording: .recording
+        case .tvChannel: .tvChannel
+        case .tvProgram: .liveTvProgram
         case .musicVideo: .musicVideo
         case .musicAlbum: .musicAlbum
         case .musicArtist: .musicArtist

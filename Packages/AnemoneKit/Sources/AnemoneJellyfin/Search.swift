@@ -4,13 +4,16 @@ import JellyfinAPI
 
 /// A kind of item Search looks for, each with its own row of results, in the order of Wholphin's
 /// `allSearchableTypes`. Raw values are Jellyfin's item types, so a saved choice of kinds stays
-/// readable. Live TV channels and programs join with the Live TV guide.
+/// readable. Live TV channels and programmes are searched when the user has a Live TV library,
+/// where Wholphin checks the user's Live TV access.
 public enum SearchKind: String, CaseIterable, Codable, Hashable, Sendable {
     case movie = "Movie"
     case series = "Series"
     case episode = "Episode"
     case collection = "BoxSet"
     case person = "Person"
+    case tvChannel = "TvChannel"
+    case liveTVProgram = "LiveTvProgram"
     case musicAlbum = "MusicAlbum"
     case musicArtist = "MusicArtist"
     case audio = "Audio"
@@ -40,6 +43,8 @@ public enum SearchKind: String, CaseIterable, Codable, Hashable, Sendable {
         case .episode: .episode
         case .collection: .boxSet
         case .person: .person
+        case .tvChannel: .tvChannel
+        case .liveTVProgram: .liveTvProgram
         case .musicAlbum: .musicAlbum
         case .musicArtist: .musicArtist
         case .audio: .audio
@@ -69,7 +74,8 @@ public extension Library {
         case .collections: [.collection]
         case .playlists: [.playlist]
         case .mixed, .folders: [.movie, .series, .episode, .video]
-        case .liveTV, .books, .trailers, .other: []
+        case .liveTV: [.tvChannel, .liveTVProgram]
+        case .books, .trailers, .other: []
         }
     }
 }
@@ -99,6 +105,11 @@ public extension JellyfinSession {
                 enableUserData: true,
                 userID: userID,
                 enableTotalRecordCount: false,
+            ))).items
+        case .liveTVProgram:
+            // With the channel's details, as Wholphin's `ProgramItemFields` ask, for the programme's sheet.
+            try await send(Paths.getItems(parameters: searchParameters(
+                term, kinds: [kind], limit: limit, fields: Self.searchFields + [.channelInfo],
             ))).items
         default:
             try await send(Paths.getItems(parameters: searchParameters(term, kinds: [kind], limit: limit))).items
@@ -131,12 +142,17 @@ public extension JellyfinSession {
         return try await send(Paths.getItems(parameters: parameters)).items?.compactMap(ItemDetails.init) ?? []
     }
 
-    private func searchParameters(_ term: String, kinds: [SearchKind], limit: Int) -> Paths.GetItemsParameters {
+    private func searchParameters(
+        _ term: String,
+        kinds: [SearchKind],
+        limit: Int,
+        fields: [ItemFields] = searchFields,
+    ) -> Paths.GetItemsParameters {
         var parameters = Paths.GetItemsParameters(userID: userID)
         parameters.searchTerm = term
         parameters.isRecursive = true
         parameters.includeItemTypes = kinds.map(\.itemKind)
-        parameters.fields = Self.searchFields
+        parameters.fields = fields
         parameters.limit = limit
         parameters.enableUserData = true
         parameters.enableTotalRecordCount = false

@@ -157,6 +157,27 @@ struct SearchTests {
         #expect(SearchRelevance.sorted(items, for: "/[/").map(\.item.name) == ["Queen Lear", "King Lear", "Lear King"])
     }
 
+    @Test func `channels and programmes are item queries, programmes with their channel's details`() async throws {
+        let channels = register(host: "search-channels.test", path: "/Items", reply: .items(
+            #"{"Id":"c1","Name":"Anemone One","Type":"TvChannel"}"#,
+        ))
+        let programs = register(host: "search-programs.test", path: "/Items", reply: .items(
+            #"{"Id":"p1","Name":"Calibration Hour","Type":"Program","ChannelName":"Anemone One"}"#,
+        ))
+
+        let foundChannels = try await session(host: "search-channels.test").search("anemone", for: .tvChannel)
+        let foundPrograms = try await session(host: "search-programs.test").search("calibration", for: .liveTVProgram)
+
+        #expect(channels.request?.query["includeItemTypes"] == "TvChannel")
+        #expect(channels.request?.query["fields"] == "Overview,PrimaryImageAspectRatio,ChildCount")
+        #expect(foundChannels.map(\.id) == ["c1"])
+        #expect(foundChannels.first?.item.kind == .tvChannel)
+        #expect(programs.request?.query["includeItemTypes"] == "LiveTvProgram")
+        #expect(programs.request?.query["fields"] == "Overview,PrimaryImageAspectRatio,ChildCount,ChannelInfo")
+        #expect(foundPrograms.map(\.id) == ["p1"])
+        #expect(foundPrograms.first?.item.kind == .tvProgram)
+    }
+
     // MARK: Kinds
 
     @Test func `offers people and the kinds the libraries hold, in Wholphin's order`() {
@@ -179,7 +200,18 @@ struct SearchTests {
         #expect(Library(id: "h", name: "Home", kind: .homeVideos).searchKinds == [.video, .photo, .photoAlbum])
         #expect(Library(id: "p", name: "Photos", kind: .photos).searchKinds == [.video, .photo, .photoAlbum])
         #expect(Library(id: "m", name: "Mixed", kind: .mixed).searchKinds == [.movie, .series, .episode, .video])
-        #expect(Library(id: "t", name: "Live", kind: .liveTV).searchKinds.isEmpty)
+        #expect(Library(id: "t", name: "Live", kind: .liveTV).searchKinds == [.tvChannel, .liveTVProgram])
+    }
+
+    @Test func `a Live TV library offers channels and programmes after people`() {
+        let libraries = [
+            Library(id: "l1", name: "Live TV", kind: .liveTV),
+            Library(id: "l2", name: "Music", kind: .music),
+        ]
+
+        #expect(SearchKind.searchable(in: libraries) == [
+            .person, .tvChannel, .liveTVProgram, .musicAlbum, .musicArtist, .audio,
+        ])
     }
 
     // MARK: Recent searches

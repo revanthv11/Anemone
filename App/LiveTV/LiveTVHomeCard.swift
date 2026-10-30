@@ -2,7 +2,7 @@ import AnemoneJellyfin
 import AnemonePlayback
 import SwiftUI
 
-/// A card on Home's Channels or Watch Live row. A channel plays, as Wholphin's
+/// A card on Home's Channels or Watch Live row, or a Search result. A channel plays, as Wholphin's
 /// `BaseItem.destination()` sends it straight to playback; a programme opens its details
 /// (`ProgramDialog`), as Wholphin's search does, to watch its channel or record it.
 struct LiveTVHomeCard<Label: View>: View {
