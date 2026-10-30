@@ -96,8 +96,8 @@ struct ScreensaverView: View {
             .foregroundStyle(theme.onBackground)
             .accessibilityIdentifier("screensaver.clock")
             .padding(.top, ScreensaverLayout.verticalInset)
-        .padding(.trailing, ScreensaverLayout.horizontalInset)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            .padding(.trailing, ScreensaverLayout.horizontalInset)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
     }
 
     /// Wholphin's item flow: a random set of items, each shown for the chosen duration once its

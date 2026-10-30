@@ -82,7 +82,7 @@ struct VideoScaleTests {
         await playback.stop()
     }
 
-    @Test func `AVPlayer gets every choice, and an engine's own layer those that need only the proportions`() throws {
+    @Test func `AVPlayer gets every choice, and an engine's own layer those that need only the proportions`() {
         func controller(_ engine: any PlayerEngine) -> PlaybackController {
             PlaybackController(
                 request: PlaybackRequest(.item("m1")),
