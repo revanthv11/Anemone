@@ -13,6 +13,7 @@ Anemone is a Swift/tvOS port of [Wholphin](https://github.com/damontecres/Wholph
 | Server | Jellyfin 12.0+ only. Jellyfin 12 removed `GET /QuickConnect/Initiate`, legacy route prefixes, and legacy auth by default. Wholphin is already warning users on older servers. |
 | Bundle ID | `com.devant.anemone` for the app and `com.devant.anemone.topshelf` for the Top Shelf extension, under the Devant Studios LLC team (moved from `com.revanthv11.anemone` in PR #66), shared later by the iOS app for universal purchase. The App Group and Keychain group keep their `revanthv11` names on purpose (`docs/release/checklist.md`). |
 | Seerr | Not in 1.0. Release builds leave `ANEMONE_SEERR` unset (Phase 5d), so nothing of Seerr is built; it waits for a later release. |
+| Localization | 1.0 ships the 35 languages Wholphin's translations cover, English where it has none; the rest of the strings, and other languages, after 1.0 (Phase 6b). |
 
 ### GPL and the App Store
 
@@ -679,7 +680,9 @@ Localization: the import script's tests pass on a made-up Wholphin (escapes, quo
 
 The sort menus' VoiceOver label, fixed after the pass: tvOS focuses a wrapper of a `Menu`'s label view that takes no label of its own, so neither a label on the menu nor on its label view reached it, and what a test found inside was the label's parts, the field's name and the direction arrow ("Up"). Each sort menu's label (the library grid's, the music lists' and the photo folders') is now one accessibility element that says "Sort by Name, ascending", so the wrapper holds that one labelled element. Checked in the simulator against the fixture server with a throwaway XCUITest reading the focused element's subtree on the Music library's Albums tab and the Photos folder: the wrapper's one labelled element read "Sort by Name, ascending" where it had held the text "Name" and the image "Up". Not verified: VoiceOver's own speech, which the simulator can't give a test.
 
-Not yet: translations for three fifths of the strings, since Wholphin words them differently or doesn't have them; the local network usage string in `Info.plist`; and Japanese and other languages Wholphin hasn't got. The project's own list of localizations (`knownRegions`) still says English only: the build takes its languages from the catalogs.
+The local network usage string in `Info.plist` is localized through `App/InfoPlist.xcstrings` in the 35 languages the catalogs have; these are Anemone's own translations, not Wholphin's, marked "needs review" in the catalog for a native speaker to check, and the build carries them as it does translated strings. The project's `knownRegions` lists all 36 localizations, where it said English only.
+
+Decided (30 October 2026): 1.0 ships with the 35 languages Wholphin's translations cover, with English where Wholphin has no translation (three fifths of the strings, which it words differently or doesn't have), rather than machine translations across 35 languages that nobody can review. Not yet: those translations, and Japanese and other languages Wholphin hasn't got, after 1.0.
 
 ##### Using the theme
 

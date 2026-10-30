@@ -1,0 +1,228 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "NSLocalNetworkUsageDescription": {
+      "comment": "Shown when tvOS asks to allow local network access, the first time the app reaches a server on the home network.",
+      "extractionState": "manual",
+      "localizations": {
+        "ar": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "يتصل Anemone بخوادم Jellyfin التي تضيفها، بما في ذلك الخوادم الموجودة على شبكتك المنزلية."
+          }
+        },
+        "be": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone падключаецца да сервераў Jellyfin, якія вы дадаяце, у тым ліку да сервераў у вашай хатняй сетцы."
+          }
+        },
+        "cs": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone se připojuje k serverům Jellyfin, které přidáte, včetně těch ve vaší domácí síti."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone opretter forbindelse til de Jellyfin-servere, du tilføjer, herunder dem på dit hjemmenetværk."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone verbindet sich mit den Jellyfin-Servern, die du hinzufügst, auch mit denen in deinem Heimnetzwerk."
+          }
+        },
+        "el": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Το Anemone συνδέεται με τους διακομιστές Jellyfin που προσθέτετε, συμπεριλαμβανομένων εκείνων στο οικιακό σας δίκτυο."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anemone connects to the Jellyfin servers you add, including ones on your home network."
+          }
+        },
+        "en-GB": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone connects to the Jellyfin servers you add, including ones on your home network."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone se conecta a los servidores Jellyfin que añades, incluidos los de tu red doméstica."
+          }
+        },
+        "et": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone ühendub Jellyfini serveritega, mille lisad, sealhulgas sinu koduvõrgus olevatega."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone se connecte aux serveurs Jellyfin que vous ajoutez, y compris ceux de votre réseau domestique."
+          }
+        },
+        "he": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone מתחבר לשרתי Jellyfin שאתם מוסיפים, כולל שרתים ברשת הביתית שלכם."
+          }
+        },
+        "hr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone se povezuje s Jellyfin poslužiteljima koje dodate, uključujući one u vašoj kućnoj mreži."
+          }
+        },
+        "hu": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Az Anemone a hozzáadott Jellyfin-kiszolgálókhoz csatlakozik, az otthoni hálózaton lévőkhöz is."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone terhubung ke server Jellyfin yang Anda tambahkan, termasuk yang ada di jaringan rumah Anda."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone si connette ai server Jellyfin che aggiungi, compresi quelli nella tua rete domestica."
+          }
+        },
+        "kab": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone yeqqen ɣer iqeddacen Jellyfin i d-ternuḍ, ula d wid yellan deg uẓeṭṭa n uxxam-ik."
+          }
+        },
+        "lv": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone savienojas ar jūsu pievienotajiem Jellyfin serveriem, tostarp tiem, kas atrodas jūsu mājas tīklā."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone kobler til Jellyfin-serverne du legger til, inkludert dem på hjemmenettverket ditt."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone maakt verbinding met de Jellyfin-servers die je toevoegt, ook die in je thuisnetwerk."
+          }
+        },
+        "nn": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone koplar til Jellyfin-tenarane du legg til, inkludert dei på heimenettverket ditt."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone łączy się z dodanymi przez Ciebie serwerami Jellyfin, w tym z tymi w Twojej sieci domowej."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O Anemone se conecta aos servidores Jellyfin que você adiciona, inclusive aos da sua rede doméstica."
+          }
+        },
+        "pt-PT": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "O Anemone liga-se aos servidores Jellyfin que adiciona, incluindo os da sua rede doméstica."
+          }
+        },
+        "ro": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone se conectează la serverele Jellyfin pe care le adăugați, inclusiv la cele din rețeaua dvs. de acasă."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone подключается к серверам Jellyfin, которые вы добавляете, в том числе к серверам в вашей домашней сети."
+          }
+        },
+        "sk": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone sa pripája k serverom Jellyfin, ktoré pridáte, vrátane tých vo vašej domácej sieti."
+          }
+        },
+        "sl": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone se povezuje s strežniki Jellyfin, ki jih dodate, vključno s tistimi v vašem domačem omrežju."
+          }
+        },
+        "sq": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone lidhet me serverët Jellyfin që shtoni, përfshirë ata në rrjetin tuaj të shtëpisë."
+          }
+        },
+        "sr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone se povezuje sa Jellyfin serverima koje dodate, uključujući i one na vašoj kućnoj mreži."
+          }
+        },
+        "sv": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone ansluter till de Jellyfin-servrar du lägger till, även de i ditt hemnätverk."
+          }
+        },
+        "th": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone เชื่อมต่อกับเซิร์ฟเวอร์ Jellyfin ที่คุณเพิ่ม รวมถึงเซิร์ฟเวอร์ในเครือข่ายภายในบ้านของคุณ"
+          }
+        },
+        "tr": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone, eklediğiniz Jellyfin sunucularına, ev ağınızdakiler de dahil olmak üzere bağlanır."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone підключається до серверів Jellyfin, які ви додаєте, зокрема до тих, що у вашій домашній мережі."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone 会连接到你添加的 Jellyfin 服务器，包括你家庭网络中的服务器。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Anemone 會連接到你新增的 Jellyfin 伺服器，包括你家用網路中的伺服器。"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
