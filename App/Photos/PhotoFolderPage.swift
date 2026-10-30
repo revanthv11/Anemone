@@ -251,7 +251,10 @@ private struct PhotoSortMenu: View {
                 }
             }
         } label: {
+            // As the library's sort menu: tvOS focuses a wrapper that reads its children.
             Label(Self.title(sort.field), systemImage: sort.direction.systemImage)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(sort.direction.spokenSort(Self.title(sort.field)))
         }
         .accessibilityIdentifier("photos.sort")
     }

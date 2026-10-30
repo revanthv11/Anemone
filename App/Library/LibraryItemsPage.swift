@@ -358,41 +358,12 @@ private struct SortMenu: View {
                 }
             }
         } label: {
+            // tvOS focuses a wrapper of the menu's label that takes no label of its own and reads
+            // its children, so the label is one element that says what the menu does.
             Label(sort.field.title, systemImage: sort.direction.systemImage)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(sort.direction.spokenSort(sort.field.title))
         }
-        .accessibilityLabel(sort.direction == .ascending
-            ? Text("Sort by \(sort.field.title), ascending")
-            : Text("Sort by \(sort.field.title), descending"))
         .accessibilityIdentifier("library.sort")
-    }
-}
-
-extension LibrarySort.Field {
-    /// Wholphin's names for its sort options.
-    var title: String {
-        switch self {
-        case .default: String(localized: "Default")
-        case .name: String(localized: "Name")
-        case .premiereDate: String(localized: "Date Released")
-        case .dateCreated: String(localized: "Date Added")
-        case .dateLastContentAdded: String(localized: "Date Episode Added")
-        case .datePlayed, .seriesDatePlayed: String(localized: "Date Played")
-        case .communityRating: String(localized: "Community Rating")
-        case .criticRating: String(localized: "Critic Rating")
-        case .officialRating: String(localized: "Parental Rating")
-        case .runtime: String(localized: "Runtime")
-        case .playCount: String(localized: "Play Count")
-        case .albumArtist: String(localized: "Album Artist")
-        case .random: String(localized: "Random")
-        }
-    }
-}
-
-extension LibrarySort.Direction {
-    var systemImage: String {
-        switch self {
-        case .ascending: "arrow.up"
-        case .descending: "arrow.down"
-        }
     }
 }
