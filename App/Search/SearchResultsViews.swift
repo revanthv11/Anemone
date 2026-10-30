@@ -62,6 +62,12 @@ private struct SearchResultsRow: View {
                     )
                 }
                 .buttonStyle(.personCard)
+            } else if kind == .tvChannel || kind == .liveTVProgram {
+                // As on Home: a channel plays, a programme opens its details.
+                LiveTVHomeCard(item: details.item, isChannel: kind == .tvChannel) {
+                    ItemCard(details: details, shape: kind.cardShape)
+                }
+                .buttonStyle(.borderless)
             } else {
                 NavigationLink(value: details.item) {
                     ItemCard(details: details, shape: kind.cardShape)
@@ -102,12 +108,8 @@ struct CombinedResults: View {
                     .accessibilityHidden(true)
                 LazyVGrid(columns: Self.columns, alignment: .leading, spacing: 40) {
                     ForEach(items) { details in
-                        NavigationLink(value: details.item) {
-                            ItemCard(details: details, shape: .poster)
-                        }
-                        .buttonStyle(.borderless)
-                        .cardMenu()
-                        .focused(focus, equals: .card(row: SearchKind.combinedRowID, item: details.id))
+                        card(details)
+                            .focused(focus, equals: .card(row: SearchKind.combinedRowID, item: details.id))
                         .accessibilityIdentifier("card.\(SearchKind.combinedRowID).\(details.id)")
                     }
                 }
@@ -117,6 +119,25 @@ struct CombinedResults: View {
             .focusSection()
         case nil:
             EmptyView()
+        }
+    }
+
+    /// A channel plays and a programme opens its details, as on Home, with no card menu; the rest
+    /// open their pages.
+    @ViewBuilder
+    private func card(_ details: ItemDetails) -> some View {
+        switch details.item.kind {
+        case .tvChannel, .tvProgram:
+            LiveTVHomeCard(item: details.item, isChannel: details.item.kind == .tvChannel) {
+                ItemCard(details: details, shape: .poster)
+            }
+            .buttonStyle(.borderless)
+        default:
+            NavigationLink(value: details.item) {
+                ItemCard(details: details, shape: .poster)
+            }
+            .buttonStyle(.borderless)
+            .cardMenu()
         }
     }
 
@@ -208,6 +229,8 @@ extension SearchKind {
         case .episode: String(localized: "Episodes")
         case .collection: String(localized: "Collections")
         case .person: String(localized: "People")
+        case .tvChannel: String(localized: "Channels")
+        case .liveTVProgram: String(localized: "Programs")
         case .musicAlbum: String(localized: "Albums")
         case .musicArtist: String(localized: "Artists")
         case .audio: String(localized: "Songs")
@@ -224,7 +247,7 @@ extension SearchKind {
     var cardShape: CardShape {
         switch self {
         case .movie, .series, .collection, .person: .poster
-        case .episode, .video, .musicVideo, .photo, .photoAlbum: .thumb
+        case .episode, .video, .musicVideo, .photo, .photoAlbum, .tvChannel, .liveTVProgram: .thumb
         case .musicAlbum, .musicArtist, .audio, .playlist: .square
         }
     }

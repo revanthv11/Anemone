@@ -170,8 +170,12 @@ struct LiveTVTests: LiveTVServerTesting {
         #expect(recordings.map(\.id) == ["r1"])
         // A recording plays from its page, so it keeps its own kind rather than falling to `other`.
         #expect(recordings.map(\.kind) == [.recording])
-        #expect(try await rows.programsOnNow(limit: 6).map(\.id) == ["p1"])
-        #expect(try await rows.channels(limit: 7).map(\.id) == ["c1"])
+        let onNow = try await rows.programsOnNow(limit: 6)
+        #expect(onNow.map(\.id) == ["p1"])
+        #expect(onNow.map(\.kind) == [.tvProgram])
+        let channels = try await rows.channels(limit: 7)
+        #expect(channels.map(\.id) == ["c1"])
+        #expect(channels.map(\.kind) == [.tvChannel])
 
         let recordingsQuery = try #require(sent.request("GET /LiveTv/Recordings")).query
         #expect(recordingsQuery["isInProgress"] == "true")

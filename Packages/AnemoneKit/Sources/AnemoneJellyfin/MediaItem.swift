@@ -15,6 +15,10 @@ public struct MediaItem: Hashable, Identifiable, Sendable {
         /// A Live TV recording, under way or finished, as the server's recordings and Home's Active
         /// Recordings row send it. It plays like a video.
         case recording
+        /// A Live TV channel, which plays when selected.
+        case tvChannel
+        /// A Live TV programme, which opens its details, to watch its channel or record it.
+        case tvProgram
         case musicVideo
         case musicAlbum
         case musicArtist
@@ -213,6 +217,10 @@ private extension MediaItem.Kind {
         .person: .person,
         .video: .video,
         .recording: .recording,
+        .tvChannel: .tvChannel,
+        // The server sends a programme as `Program`; `LiveTvProgram` is the type queries name.
+        .program: .tvProgram,
+        .liveTvProgram: .tvProgram,
         .musicVideo: .musicVideo,
         .musicAlbum: .musicAlbum,
         .musicArtist: .musicArtist,
