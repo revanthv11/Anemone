@@ -134,6 +134,27 @@ struct PlaylistPage: View {
         }
     }
 
+    /// Plays the playlist from one of its entries, leaving out those before it, as Wholphin's
+    /// `startIndex` does. A playlist of songs plays as music from that song.
+    private func play(from index: Int) {
+        Task {
+            if let entries, !entries.isEmpty, entries.allSatisfy({ $0.item.kind == .audio }) {
+                let id = playlist.id
+                let started = await browse
+                    .optional(attempt { try await music.play(playlist: id, from: index) }) ?? false
+                if started {
+                    showsNowPlaying = true
+                    return
+                }
+            }
+            // A song or other entry the video player leaves out starts the queue at the next video.
+            let start = entries.flatMap { QueueStart(at: index, in: $0) }
+            await browse.playQueue(of: playlist, shuffled: false, startingAt: start) { playback = $0 } failed: {
+                alert = $0
+            }
+        }
+    }
+
     /// Wholphin's move buttons, shown when the user can edit the playlist.
     private func moveButtons(index: Int, count: Int) -> some View {
         HStack(spacing: 12) {
@@ -210,6 +231,11 @@ struct PlaylistPage: View {
                             .accessibilityLabel(entry.entryLabel(index: index))
                             .focused($focus, equals: entryFocus(index))
                             .accessibilityIdentifier("entry.\(index)")
+                            // The remote's Play button plays the playlist from here, as in
+                            // Wholphin (`onClickPlayRemoteButton`); Select still opens the page.
+                            .onPlayPauseCommand {
+                                play(from: index)
+                            }
                             if canEdit, !hasRepeats {
                                 moveButtons(index: index, count: entries.count)
                             }

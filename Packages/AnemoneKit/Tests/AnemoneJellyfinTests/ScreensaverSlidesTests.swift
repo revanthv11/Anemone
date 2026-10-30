@@ -34,6 +34,66 @@ struct ScreensaverSlidesTests {
         #expect(sent.query["hasParentalRating"] == nil)
     }
 
+    @Test func `with photos included, the backdrop isn't asked of the server`() async throws {
+        let server = HomeServer("screensaver-photos.test") { path, _ in
+            path == "/Items" ? .homeItems() : nil
+        }
+
+        _ = try await server.session().screensaverSlides(
+            maxAgeRating: nil,
+            types: ScreensaverItemTypes([.photo, .series]),
+        )
+
+        let sent = try #require(server.requests(to: "/Items").first)
+        #expect(sent.query["includeItemTypes"] == "Series,Photo")
+        #expect(sent.query["imageTypes"] == nil)
+        #expect(sent.query["enableImageTypes"] == "Backdrop,Logo,Primary")
+    }
+
+    @Test func `with no types, nothing is asked and there's nothing to show`() async throws {
+        let server = HomeServer("screensaver-notypes.test") { path, _ in
+            path == "/Items" ? .homeItems() : nil
+        }
+
+        let slides = try await server.session().screensaverSlides(maxAgeRating: nil, types: ScreensaverItemTypes([]))
+
+        #expect(slides.isEmpty)
+        #expect(server.requests(to: "/Items").isEmpty)
+    }
+
+    @Test func `a photo is its own picture, titled with the day it was taken`() async throws {
+        let server = HomeServer("screensaver-photo-slide.test") { path, _ in
+            guard path == "/Items" else { return nil }
+            return .homeItems(
+                #"{"Id":"p1","Name":"IMG_0001.jpg","Type":"Photo","ImageTags":{"Primary":"t1"},"#
+                    + #""PremiereDate":"2024-07-04T00:00:00.0000000Z"}"#,
+                #"{"Id":"p2","Name":"IMG_0002.jpg","Type":"Photo","ImageTags":{"Primary":"t2"}}"#,
+                #"{"Id":"m2","Name":"No Backdrop","Type":"Movie"}"#,
+            )
+        }
+
+        let slides = try await server.session().screensaverSlides(
+            maxAgeRating: nil,
+            types: ScreensaverItemTypes([.movie, .photo]),
+        )
+
+        #expect(slides.map(\.id) == ["p1", "p2"])
+        #expect(slides.first?.backdrop == ItemImage(itemID: "p1", kind: .primary, tag: "t1"))
+        #expect(slides.first?.logo == nil)
+        #expect(slides.first?.title.contains("2024") == true)
+        #expect(slides.last?.title == "")
+    }
+
+    @Test func `the types are stored as the server's names, unknown ones dropped`() {
+        #expect(ScreensaverItemTypes([.photo, .movie]).rawValue == "Movie,Photo")
+        #expect(ScreensaverItemTypes(rawValue: "Series, Photo,Book")?.kinds == [.series, .photo])
+        #expect(ScreensaverItemTypes(rawValue: "")?.kinds == [])
+        var types = ScreensaverItemTypes.default
+        types.set(.photo, included: true)
+        types.set(.movie, included: false)
+        #expect(types.rawValue == "Series,Photo")
+    }
+
     @Test func `each slide is a backdrop with a logo when there is one`() async throws {
         let server = HomeServer("screensaver-slides.test") { path, _ in
             guard path == "/Items" else { return nil }

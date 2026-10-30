@@ -6,15 +6,23 @@ import AnemonePlayback
 extension BrowseModel {
     /// What a page asks for to play an item, starting at `position`, or the beginning when `nil`.
     /// An episode goes on through the episodes after it, as in Wholphin; they're found once it's
-    /// playing.
+    /// playing. A video split across files plays its other parts after it, as Wholphin's
+    /// `PlaylistCreator` adds them; they're found the same way.
     func playback(of details: ItemDetails, from position: Duration?) -> PlaybackRequest {
         var following: PlaybackRequest.Following?
+        let session = session
         if details.item.kind == .episode, let seriesID = details.item.episode?.seriesID {
-            let session = session
             let episodeID = details.id
             following = { @MainActor [self] in
+                // The episode's own parts first, then the episodes after it, each with its parts.
                 let episodes = try await session.episodes(ofSeries: seriesID, from: episodeID)
-                return episodes.drop { $0.id == episodeID }.map { entry(for: $0, from: nil) }
+                let after = episodes.drop { $0.id == episodeID }
+                let queued = await session.addingParts(to: [details] + after).dropFirst()
+                return queued.map { entry(for: $0, from: nil) }
+            }
+        } else if details.item.partCount != nil {
+            following = { @MainActor [self] in
+                await session.addingParts(to: [details]).dropFirst().map { entry(for: $0, from: nil) }
             }
         }
         return request(PlaybackQueue(entry(for: details, from: position)), following: following)
@@ -24,12 +32,16 @@ extension BrowseModel {
     /// `PlaylistCreator`: asks the server what to play, then hands it to `play`, or says why
     /// there's nothing through `failed`. Series Play resumes the episode next up; the rest start
     /// from the beginning. A collection's page passes the items it lists as `shown`, in `order`,
-    /// so they aren't asked for again.
+    /// so they aren't asked for again. With `start`, the queue starts at that entry, as Wholphin's
+    /// playlist plays from the entry the remote's Play button is pressed on; the entries before it
+    /// are left out, as its `startIndex` leaves them out. Each video split across files is
+    /// followed by its other parts.
     func playQueue(
         of container: ItemDetails,
         shuffled: Bool,
         order: (sort: LibrarySort, filter: LibraryFilter)? = nil,
         shown: [ItemDetails]? = nil,
+        startingAt start: QueueStart? = nil,
         play: (PlaybackRequest) -> Void,
         failed: (ItemAlert) -> Void,
     ) async {
@@ -39,8 +51,18 @@ extension BrowseModel {
         defer { Self.isFindingQueue = false }
         do {
             let found = try await queueItems(of: container, shuffled: shuffled, order: order, shown: shown)
+            var items = found.items
+            if let first = start?.index(in: items) {
+                items.removeFirst(first)
+            }
+            // Playlists are shuffled here, before the parts join, so each part stays after its
+            // video; the server shuffles the rest.
+            if shuffled, container.item.kind == .playlist {
+                items.shuffle()
+            }
+            items = await session.addingParts(to: items)
             let resumesFirst = container.item.kind == .series && !shuffled
-            let entries = found.items.enumerated().map { index, item in
+            let entries = items.enumerated().map { index, item in
                 entry(for: item, from: index == 0 && resumesFirst ? item.userState.resumePosition : nil)
             }
             guard var queue = PlaybackQueue(entries: entries) else {
@@ -53,8 +75,7 @@ extension BrowseModel {
             }
             queue.skippedCount = found.skippedCount
             queue.overLimitCount = found.overLimitCount
-            // Playlists are shuffled here; the server shuffles the rest.
-            play(request(queue, shuffles: shuffled && container.item.kind == .playlist))
+            play(request(queue))
         } catch {
             if let message = problem(with: error, failure: "Couldn't find what to play in \(container.item.name).") {
                 failed(.failed(message))

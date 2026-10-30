@@ -165,9 +165,9 @@ public extension JellyfinSession {
         return try await ItemDetails.UserState(send(request))
     }
 
-    /// Fields for rows on item pages: the focused item's overview, card shapes, and episode or
-    /// item counts.
-    private static let rowFields: [ItemFields] = [.overview, .primaryImageAspectRatio, .childCount]
+    /// Fields for rows on item pages: the focused item's overview, card shapes, episode or item
+    /// counts, and whether the user may delete the item, for its card's menu.
+    private static let rowFields: [ItemFields] = [.overview, .primaryImageAspectRatio, .childCount, .canDelete]
 }
 
 extension JellyfinSession {

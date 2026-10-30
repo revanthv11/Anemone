@@ -47,7 +47,7 @@ struct LibraryShuffleTests {
         let pageIDs = pages.map { ($0["ids"] ?? "").split(separator: ",").map(String.init) }
         #expect(pageIDs.map(\.count) == Array(repeating: 100, count: 12) + [50])
         #expect(pageIDs.flatMap(\.self) == shown)
-        #expect(pages.allSatisfy { $0["fields"] == "SortName,Overview" && $0["sortBy"] == nil })
+        #expect(pages.allSatisfy { $0["fields"] == "SortName,Overview,CanDelete" && $0["sortBy"] == nil })
     }
 
     @Test func `a big random grid counts its IDs with the first page, then asks for the rest together`() async throws {

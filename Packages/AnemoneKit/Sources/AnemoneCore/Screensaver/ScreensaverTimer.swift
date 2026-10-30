@@ -7,6 +7,11 @@ import Observation
 /// press or touch closes it. tvOS has no screensaver API for apps, so this is all in the app,
 /// and the system's own screensaver still takes over later.
 ///
+/// Wholphin's "Dim screen after delay" runs on the same timer (its `dimJob` waits for the same
+/// delay): with it on, the screen dims after the delay whether or not the screensaver is turned
+/// on, and the screensaver, when it shows, is dimmed too. What shows is `isShowing`, and
+/// `showsSlides` says whether it's the screensaver's pictures or the dimming alone.
+///
 /// `isShowing` is what should be on screen; the app's presenter shows it and says whether it
 /// really is (`isOnScreen`), so a screensaver that never made it on screen, or that the system
 /// took off screen without `stop()`, doesn't count as showing for long.
@@ -17,14 +22,20 @@ public final class ScreensaverTimer {
     public struct Settings: Equatable, Sendable {
         public var isEnabled: Bool
         public var startDelay: Duration
+        /// Wholphin's `dimEnabled`: whether the screen dims after the delay, screensaver or not.
+        public var dimsScreen: Bool
 
-        public init(isEnabled: Bool, startDelay: Duration) {
+        public init(isEnabled: Bool, startDelay: Duration, dimsScreen: Bool = false) {
             self.isEnabled = isEnabled
             self.startDelay = startDelay
+            self.dimsScreen = dimsScreen
         }
     }
 
     public private(set) var isShowing = false
+    /// While showing: whether the screensaver's pictures show, or only the dimming, for a start
+    /// with the screensaver turned off and the dimming on.
+    public private(set) var showsSlides = false
     /// Whether something on screen keeps the screen on, which pauses the timer like Wholphin's
     /// `keepScreenOn`. The presenter sets it.
     @ObservationIgnored public var keepsScreenOn: () -> Bool = { false }
@@ -50,6 +61,7 @@ public final class ScreensaverTimer {
 
     /// Shows it now, even when it's turned off, like Wholphin's "Start screensaver".
     public func start() {
+        showsSlides = true
         isShowing = true
     }
 
@@ -76,7 +88,7 @@ public final class ScreensaverTimer {
             }
             let current = settings()
             schedule.startDelay = current.startDelay
-            guard current.isEnabled else {
+            guard current.isEnabled || current.dimsScreen else {
                 // Checked again later, in case it's turned on meanwhile.
                 schedule.noteActivity(at: .now)
                 await wait(until: .now + pollInterval)
@@ -84,6 +96,7 @@ public final class ScreensaverTimer {
             }
             switch schedule.check(at: .now, keepsScreenOn: keepsScreenOn()) {
             case .start:
+                showsSlides = current.isEnabled
                 isShowing = true
             case let .wait(until):
                 await wait(until: min(until, .now + pollInterval))

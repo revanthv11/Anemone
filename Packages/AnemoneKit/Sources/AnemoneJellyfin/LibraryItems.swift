@@ -257,8 +257,9 @@ extension LibraryFilter {
 }
 
 extension LibraryEntry {
-    /// Wholphin's `SlimItemFields`: the overview is for the details header and list layout.
-    static let fields: [ItemFields] = [.sortName, .overview]
+    /// Wholphin's `SlimItemFields`: the overview is for the details header and list layout, and
+    /// `CanDelete` for the card's menu.
+    static let fields: [ItemFields] = [.sortName, .overview, .canDelete]
     static let imageTypes: [ImageType] = [.primary, .thumb, .backdrop, .logo]
 
     init?(_ dto: BaseItemDto) {

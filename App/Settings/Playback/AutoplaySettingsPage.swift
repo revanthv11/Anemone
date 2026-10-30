@@ -22,7 +22,10 @@ struct AutoplaySettingsPage: View {
                 )
                 .accessibilityIdentifier("autoplay.timing")
             } footer: {
-                Text("During the credits needs the server to know where they start; otherwise it shows at the end.")
+                Text("""
+                During the credits needs the server to know where they start; otherwise it shows at the end. \
+                With Never, autoplay goes straight on to the next video, and without autoplay the player closes.
+                """)
             }
             Section {
                 Toggle("Autoplay next", isOn: $autoPlayNext)
@@ -119,6 +122,7 @@ private extension UpNextTiming {
         switch self {
         case .endOfPlayback: String(localized: "At the end")
         case .duringCredits: String(localized: "During the credits")
+        case .never: String(localized: "Never")
         }
     }
 }

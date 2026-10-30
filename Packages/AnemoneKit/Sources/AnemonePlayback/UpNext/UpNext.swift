@@ -7,7 +7,8 @@ import Foundation
 /// when `SegmentSkipping` finds the outro instead, once for each outro and in place of its skip
 /// button, as in Wholphin; Cancel keeps the credits playing until the card comes back at the end.
 /// Going back before the credits takes the card down until they play again. Moving on from the
-/// credits marks the entry played, which Wholphin doesn't (see `play(_:)`).
+/// credits marks the entry played, which Wholphin doesn't (see `play(_:)`). With "Never", no card
+/// comes: autoplay moves on at the end at once, and without it the player closes.
 ///
 /// Pass-out protection: once `passOutCount` entries have played on their own with no press on
 /// the remote, the card asks "Still watching?" instead, and playback stops when nobody answers.
@@ -162,6 +163,10 @@ private extension UpNext {
 private extension UpNext {
     func ended(in controller: PlaybackController) {
         guard controller.queue.next != nil else { return }
+        if settings.timing == .never, !settings.autoplays {
+            // Nothing to offer: the player closes at the end, as Wholphin's goes back.
+            return
+        }
         // The player stays open with the card over the last frame.
         controller.closesAtEnd = false
         if var offer {
@@ -184,7 +189,8 @@ private extension UpNext {
             } then: { [weak self] in
                 self?.stop()
             }
-        } else if settings.autoplays, settings.countdown <= .zero {
+        } else if settings.autoplays, settings.countdown <= .zero || settings.timing == .never {
+            // "Never" shows no card, so there's no countdown to watch.
             autoplay(index)
         } else {
             guard settings.autoplays else {

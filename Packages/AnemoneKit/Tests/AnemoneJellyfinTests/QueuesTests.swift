@@ -185,6 +185,80 @@ struct QueuesTests {
         #expect(request.query["limit"] == nil)
     }
 
+    @Test func `a video split across files is followed by its other parts`() async throws {
+        let sent = register(host: "queue-parts.test", replies: [
+            "/Videos/m1/AdditionalParts": Self.items([Self.movie("m1b"), Self.movie("m1c")]),
+        ])
+        let session = try session(host: "queue-parts.test")
+        let split = ItemDetails(item: MediaItem(id: "m1", name: "Film", kind: .movie, partCount: 3))
+        let whole = ItemDetails(item: MediaItem(id: "m2", name: "Other", kind: .movie))
+
+        let parts = try await session.additionalParts(of: split)
+        let queue = await session.addingParts(to: [whole, split])
+
+        #expect(parts.map(\.id) == ["m1b", "m1c"])
+        #expect(queue.map(\.id) == ["m2", "m1", "m1b", "m1c"])
+        #expect(sent["/Videos/m1/AdditionalParts"]?.query["userId"] == "u1")
+        #expect(sent["/Videos/m2/AdditionalParts"] == nil)
+    }
+
+    @Test func `the server's part count comes with a queue's items, one file counting as none`() async throws {
+        let sent = register(host: "queue-partcount.test", replies: [
+            "/Shows/s1/Episodes": Self.items([
+                Self.episode("e1", season: 1, number: 1, partCount: 2),
+                Self.episode("e2", season: 1, number: 2, partCount: 1),
+            ]),
+            "/Videos/e1/AdditionalParts": Self.items([Self.episode("e1b", season: 1, number: 1)]),
+        ])
+        let session = try session(host: "queue-partcount.test")
+
+        let episodes = try await session.seasonQueue(seriesID: "s1", seasonID: "season1")
+        let queue = await session.addingParts(to: episodes)
+
+        #expect(episodes.map(\.item.partCount) == [2, nil])
+        #expect(queue.map(\.id) == ["e1", "e1b", "e2"])
+        #expect(sent["/Videos/e2/AdditionalParts"] == nil)
+    }
+
+    @Test func `a video whose parts can't be read plays alone, and the rest keep theirs`() async throws {
+        // No reply for m1's parts, so that request fails.
+        _ = register(host: "queue-partsfail.test", replies: [
+            "/Videos/m2/AdditionalParts": Self.items([Self.movie("m2b")]),
+        ])
+        let session = try session(host: "queue-partsfail.test")
+        let broken = ItemDetails(item: MediaItem(id: "m1", name: "Broken", kind: .movie, partCount: 2))
+        let whole = ItemDetails(item: MediaItem(id: "m3", name: "Whole", kind: .movie))
+        let split = ItemDetails(item: MediaItem(id: "m2", name: "Split", kind: .movie, partCount: 2))
+
+        let queue = await session.addingParts(to: [broken, whole, split])
+
+        #expect(queue.map(\.id) == ["m1", "m3", "m2", "m2b"])
+    }
+
+    @Test func `a queue starts at the entry picked, its own copy of a repeated item`() throws {
+        let film = ItemDetails(item: MediaItem(id: "m1", name: "Film", kind: .movie))
+        let other = ItemDetails(item: MediaItem(id: "m2", name: "Other", kind: .movie))
+        let song = ItemDetails(item: MediaItem(id: "a1", name: "Song", kind: .audio))
+        // The page lists Film, Song, Other, Film; the queue holds its videos only.
+        let listed = [film, song, other, film]
+        let videos = [film, other, film]
+
+        let second = try #require(QueueStart(at: 3, in: listed))
+        let fromSong = try #require(QueueStart(at: 1, in: listed))
+
+        #expect(second.index(in: videos) == 2)
+        #expect(fromSong.itemID == "m2")
+        #expect(fromSong.index(in: videos) == 1)
+        #expect(QueueStart(at: 0, in: listed)?.index(in: videos) == 0)
+        // A copy the queue no longer has, and a song with no video after it.
+        #expect(second.index(in: [film, other]) == nil)
+        #expect(QueueStart(at: 1, in: [film, song]) == nil)
+    }
+
+    static func movie(_ id: String) -> String {
+        #"{"Id":"\#(id)","Name":"Film \#(id)","Type":"Movie","LocationType":"FileSystem"}"#
+    }
+
     static func items(_ items: [String]) -> String {
         #"{"Items":[\#(items.joined(separator: ","))],"TotalRecordCount":\#(items.count)}"#
     }
@@ -195,10 +269,12 @@ struct QueuesTests {
         number: Int,
         resumeTicks: Int = 0,
         location: String = "FileSystem",
+        partCount: Int? = nil,
     ) -> String {
-        #"""
+        let parts = partCount.map { #","PartCount":\#($0)"# } ?? ""
+        return #"""
         {"Id":"\#(id)","Name":"Episode \#(id)","Type":"Episode","SeriesId":"s1","SeriesName":"Show",
-         "ParentIndexNumber":\#(season),"IndexNumber":\#(number),"LocationType":"\#(location)",
+         "ParentIndexNumber":\#(season),"IndexNumber":\#(number),"LocationType":"\#(location)"\#(parts),
          "UserData":{"Key":"\#(id)","PlaybackPositionTicks":\#(resumeTicks),"Played":false}}
         """#
     }

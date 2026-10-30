@@ -50,10 +50,17 @@ extension MusicPlayer {
     /// Adds the rest of `source` to the playing queue a page at a time, up to `queueLimit` of the
     /// server's entries. A page that fails ends the queue where it is: the music has started, so
     /// it plays on.
-    func addPages(of source: MusicSource, after first: MusicPage, request: Int) async {
-        let total = min(first.totalCount ?? first.serverCount, Self.queueLimit)
-        var fetched = first.serverCount
-        while fetched < total {
+    ///
+    /// - Parameter startIndex: where `first` started, when not at the source's first entry. The
+    ///   server counts the entries only for a page from the first, so from elsewhere the pages go
+    ///   on until one comes back short.
+    func addPages(of source: MusicSource, after first: MusicPage, request: Int, from startIndex: Int = 0) async {
+        let limit = startIndex + Self.queueLimit
+        let isCounted = first.totalCount != nil || startIndex == 0
+        let total = min(first.totalCount ?? (startIndex == 0 ? first.serverCount : limit), limit)
+        var fetched = startIndex + first.serverCount
+        var lastPageWasFull = first.serverCount >= Self.pageSize
+        while fetched < total, isCounted || lastPageWasFull {
             let page: MusicPage
             do {
                 page = try await loadSongs(source, false, fetched, Self.pageSize)
@@ -69,6 +76,7 @@ extension MusicPlayer {
                 queueChanged()
             }
             fetched += page.serverCount
+            lastPageWasFull = page.serverCount >= Self.pageSize
         }
     }
 

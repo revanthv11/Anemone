@@ -22,6 +22,35 @@ extension MusicPlayerTests {
         player.stop()
     }
 
+    @Test func `a playlist plays from one of its entries, leaving out those before it`() async throws {
+        library.songs = (0 ..< 250).map { MusicItem.song("s\($0)") }
+        let player = player()
+
+        let isMusic = try await player.play(playlist: "pl1", from: 120)
+        await startSong(1, in: player)
+
+        #expect(isMusic)
+        #expect(player.current?.id == "s120")
+        #expect(await eventually { player.queue.entries.count == 130 })
+        // The server counts entries only from the first, so the pages go on until one is short.
+        #expect(library.received.map(\.startIndex) == [120, 220])
+        player.stop()
+    }
+
+    @Test func `a playlist played from its last page asks for nothing more`() async throws {
+        library.songs = (0 ..< 250).map { MusicItem.song("s\($0)") }
+        let player = player()
+
+        _ = try await player.play(playlist: "pl1", from: 230)
+        await startSong(1, in: player)
+
+        #expect(player.current?.id == "s230")
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(player.queue.entries.count == 20)
+        #expect(library.received.map(\.startIndex) == [230])
+        player.stop()
+    }
+
     @Test func `a playlist not listed yet takes no more than a queue's limit`() async throws {
         library.songs = (0 ..< 1200).map { MusicItem.song("s\($0)") }
         let player = player()

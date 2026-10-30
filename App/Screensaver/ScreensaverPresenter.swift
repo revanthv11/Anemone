@@ -68,7 +68,8 @@ private struct ScreensaverPresenter: ViewModifier {
         while let next = top.presentedViewController, !next.isBeingDismissed {
             top = next
         }
-        let controller = ScreensaverController(content: ScreensaverView(session: session)) { [screensaver] in
+        let content = ScreensaverView(session: session, showsSlides: screensaver.showsSlides)
+        let controller = ScreensaverController(content: content) { [screensaver] in
             screensaver.stop()
         }
         controller.removed = { [weak controller, stage, screensaver] in
@@ -168,7 +169,8 @@ private final class ScreensaverController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .black
+        // The view draws black behind its pictures; dimming alone shows the app through it.
+        view.backgroundColor = .clear
         view.accessibilityIdentifier = "screensaver"
         addChild(content)
         content.view.frame = view.bounds
