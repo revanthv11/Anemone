@@ -25,6 +25,8 @@ struct VideoScaleTests {
         #expect(VideoScale.fill.stretches)
         #expect(VideoScale.unscaled.frame(video: wide, in: screen) == CGRect(x: -960, y: -260, width: 3840, height: 1600))
         #expect(!VideoScale.unscaled.stretches)
+        // Pixel for pixel on a 4K screen, which has two pixels a point.
+        #expect(VideoScale.unscaled.frame(video: wide, in: screen, pixelsPerPoint: 2) == CGRect(x: 0, y: 140, width: 1920, height: 800))
     }
 
     @Test func `fill width and fill height fit one side and let the other run over or short`() {
@@ -50,10 +52,10 @@ struct VideoScaleTests {
     }
 
     @Test func `the overlay's menu lists the choices after the features' menus, and a pick lasts for the player`() async throws {
-        let engine = FakeEngine()
+        // `FakeEngine` draws into a layer of its own, as MPV does, which the speed menu shows for.
         let playback = PlaybackController(
             request: PlaybackRequest(.item("m1")),
-            engine: engine,
+            engine: FakeEngine(),
             features: [PlaybackSpeedMenu()],
             loadStream: FakeStreams().load,
         )
@@ -64,7 +66,7 @@ struct VideoScaleTests {
         #expect(overlay.menus.map(\.id) == ["speed", PlayerOverlay.videoScaleMenuID])
         let menu = overlay.videoScaleMenu
         #expect(menu.title == "Video scale")
-        #expect(menu.options.map(\.title) == ["Fit", "None", "Crop", "Fill", "Fill width", "Fill height"])
+        #expect(menu.options.map(\.title) == ["Fit", "Crop", "Fill width", "Fill height"])
         #expect(menu.options.filter(\.isSelected).map(\.id) == ["crop"])
 
         try #require(menu.options.first { $0.id == "fillWidth" }).select()
@@ -74,5 +76,31 @@ struct VideoScaleTests {
         // The setting it started from is left alone.
         #expect(Preferences.videoScale.value() == .fit)
         await playback.stop()
+    }
+
+    @Test func `AVPlayer gets every choice, and an engine's own layer those that need only the proportions`() throws {
+        func controller(_ engine: any PlayerEngine) -> PlaybackController {
+            PlaybackController(
+                request: PlaybackRequest(.item("m1")),
+                engine: engine,
+                features: [],
+                loadStream: FakeStreams().load,
+            )
+        }
+        let avPlayer = PlayerOverlay(controller: controller(AVPlayerEngine()), videoScale: .fill)
+        #expect(avPlayer.videoScale == .fill)
+        #expect(avPlayer.videoScaleMenu.options.map(\.title) == ["Fit", "None", "Crop", "Fill", "Fill width", "Fill height"])
+        #expect(avPlayer.videoScaleMenu.options.filter(\.isSelected).map(\.id) == ["fill"])
+
+        // `FakeEngine` draws into a layer of its own, as MPV does.
+        let playback = controller(FakeEngine())
+        #expect(VideoScale.choices(for: playback.engine.videoOutput) == [.fit, .crop, .fillWidth, .fillHeight])
+
+        // A saved Fill can't be drawn there, so the player starts from Fit.
+        let overlay = PlayerOverlay(controller: playback, videoScale: .fill)
+        #expect(overlay.videoScale == .fit)
+        #expect(overlay.videoScaleMenu.options.map(\.id) == ["fit", "crop", "fillWidth", "fillHeight"])
+        #expect(overlay.videoScaleMenu.options.filter(\.isSelected).map(\.id) == ["fit"])
+        #expect(PlayerOverlay(controller: playback, videoScale: .crop).videoScale == .crop)
     }
 }

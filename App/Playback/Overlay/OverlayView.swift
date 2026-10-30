@@ -298,19 +298,17 @@ struct PlayerActionButton: View {
 }
 
 /// The time of day in the top right corner while the controls show, as Wholphin's `TimeDisplay`,
-/// behind Settings › Playback › Player Controls › Show clock. It moves on each minute.
+/// behind Settings › Playback › Player Controls › Show clock.
 private struct OverlayClock: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        TimelineView(.everyMinute) { context in
-            Text(context.date, format: .dateTime.hour().minute())
-        }
-        .font(.title3.monospacedDigit())
-        .foregroundStyle(theme.onBackground)
-        // Readable over bright video, where the controls' gradient doesn't reach.
-        .shadow(color: theme.scrim.withAlpha(0.6).color, radius: 6)
-        .accessibilityIdentifier("player.clock")
+        ClockText()
+            .font(.title3)
+            .foregroundStyle(theme.onBackground)
+            // Readable over bright video, where the controls' gradient doesn't reach.
+            .shadow(color: theme.scrim.withAlpha(0.6).color, radius: 6)
+            .accessibilityIdentifier("player.clock")
     }
 }
 

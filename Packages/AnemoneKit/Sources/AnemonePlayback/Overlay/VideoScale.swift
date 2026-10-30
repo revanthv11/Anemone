@@ -30,18 +30,32 @@ public enum VideoScale: String, CaseIterable, Sendable, PreferenceValue {
         self == .fill
     }
 
-    /// Where a video `video` points big goes on a screen `bounds` points big: centred, in the
+    /// The choices for an engine's output. A layer the engine draws itself, such as MPV's, keeps
+    /// the picture in proportion inside the layer, so Fill would be Fit, and doesn't say how big
+    /// its picture is (the server's size for the source isn't the transcode's), so None can't be
+    /// placed; the rest need only the proportions, which a transcode keeps. Wholphin offers MPV
+    /// no choice at all.
+    public static func choices(for output: PlayerVideoOutput) -> [VideoScale] {
+        switch output {
+        case .avPlayer: allCases
+        case .layer: allCases.filter { $0 != .fill && $0 != .unscaled }
+        }
+    }
+
+    /// Where a video `video` pixels big goes on a screen `bounds` points big: centred, in the
     /// video's proportions (but for Fill, which takes the screen), and past the screen's edges
-    /// where the choice crops. The whole screen while the video's size isn't known.
-    public func frame(video: CGSize, in bounds: CGSize) -> CGRect {
-        guard video.width > 0, video.height > 0, bounds.width > 0, bounds.height > 0 else {
+    /// where the choice crops. None counts the pixels at `pixelsPerPoint`, the screen's native
+    /// scale, so it's pixel for pixel on a 4K Apple TV too. The whole screen while the video's
+    /// size isn't known.
+    public func frame(video: CGSize, in bounds: CGSize, pixelsPerPoint: CGFloat = 1) -> CGRect {
+        guard video.width > 0, video.height > 0, bounds.width > 0, bounds.height > 0, pixelsPerPoint > 0 else {
             return CGRect(origin: .zero, size: bounds)
         }
         let widthScale = bounds.width / video.width
         let heightScale = bounds.height / video.height
         let size: CGSize = switch self {
         case .fit: Self.scaled(video, by: min(widthScale, heightScale))
-        case .unscaled: video
+        case .unscaled: Self.scaled(video, by: 1 / pixelsPerPoint)
         case .crop: Self.scaled(video, by: max(widthScale, heightScale))
         case .fill: bounds
         case .fillWidth: Self.scaled(video, by: widthScale)

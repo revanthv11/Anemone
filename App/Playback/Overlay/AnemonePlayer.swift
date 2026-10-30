@@ -287,8 +287,9 @@ private final class FocusCatcherView: UIView {
 /// Where the engine's video shows: AVPlayer's through an `AVPlayerLayer`, or a layer the engine
 /// draws itself, such as MPV's, placed on the screen as the overlay's Video scale says
 /// (`VideoScale.frame`). AVPlayer says how big its video is; an engine's own layer doesn't, so
-/// `fallbackVideoSize` stands in for it, and such a layer keeps the picture in proportion
-/// itself, so Fill is Fit there, as Wholphin leaves MPV at its own scale.
+/// `fallbackVideoSize` stands in for it (the overlay offers such a layer only the choices that
+/// need the picture's proportions). The screensaver counts a view with an `output` as a video
+/// playing (`ScreensaverPresenter`).
 final class PlayerVideoView: UIView {
     var output: PlayerVideoOutput? {
         didSet {
@@ -331,6 +332,11 @@ final class PlayerVideoView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
+    isolated deinit {
+        // The publisher never ends on its own, and the task holds the player.
+        sizeWatcher?.cancel()
+    }
+
     private var videoSize: CGSize {
         playerLayer != nil ? presentedSize : fallbackVideoSize ?? .zero
     }
@@ -347,7 +353,9 @@ final class PlayerVideoView: UIView {
         // As a view's frame moves without animating.
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        hostedLayer?.frame = scale.frame(video: videoSize, in: bounds.size)
+        // None counts the video's pixels against the screen's: 2 a point on a 4K Apple TV.
+        let pixelsPerPoint = max(window?.screen.nativeScale ?? 1, 1)
+        hostedLayer?.frame = scale.frame(video: videoSize, in: bounds.size, pixelsPerPoint: pixelsPerPoint)
         CATransaction.commit()
     }
 

@@ -9,14 +9,15 @@ public extension PlayerOverlay {
         controller.accessories.menus + [videoScaleMenu]
     }
 
-    /// Fit, None, Crop and the rest, the one in use marked. A pick lasts for this player, as
-    /// Wholphin's does; the setting it started from stays as it is.
-    var videoScaleMenu: PlayerMenu {
+    /// Fit, Crop and the rest the engine's output can take (`VideoScale.choices`), the one in use
+    /// marked. A pick lasts for this player, as Wholphin's does; the setting it started from
+    /// stays as it is.
+    internal func makeVideoScaleMenu() -> PlayerMenu {
         PlayerMenu(
             id: Self.videoScaleMenuID,
             title: String(localized: "Video scale", bundle: .module),
             systemImage: "aspectratio",
-            options: VideoScale.allCases.map { scale in
+            options: VideoScale.choices(for: controller.engine.videoOutput).map { scale in
                 PlayerMenu.Option(id: scale.rawValue, title: scale.title, isSelected: scale == videoScale) { [weak self] in
                     self?.videoScale = scale
                     self?.pulse()

@@ -75,7 +75,14 @@ public final class PlayerOverlay {
     public var hideDelay: Duration
     /// How the video fills the screen: the setting when the player opens, then what the Video
     /// scale menu picks, for this player, as Wholphin's `contentScale` lasts for its page.
-    public var videoScale: VideoScale
+    public var videoScale: VideoScale {
+        didSet {
+            videoScaleMenu = makeVideoScaleMenu()
+        }
+    }
+
+    /// The Video scale menu, made again when the choice changes rather than at every draw.
+    public private(set) var videoScaleMenu: PlayerMenu
 
     @ObservationIgnored private let details: PlaybackDetails?
     @ObservationIgnored private let segments: SegmentSkipping?
@@ -102,10 +109,13 @@ public final class PlayerOverlay {
         self.seeker = seeker ?? Seeker(engine: controller.engine)
         self.hideDelay = hideDelay
         self.skipBehavior = skipBehavior
-        self.videoScale = videoScale
+        // A choice the engine's output can't take, such as Fill saved for MPV, starts from Fit.
+        self.videoScale = VideoScale.choices(for: controller.engine.videoOutput).contains(videoScale) ? videoScale : .fit
+        videoScaleMenu = PlayerMenu(id: Self.videoScaleMenuID, title: "", options: [])
         lingerDelay = seekBarLinger
         details = controller.feature(PlaybackDetails.self)
         segments = controller.feature(SegmentSkipping.self)
+        videoScaleMenu = makeVideoScaleMenu()
     }
 
     /// Paused, or not yet under way.
