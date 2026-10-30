@@ -13,6 +13,8 @@ import SwiftUI
 struct LibraryRecommendedTab: View {
     let library: Library
     @Binding var path: NavigationPath
+    /// Whether this tab is the one showing; a hidden tab reloads once it shows again.
+    var isShowing = true
     var onPastFirstRow: (Bool) -> Void = { _ in }
 
     @Environment(BrowseModel.self) private var browse
@@ -24,6 +26,10 @@ struct LibraryRecommendedTab: View {
     /// The rows' scroll view and last row, so the last row can be scrolled to the top too.
     @State private var viewportHeight: CGFloat = 0
     @State private var lastRowHeight: CGFloat = 0
+    /// The reload under way after Back, so a second Back replaces it rather than racing it.
+    @State private var reload: Task<Void, Never>?
+    /// A Back came while the tab was hidden; it reloads when it shows again.
+    @State private var reloadWhenShown = false
 
     private enum Content {
         case loading
@@ -57,7 +63,19 @@ struct LibraryRecommendedTab: View {
         .task {
             await load()
         }
-        // The rows don't load again after Back, so a title deleted from its page is dropped here.
+        // After Back from a title's page the rows load again, as Wholphin's do, so what was
+        // watched or marked there shows; Suggestions stay as they were. A deleted title is
+        // dropped at once, below, since the reload can come later.
+        .onChange(of: path.count) { old, new in
+            if old > 0, new == 0 {
+                scheduleReload()
+            }
+        }
+        .onChange(of: isShowing) { _, showing in
+            if showing, reloadWhenShown {
+                scheduleReload()
+            }
+        }
         .onItemsDeleted { deleted in
             guard case let .loaded(recommended) = content else { return }
             let remaining = recommended.removing(deleted)
@@ -133,6 +151,46 @@ struct LibraryRecommendedTab: View {
         // Gives focus somewhere to rest, so the tabs and the sidebar stay in reach.
         .focusable()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// Reloads now when the tab shows, or once it next shows: Back from a page another tab
+    /// opened needn't fetch rows nobody sees. One reload at a time; a new one replaces the last.
+    private func scheduleReload() {
+        guard isShowing else {
+            reloadWhenShown = true
+            return
+        }
+        reloadWhenShown = false
+        reload?.cancel()
+        reload = Task { await refresh() }
+    }
+
+    /// Loads every row but Suggestions again and keeps what's showing when that fails.
+    private func refresh() async {
+        guard case .loaded = content else { return }
+        let kept: Set<RecommendedRow.Kind> = [.suggestions]
+        do {
+            let fresh = try await browse.session.recommended(
+                in: library,
+                rows: library.recommendedRows.filter { !kept.contains($0) },
+                itemsPerRow: Preferences.maxItemsPerRow.value(),
+                enableRewatchingNextUp: Preferences.enableRewatchingNextUp.value(),
+            )
+            // Into what's showing now, not what was when the reload began: a title deleted
+            // meanwhile stays gone.
+            guard !Task.isCancelled, case let .loaded(latest) = content else { return }
+            let merged = latest.merging(fresh, keeping: kept, order: library.recommendedRows)
+            content = .loaded(merged)
+            // The header describes the focused title as it is now.
+            if let id = focus.details?.id, let item = merged.rows.lazy.flatMap(\.items).first(where: { $0.id == id }) {
+                focus.details = ItemDetails(item: item)
+            }
+        } catch SessionError.signedOut {
+            browse.noteSignedOut()
+            content = .signedOut
+        } catch {
+            // What's showing stays, as a row that fails to load again would only vanish.
+        }
     }
 
     private func load() async {

@@ -114,6 +114,13 @@ public extension View {
     func cardMenu() -> some View {
         modifier(CardMenuHost())
     }
+
+    /// Gives the card menu its item from a view that isn't a `MediaCard`, such as a list row,
+    /// with the marks the menu's entries read (watched, favourite). Put it on the button's
+    /// label; `cardMenu()` on the button picks it up.
+    func cardMenuItem(_ item: CardMenuItem?, marks: CardMarks = CardMarks()) -> some View {
+        preference(key: CardMenuRequestKey.self, value: item.map { CardMenuRequest(item: $0, marks: marks) })
+    }
 }
 
 /// What a `MediaCard` asks its button's menu for: its item, and the marks its caller passed.

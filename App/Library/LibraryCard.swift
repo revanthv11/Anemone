@@ -29,7 +29,7 @@ struct LibraryCard: View {
                 menuItem: menuItem,
             )
         case .list, .denseList:
-            LibraryListRow(entry: entry, isDense: options.layout == .denseList)
+            LibraryListRow(entry: entry, isDense: options.layout == .denseList, showsMenu: showsMenu)
                 .frame(width: width)
         }
     }
@@ -38,7 +38,15 @@ struct LibraryCard: View {
     /// favourite; none while its page loads.
     private var menuItem: CardMenuItem? {
         guard showsMenu, let entry else { return nil }
-        return entry.details.map { CardMenuItem($0) } ?? CardMenuItem(entry.item)
+        return entry.cardMenuItem
+    }
+}
+
+extension LibraryEntry {
+    /// What the card menu is given: the entry's details when it has them, so the menu knows
+    /// whether it's watched or a favourite, else the item alone.
+    var cardMenuItem: CardMenuItem {
+        details.map { CardMenuItem($0) } ?? CardMenuItem(item)
     }
 }
 

@@ -12,6 +12,8 @@ import SwiftUI
 struct LibraryListRow: View {
     let entry: LibraryEntry?
     let isDense: Bool
+    /// Whether the row gives the card menu its item; pages opt in, as for the grid card.
+    var showsMenu = false
 
     @Environment(\.theme) private var theme
 
@@ -54,6 +56,8 @@ struct LibraryListRow: View {
                 }
             }
         }
+        // The card menu, which a MediaCard asks for itself: the row's button opens it.
+        .cardMenuItem(showsMenu ? entry?.cardMenuItem : nil, marks: CardMarks(badges: shownBadges))
     }
 
     private var item: MediaItem? {
